@@ -8,6 +8,6 @@ void main() {
 
     expect(find.text('PariFlow Partners'), findsOneWidget);
     expect(find.text('Escolha por onde comecar.'), findsOneWidget);
-    expect(find.text('Abrir teia visual'), findsOneWidget);
+    expect(find.text('Ver previa da teia'), findsOneWidget);
   });
 }
