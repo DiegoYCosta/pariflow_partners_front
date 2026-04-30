@@ -3252,11 +3252,12 @@ class _NetworkLinkPainter extends CustomPainter {
     final positions = <String, Offset>{};
 
     for (final node in nodes) {
+      final nodeSize = _graphNodeCardSize(node);
       final normalizedX = (node.position.x + 1) / 2;
       final normalizedY = (node.position.y + 1) / 2;
       positions[node.id] = Offset(
-        (size.width - 150) * normalizedX + 75,
-        (size.height - 70) * normalizedY + 35,
+        (size.width - nodeSize.width) * normalizedX + (nodeSize.width / 2),
+        (size.height - nodeSize.height) * normalizedY + (nodeSize.height / 2),
       );
     }
 
@@ -3521,6 +3522,30 @@ class _GraphNode {
       return '3 a 5 anos';
     }
     return '5 anos ou mais';
+  }
+
+  _GraphNode copyWith({Alignment? position}) {
+    return _GraphNode(
+      id: id,
+      kind: kind,
+      rootCompanyId: rootCompanyId,
+      label: label,
+      subtitle: subtitle,
+      miniLabel: miniLabel,
+      position: position ?? this.position,
+      status: status,
+      color: color,
+      icon: icon,
+      highlights: highlights,
+      sector: sector,
+      jobTitle: jobTitle,
+      gender: gender,
+      race: race,
+      tenureMonths: tenureMonths,
+      hasWarnings: hasWarnings,
+      isRoot: isRoot,
+      dismissedDaysAgo: dismissedDaysAgo,
+    );
   }
 }
 
@@ -4394,7 +4419,7 @@ List<_GraphNode> _visibleGraphNodes(_NetworkFilterState filters) {
     return true;
   }).toList();
 
-  return _pruneGraphNodes(candidates);
+  return _layoutGraphNodes(_pruneGraphNodes(candidates));
 }
 
 List<_GraphNode> _pruneGraphNodes(List<_GraphNode> nodes) {
@@ -4456,6 +4481,217 @@ List<_GraphNode> _pruneGraphNodes(List<_GraphNode> nodes) {
   }
 
   return nodes.where((node) => currentIds.contains(node.id)).toList();
+}
+
+List<_GraphNode> _layoutGraphNodes(List<_GraphNode> nodes) {
+  if (nodes.isEmpty) {
+    return nodes;
+  }
+
+  final nodesById = {for (final node in nodes) node.id: node};
+  final visibleEdges = _visibleGraphEdges(nodes);
+  final positioned = <String, Alignment>{};
+  final rootCompanies =
+      nodes
+          .where((node) => node.kind == _GraphNodeKind.company && node.isRoot)
+          .toList()
+        ..sort(
+          (left, right) => _graphNodeOriginalOrder(
+            left.id,
+          ).compareTo(_graphNodeOriginalOrder(right.id)),
+        );
+
+  final laneCenters = _spreadAlignments(
+    rootCompanies.length,
+    center: 0,
+    spread: rootCompanies.length == 1 ? 0 : 1.18,
+  );
+
+  for (var rootIndex = 0; rootIndex < rootCompanies.length; rootIndex++) {
+    final root = rootCompanies[rootIndex];
+    final laneCenter = laneCenters[rootIndex];
+    positioned[root.id] = Alignment(laneCenter, -0.80);
+
+    final clients =
+        nodes
+            .where(
+              (node) =>
+                  node.kind == _GraphNodeKind.company &&
+                  !node.isRoot &&
+                  node.rootCompanyId == root.id,
+            )
+            .toList()
+          ..sort(
+            (left, right) => _graphNodeOriginalOrder(
+              left.id,
+            ).compareTo(_graphNodeOriginalOrder(right.id)),
+          );
+
+    final clientCenters = _spreadAlignments(
+      clients.length,
+      center: laneCenter,
+      spread: clients.length == 1 ? 0 : 0.34,
+    );
+
+    final positionedPeopleForRoot = <String>{};
+
+    for (var clientIndex = 0; clientIndex < clients.length; clientIndex++) {
+      final client = clients[clientIndex];
+      final clientCenter = clientCenters[clientIndex];
+      positioned[client.id] = Alignment(clientCenter, -0.34);
+
+      final clientContracts = _contractsForClient(
+        client.id,
+        nodesById,
+        visibleEdges,
+      );
+      final contractCenters = _spreadAlignments(
+        clientContracts.length,
+        center: clientCenter,
+        spread: clientContracts.length == 1 ? 0 : 0.16,
+      );
+
+      for (
+        var contractIndex = 0;
+        contractIndex < clientContracts.length;
+        contractIndex++
+      ) {
+        final contract = clientContracts[contractIndex];
+        final contractCenter = contractCenters[contractIndex];
+        positioned[contract.id] = Alignment(contractCenter, 0.02);
+
+        final contractPeople = _peopleForContract(
+          contract.id,
+          nodesById,
+          visibleEdges,
+        );
+        for (
+          var rowStart = 0;
+          rowStart < contractPeople.length;
+          rowStart += 2
+        ) {
+          final row = rowStart ~/ 2;
+          final rowPeople = contractPeople.skip(rowStart).take(2).toList();
+          final rowCenters = _spreadAlignments(
+            rowPeople.length,
+            center: contractCenter,
+            spread: rowPeople.length == 1 ? 0 : 0.24,
+          );
+
+          for (var rowIndex = 0; rowIndex < rowPeople.length; rowIndex++) {
+            final person = rowPeople[rowIndex];
+            final personY = 0.36 + (row * 0.24);
+            positioned[person.id] = Alignment(rowCenters[rowIndex], personY);
+            positionedPeopleForRoot.add(person.id);
+          }
+        }
+      }
+    }
+
+    final unassignedPeople =
+        nodes
+            .where(
+              (node) =>
+                  node.kind == _GraphNodeKind.person &&
+                  node.rootCompanyId == root.id &&
+                  !positionedPeopleForRoot.contains(node.id),
+            )
+            .toList()
+          ..sort(
+            (left, right) => _graphNodeOriginalOrder(
+              left.id,
+            ).compareTo(_graphNodeOriginalOrder(right.id)),
+          );
+
+    for (
+      var looseIndex = 0;
+      looseIndex < unassignedPeople.length;
+      looseIndex++
+    ) {
+      final loosePerson = unassignedPeople[looseIndex];
+      final looseOffsets = _spreadAlignments(
+        unassignedPeople.length,
+        center: laneCenter,
+        spread: unassignedPeople.length == 1 ? 0 : 0.20,
+      );
+      positioned[loosePerson.id] = Alignment(
+        looseOffsets[looseIndex],
+        0.34 + ((looseIndex ~/ 2) * 0.24),
+      );
+    }
+  }
+
+  return nodes
+      .map((node) => node.copyWith(position: positioned[node.id]))
+      .toList();
+}
+
+List<_GraphNode> _contractsForClient(
+  String clientId,
+  Map<String, _GraphNode> nodesById,
+  List<_GraphEdge> visibleEdges,
+) {
+  return visibleEdges
+      .where(
+        (edge) => edge.type == _GraphEdgeType.scope && edge.from == clientId,
+      )
+      .map((edge) => nodesById[edge.to])
+      .whereType<_GraphNode>()
+      .toList()
+    ..sort(
+      (left, right) => _graphNodeOriginalOrder(
+        left.id,
+      ).compareTo(_graphNodeOriginalOrder(right.id)),
+    );
+}
+
+List<_GraphNode> _peopleForContract(
+  String contractId,
+  Map<String, _GraphNode> nodesById,
+  List<_GraphEdge> visibleEdges,
+) {
+  final people = visibleEdges
+      .where(
+        (edge) =>
+            (edge.type == _GraphEdgeType.allocation ||
+                edge.type == _GraphEdgeType.dismissal) &&
+            edge.from == contractId,
+      )
+      .map((edge) => nodesById[edge.to])
+      .whereType<_GraphNode>()
+      .toList();
+
+  people.sort((left, right) {
+    if (left.status != right.status) {
+      return left.status == 'ativo' ? -1 : 1;
+    }
+    return _graphNodeOriginalOrder(
+      left.id,
+    ).compareTo(_graphNodeOriginalOrder(right.id));
+  });
+
+  return people;
+}
+
+int _graphNodeOriginalOrder(String nodeId) {
+  return _graphNodes.indexWhere((node) => node.id == nodeId);
+}
+
+List<double> _spreadAlignments(
+  int count, {
+  required double center,
+  required double spread,
+}) {
+  if (count <= 0) {
+    return const [];
+  }
+  if (count == 1) {
+    return [center];
+  }
+
+  final start = center - (spread / 2);
+  final step = spread / (count - 1);
+  return List<double>.generate(count, (index) => start + (step * index));
 }
 
 List<_GraphEdge> _visibleGraphEdges(List<_GraphNode> visibleNodes) {
