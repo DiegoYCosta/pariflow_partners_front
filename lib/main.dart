@@ -88,6 +88,125 @@ enum _Destination { home, companies, contracts, people, network }
 
 enum _HomeMode { overview, network }
 
+enum _DismissedPeriod { sixMonths, oneYear, twoYears, fiveYears, allTime }
+
+enum _NetworkZoomPreset { overview, reading, focus, detail }
+
+enum _NetworkMapControlMode { guided, direct }
+
+extension on _DismissedPeriod {
+  String get label => switch (this) {
+    _DismissedPeriod.sixMonths => '6 meses',
+    _DismissedPeriod.oneYear => '1 ano',
+    _DismissedPeriod.twoYears => '2 anos',
+    _DismissedPeriod.fiveYears => '5 anos',
+    _DismissedPeriod.allTime => 'todo o periodo',
+  };
+
+  String get summary => switch (this) {
+    _DismissedPeriod.sixMonths => 'desligados ate 6 meses',
+    _DismissedPeriod.oneYear => 'desligados ate 1 ano',
+    _DismissedPeriod.twoYears => 'desligados ate 2 anos',
+    _DismissedPeriod.fiveYears => 'desligados ate 5 anos',
+    _DismissedPeriod.allTime => 'desligados de todo o periodo',
+  };
+
+  int? get maxDays => switch (this) {
+    _DismissedPeriod.sixMonths => 183,
+    _DismissedPeriod.oneYear => 365,
+    _DismissedPeriod.twoYears => 730,
+    _DismissedPeriod.fiveYears => 1825,
+    _DismissedPeriod.allTime => null,
+  };
+}
+
+extension on _NetworkZoomPreset {
+  String get label => switch (this) {
+    _NetworkZoomPreset.overview => 'geral',
+    _NetworkZoomPreset.reading => 'leitura',
+    _NetworkZoomPreset.focus => 'foco',
+    _NetworkZoomPreset.detail => 'detalhe',
+  };
+
+  double get multiplier => switch (this) {
+    _NetworkZoomPreset.overview => 1,
+    _NetworkZoomPreset.reading => 1.12,
+    _NetworkZoomPreset.focus => 1.32,
+    _NetworkZoomPreset.detail => 1.56,
+  };
+}
+
+extension on _NetworkMapControlMode {
+  String get label => switch (this) {
+    _NetworkMapControlMode.guided => 'mouse guiado',
+    _NetworkMapControlMode.direct => 'explorar com mouse',
+  };
+}
+
+class _NetworkFilterState {
+  const _NetworkFilterState({
+    this.dismissedDays = 45,
+    this.dismissedPeriod,
+    this.hiddenRootCompanyIds = const {},
+    this.selectedSectors = const {},
+    this.selectedJobTitles = const {},
+    this.selectedTenureBands = const {},
+    this.selectedGenders = const {},
+    this.selectedRaces = const {},
+    this.requireWarnings,
+  });
+
+  static const _unset = Object();
+
+  final int dismissedDays;
+  final _DismissedPeriod? dismissedPeriod;
+  final Set<String> hiddenRootCompanyIds;
+  final Set<String> selectedSectors;
+  final Set<String> selectedJobTitles;
+  final Set<String> selectedTenureBands;
+  final Set<String> selectedGenders;
+  final Set<String> selectedRaces;
+  final bool? requireWarnings;
+
+  bool get usesCustomDismissedWindow => dismissedPeriod == null;
+
+  int? get maxDismissedDays => dismissedPeriod?.maxDays ?? dismissedDays;
+
+  String get dismissedWindowLabel =>
+      dismissedPeriod?.label ?? '$dismissedDays dias';
+
+  String get dismissedWindowSummary =>
+      dismissedPeriod?.summary ?? 'desligados ate $dismissedDays dias';
+
+  _NetworkFilterState copyWith({
+    int? dismissedDays,
+    Object? dismissedPeriod = _unset,
+    Set<String>? hiddenRootCompanyIds,
+    Set<String>? selectedSectors,
+    Set<String>? selectedJobTitles,
+    Set<String>? selectedTenureBands,
+    Set<String>? selectedGenders,
+    Set<String>? selectedRaces,
+    Object? requireWarnings = _unset,
+  }) {
+    return _NetworkFilterState(
+      dismissedDays: dismissedDays ?? this.dismissedDays,
+      dismissedPeriod: dismissedPeriod == _unset
+          ? this.dismissedPeriod
+          : dismissedPeriod as _DismissedPeriod?,
+      hiddenRootCompanyIds: hiddenRootCompanyIds ?? this.hiddenRootCompanyIds,
+      selectedSectors: selectedSectors ?? this.selectedSectors,
+      selectedJobTitles: selectedJobTitles ?? this.selectedJobTitles,
+      selectedTenureBands: selectedTenureBands ?? this.selectedTenureBands,
+      selectedGenders: selectedGenders ?? this.selectedGenders,
+      selectedRaces: selectedRaces ?? this.selectedRaces,
+      requireWarnings: requireWarnings == _unset
+          ? this.requireWarnings
+          : requireWarnings as bool?,
+    );
+  }
+}
+
 class LayoutPreviewPage extends StatefulWidget {
   const LayoutPreviewPage({super.key});
 
@@ -98,7 +217,8 @@ class LayoutPreviewPage extends StatefulWidget {
 class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
   _Destination _destination = _Destination.home;
   _HomeMode _homeMode = _HomeMode.overview;
-  double _dismissedDays = 45;
+  _NetworkFilterState _networkFilters = const _NetworkFilterState();
+  bool _showAdvancedNetworkFilters = false;
   String _selectedNetworkNodeId = 'person_ana';
   String? _hoveredNetworkNodeId;
   final Map<_Destination, int> _selectedItemIndex = {
@@ -190,7 +310,8 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
       case _Destination.home:
         return _HomeContent(
           mode: _homeMode,
-          dismissedDays: _dismissedDays,
+          filters: _networkFilters,
+          showAdvancedFilters: _showAdvancedNetworkFilters,
           selectedNodeId: _selectedNetworkNodeId,
           hoveredNodeId: _hoveredNetworkNodeId,
           onChangeMode: (mode) {
@@ -198,9 +319,14 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
               _homeMode = mode;
             });
           },
-          onChangeDays: (value) {
+          onFiltersChanged: (filters) {
             setState(() {
-              _dismissedDays = value;
+              _networkFilters = filters;
+            });
+          },
+          onToggleAdvancedFilters: () {
+            setState(() {
+              _showAdvancedNetworkFilters = !_showAdvancedNetworkFilters;
             });
           },
           onSelectNode: _handleNetworkNodeSelection,
@@ -217,13 +343,19 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
         return _NetworkWorkspace(
           title: page.title,
           subtitle: page.description,
-          dismissedDays: _dismissedDays,
+          filters: _networkFilters,
+          showAdvancedFilters: _showAdvancedNetworkFilters,
           selectedNodeId: _selectedNetworkNodeId,
           hoveredNodeId: _hoveredNetworkNodeId,
           compact: false,
-          onChangeDays: (value) {
+          onFiltersChanged: (filters) {
             setState(() {
-              _dismissedDays = value;
+              _networkFilters = filters;
+            });
+          },
+          onToggleAdvancedFilters: () {
+            setState(() {
+              _showAdvancedNetworkFilters = !_showAdvancedNetworkFilters;
             });
           },
           onSelectNode: _handleNetworkNodeSelection,
@@ -568,11 +700,13 @@ class _AppSidebar extends StatelessWidget {
 class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.mode,
-    required this.dismissedDays,
+    required this.filters,
+    required this.showAdvancedFilters,
     required this.selectedNodeId,
     required this.hoveredNodeId,
     required this.onChangeMode,
-    required this.onChangeDays,
+    required this.onFiltersChanged,
+    required this.onToggleAdvancedFilters,
     required this.onSelectNode,
     required this.onHoverNode,
     required this.onChooseDestination,
@@ -581,11 +715,13 @@ class _HomeContent extends StatelessWidget {
   });
 
   final _HomeMode mode;
-  final double dismissedDays;
+  final _NetworkFilterState filters;
+  final bool showAdvancedFilters;
   final String selectedNodeId;
   final String? hoveredNodeId;
   final ValueChanged<_HomeMode> onChangeMode;
-  final ValueChanged<double> onChangeDays;
+  final ValueChanged<_NetworkFilterState> onFiltersChanged;
+  final VoidCallback onToggleAdvancedFilters;
   final ValueChanged<String> onSelectNode;
   final ValueChanged<String?> onHoverNode;
   final ValueChanged<_ChoiceTarget> onChooseDestination;
@@ -611,12 +747,14 @@ class _HomeContent extends StatelessWidget {
           _NetworkWorkspace(
             title: 'Teia relacional na primeira pagina',
             subtitle:
-                'O usuario pode abrir a teia aqui mesmo para enxergar ativos e desligados recentes antes de decidir o proximo clique.',
-            dismissedDays: dismissedDays,
+                'O usuario pode abrir a teia aqui mesmo para enxergar carteiras, clientes e historico antes de decidir o proximo clique.',
+            filters: filters,
+            showAdvancedFilters: showAdvancedFilters,
             selectedNodeId: selectedNodeId,
             hoveredNodeId: hoveredNodeId,
             compact: true,
-            onChangeDays: onChangeDays,
+            onFiltersChanged: onFiltersChanged,
+            onToggleAdvancedFilters: onToggleAdvancedFilters,
             onSelectNode: onSelectNode,
             onHoverNode: onHoverNode,
             actionLabel: 'Abrir em tela focada',
@@ -992,11 +1130,13 @@ class _NetworkWorkspace extends StatelessWidget {
   const _NetworkWorkspace({
     required this.title,
     required this.subtitle,
-    required this.dismissedDays,
+    required this.filters,
+    required this.showAdvancedFilters,
     required this.selectedNodeId,
     required this.hoveredNodeId,
     required this.compact,
-    required this.onChangeDays,
+    required this.onFiltersChanged,
+    required this.onToggleAdvancedFilters,
     required this.onSelectNode,
     required this.onHoverNode,
     required this.actionLabel,
@@ -1005,11 +1145,13 @@ class _NetworkWorkspace extends StatelessWidget {
 
   final String title;
   final String subtitle;
-  final double dismissedDays;
+  final _NetworkFilterState filters;
+  final bool showAdvancedFilters;
   final String selectedNodeId;
   final String? hoveredNodeId;
   final bool compact;
-  final ValueChanged<double> onChangeDays;
+  final ValueChanged<_NetworkFilterState> onFiltersChanged;
+  final VoidCallback onToggleAdvancedFilters;
   final ValueChanged<String> onSelectNode;
   final ValueChanged<String?> onHoverNode;
   final String actionLabel;
@@ -1017,15 +1159,24 @@ class _NetworkWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleNodes = _visibleGraphNodes(dismissedDays);
-    final selectedNode = visibleNodes.firstWhere(
-      (node) => node.id == selectedNodeId,
-      orElse: () => visibleNodes.first,
+    final structuralNodes = _structuralGraphNodes(filters);
+    final facets = _networkFacets(structuralNodes);
+    final effectiveSectors = filters.selectedSectors.intersection(
+      facets.sectors.toSet(),
     );
-    final focusNode = visibleNodes.firstWhere(
-      (node) => node.id == hoveredNodeId,
-      orElse: () => selectedNode,
+    final effectiveJobTitles = filters.selectedJobTitles.intersection(
+      facets.jobTitles.toSet(),
     );
+    final effectiveTenureBands = filters.selectedTenureBands.intersection(
+      facets.tenureBands.toSet(),
+    );
+    final effectiveGenders = filters.selectedGenders.intersection(
+      facets.genders.toSet(),
+    );
+    final effectiveRaces = filters.selectedRaces.intersection(
+      facets.races.toSet(),
+    );
+    final visibleNodes = _visibleGraphNodes(filters);
     final activePeopleCount = visibleNodes
         .where(
           (node) =>
@@ -1038,6 +1189,29 @@ class _NetworkWorkspace extends StatelessWidget {
               node.kind == _GraphNodeKind.person && node.status == 'desligado',
         )
         .length;
+    final visibleRootCompanies = visibleNodes
+        .where((node) => node.kind == _GraphNodeKind.company && node.isRoot)
+        .length;
+    final activeFacetCount =
+        effectiveSectors.length +
+        effectiveJobTitles.length +
+        effectiveTenureBands.length +
+        effectiveGenders.length +
+        effectiveRaces.length +
+        (filters.requireWarnings == null ? 0 : 1);
+    final hasVisibleNodes = visibleNodes.isNotEmpty;
+    final selectedNode = hasVisibleNodes
+        ? visibleNodes.firstWhere(
+            (node) => node.id == selectedNodeId,
+            orElse: () => visibleNodes.first,
+          )
+        : null;
+    final focusNode = hasVisibleNodes
+        ? visibleNodes.firstWhere(
+            (node) => node.id == hoveredNodeId,
+            orElse: () => selectedNode!,
+          )
+        : null;
 
     return Column(
       children: [
@@ -1090,124 +1264,518 @@ class _NetworkWorkspace extends StatelessWidget {
                     background: _tealColor.withValues(alpha: 0.12),
                   ),
                   _Tag(
-                    label: '$dismissedPeopleCount desligados recentes',
+                    label: filters.dismissedPeriod == _DismissedPeriod.allTime
+                        ? '$dismissedPeopleCount desligados no historico'
+                        : '$dismissedPeopleCount desligados no recorte',
                     icon: Icons.person_off_outlined,
                     color: _roseColor,
                     background: _roseColor.withValues(alpha: 0.12),
                   ),
                   _Tag(
-                    label: 'empresas e contratos clicaveis',
+                    label: '$visibleRootCompanies carteiras-raiz visiveis',
                     icon: Icons.apartment_outlined,
                     color: _slateColor,
                     background: _slateColor.withValues(alpha: 0.12),
                   ),
+                  if (activeFacetCount > 0)
+                    _Tag(
+                      label: '$activeFacetCount filtros ativos',
+                      icon: Icons.filter_alt_outlined,
+                      color: _amberColor,
+                      background: _amberColor.withValues(alpha: 0.12),
+                    ),
                 ],
               ),
               const SizedBox(height: 22),
-              Row(
-                children: [
-                  const Icon(Icons.schedule_outlined, color: _amberColor),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Desligados exibidos nos ultimos ${dismissedDays.round()} dias',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  Text(
-                    '${dismissedDays.round()}d',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: _amberColor),
-                  ),
-                ],
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F4EC),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: _lineColor),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stackedPrimary = constraints.maxWidth < 980;
+
+                    final dismissedWindowSection = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Janela de desligados',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'A barra fina de 1 a 90 dias continua aqui para leitura curta, enquanto os atalhos abrem recortes historicos maiores.',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.schedule_outlined,
+                              color: _amberColor,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                filters.usesCustomDismissedWindow
+                                    ? 'Janela fina ativa: desligados ate ${filters.dismissedDays} dias'
+                                    : 'Atalho ativo: ${filters.dismissedWindowSummary}',
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                            ),
+                            Text(
+                              '${filters.dismissedDays}d',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: filters.usesCustomDismissedWindow
+                                        ? _amberColor
+                                        : _mutedColor,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        Slider(
+                          value: filters.dismissedDays.toDouble(),
+                          min: 1,
+                          max: 90,
+                          divisions: 89,
+                          label: '${filters.dismissedDays} dias',
+                          onChanged: (value) {
+                            onFiltersChanged(
+                              filters.copyWith(
+                                dismissedDays: value.round(),
+                                dismissedPeriod: null,
+                              ),
+                            );
+                          },
+                        ),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            FilterChip(
+                              label: const Text('janela 1-90 dias'),
+                              selected: filters.usesCustomDismissedWindow,
+                              onSelected: (_) {
+                                onFiltersChanged(
+                                  filters.copyWith(dismissedPeriod: null),
+                                );
+                              },
+                            ),
+                            for (final period in _DismissedPeriod.values)
+                              FilterChip(
+                                label: Text(period.label),
+                                selected: filters.dismissedPeriod == period,
+                                onSelected: (_) {
+                                  onFiltersChanged(
+                                    filters.copyWith(dismissedPeriod: period),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                    );
+
+                    final companySection = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Carteiras empresariais',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'O esconder por raiz continua estrategico: some a arvore inteira daquela carteira, com clientes, contratos e pessoas.',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            for (final company in facets.rootCompanies)
+                              FilterChip(
+                                label: Text(company.label),
+                                selected: !filters.hiddenRootCompanyIds
+                                    .contains(company.id),
+                                onSelected: (selected) {
+                                  final nextHidden = {
+                                    ...filters.hiddenRootCompanyIds,
+                                  };
+                                  if (selected) {
+                                    nextHidden.remove(company.id);
+                                  } else {
+                                    nextHidden.add(company.id);
+                                  }
+                                  onFiltersChanged(
+                                    filters.copyWith(
+                                      hiddenRootCompanyIds: nextHidden,
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                    );
+
+                    final filterActions = Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: onToggleAdvancedFilters,
+                          icon: Icon(
+                            showAdvancedFilters
+                                ? Icons.unfold_less_rounded
+                                : Icons.tune_rounded,
+                          ),
+                          label: Text(
+                            showAdvancedFilters
+                                ? 'Ocultar filtros avancados'
+                                : 'Mostrar filtros avancados',
+                          ),
+                        ),
+                        if (activeFacetCount > 0)
+                          TextButton.icon(
+                            onPressed: () {
+                              onFiltersChanged(
+                                filters.copyWith(
+                                  selectedSectors: {},
+                                  selectedJobTitles: {},
+                                  selectedTenureBands: {},
+                                  selectedGenders: {},
+                                  selectedRaces: {},
+                                  requireWarnings: null,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.filter_alt_off_outlined),
+                            label: const Text('Limpar filtros avancados'),
+                          ),
+                      ],
+                    );
+
+                    if (stackedPrimary) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          dismissedWindowSection,
+                          const SizedBox(height: 20),
+                          companySection,
+                          const SizedBox(height: 18),
+                          filterActions,
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(flex: 7, child: dismissedWindowSection),
+                            const SizedBox(width: 20),
+                            Expanded(flex: 5, child: companySection),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        filterActions,
+                      ],
+                    );
+                  },
+                ),
               ),
-              Slider(
-                value: dismissedDays,
-                min: 15,
-                max: 90,
-                divisions: 15,
-                label: '${dismissedDays.round()} dias',
-                onChanged: onChangeDays,
-              ),
+              if (showAdvancedFilters) ...[
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _lineColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Filtros avancados da malha atual',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Essas facetas so aparecem porque existem no conjunto que a teia ja esta mostrando. Nada fica pregado como filtro fixo.',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                      ),
+                      const SizedBox(height: 16),
+                      _NetworkFilterSection(
+                        title: 'Setores disponiveis',
+                        subtitle:
+                            'Os setores nascem dos contratos e colaboradores visiveis agora.',
+                        children: [
+                          for (final sector in facets.sectors)
+                            FilterChip(
+                              label: Text(sector),
+                              selected: effectiveSectors.contains(sector),
+                              onSelected: (_) {
+                                onFiltersChanged(
+                                  filters.copyWith(
+                                    selectedSectors: _toggleValue(
+                                      effectiveSectors,
+                                      sector,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                      if (facets.jobTitles.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _NetworkFilterSection(
+                          title: 'Empregos especificos',
+                          subtitle:
+                              'Cada cargo pode entrar ou sair da leitura sem colapsar a estrutura da teia.',
+                          children: [
+                            for (final jobTitle in facets.jobTitles)
+                              FilterChip(
+                                label: Text(jobTitle),
+                                selected: effectiveJobTitles.contains(jobTitle),
+                                onSelected: (_) {
+                                  onFiltersChanged(
+                                    filters.copyWith(
+                                      selectedJobTitles: _toggleValue(
+                                        effectiveJobTitles,
+                                        jobTitle,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (facets.tenureBands.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _NetworkFilterSection(
+                          title: 'Tempo de servico',
+                          subtitle:
+                              'Permite recortes por permanencia sem transformar a home num formulario enorme.',
+                          children: [
+                            for (final band in facets.tenureBands)
+                              FilterChip(
+                                label: Text(band),
+                                selected: effectiveTenureBands.contains(band),
+                                onSelected: (_) {
+                                  onFiltersChanged(
+                                    filters.copyWith(
+                                      selectedTenureBands: _toggleValue(
+                                        effectiveTenureBands,
+                                        band,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (facets.genders.isNotEmpty ||
+                          facets.races.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _NetworkFilterSection(
+                          title: 'Recortes de colaborador',
+                          subtitle:
+                              'Sexo, raca autodeclarada e advertencias ficam disponiveis quando a teia realmente tem esses dados no resultado atual.',
+                          children: [
+                            for (final gender in facets.genders)
+                              FilterChip(
+                                label: Text(gender),
+                                selected: effectiveGenders.contains(gender),
+                                onSelected: (_) {
+                                  onFiltersChanged(
+                                    filters.copyWith(
+                                      selectedGenders: _toggleValue(
+                                        effectiveGenders,
+                                        gender,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            for (final race in facets.races)
+                              FilterChip(
+                                label: Text(race),
+                                selected: effectiveRaces.contains(race),
+                                onSelected: (_) {
+                                  onFiltersChanged(
+                                    filters.copyWith(
+                                      selectedRaces: _toggleValue(
+                                        effectiveRaces,
+                                        race,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            if (facets.hasRecordsWithWarnings)
+                              FilterChip(
+                                label: const Text('com advertencias'),
+                                selected: filters.requireWarnings == true,
+                                onSelected: (_) {
+                                  onFiltersChanged(
+                                    filters.copyWith(
+                                      requireWarnings:
+                                          filters.requireWarnings == true
+                                          ? null
+                                          : true,
+                                    ),
+                                  );
+                                },
+                              ),
+                            if (facets.hasRecordsWithoutWarnings)
+                              FilterChip(
+                                label: const Text('sem advertencias'),
+                                selected: filters.requireWarnings == false,
+                                onSelected: (_) {
+                                  onFiltersChanged(
+                                    filters.copyWith(
+                                      requireWarnings:
+                                          filters.requireWarnings == false
+                                          ? null
+                                          : false,
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: 24),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final stacked = constraints.maxWidth < 1160;
+        if (!hasVisibleNodes)
+          _Panel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nenhum no ficou visivel',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'A combinacao atual ocultou todas as carteiras ou removeu os contratos e colaboradores da malha.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                ),
+                const SizedBox(height: 18),
+                FilledButton.tonalIcon(
+                  onPressed: () {
+                    onFiltersChanged(const _NetworkFilterState());
+                  },
+                  icon: const Icon(Icons.restart_alt_rounded),
+                  label: const Text('Restaurar filtros da teia'),
+                ),
+              ],
+            ),
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final activeSelectedNode = selectedNode!;
+              final activeFocusNode = focusNode!;
+              final stacked = constraints.maxWidth < 1160;
 
-            if (stacked) {
-              return Column(
+              if (stacked) {
+                return Column(
+                  children: [
+                    _Panel(
+                      child: _NetworkCanvasCard(
+                        visibleNodes: visibleNodes,
+                        selectedNodeId: activeSelectedNode.id,
+                        hoveredNodeId: hoveredNodeId,
+                        focusNodeId: activeFocusNode.id,
+                        compact: compact,
+                        onSelectNode: onSelectNode,
+                        onHoverNode: onHoverNode,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _Panel(
+                      child: _NetworkDetailCard(
+                        node: activeFocusNode,
+                        visibleNodes: visibleNodes,
+                        isPreview:
+                            hoveredNodeId != null &&
+                            hoveredNodeId != activeSelectedNode.id,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Panel(
-                    child: _NetworkCanvasCard(
-                      dismissedDays: dismissedDays,
-                      selectedNodeId: selectedNode.id,
-                      hoveredNodeId: hoveredNodeId,
-                      focusNodeId: focusNode.id,
-                      compact: compact,
-                      onSelectNode: onSelectNode,
-                      onHoverNode: onHoverNode,
+                  Expanded(
+                    flex: 7,
+                    child: _Panel(
+                      child: _NetworkCanvasCard(
+                        visibleNodes: visibleNodes,
+                        selectedNodeId: activeSelectedNode.id,
+                        hoveredNodeId: hoveredNodeId,
+                        focusNodeId: activeFocusNode.id,
+                        compact: compact,
+                        onSelectNode: onSelectNode,
+                        onHoverNode: onHoverNode,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  _Panel(
-                    child: _NetworkDetailCard(
-                      node: focusNode,
-                      visibleNodes: visibleNodes,
-                      isPreview:
-                          hoveredNodeId != null &&
-                          hoveredNodeId != selectedNode.id,
+                  const SizedBox(width: 24),
+                  Expanded(
+                    flex: 4,
+                    child: _Panel(
+                      child: _NetworkDetailCard(
+                        node: activeFocusNode,
+                        visibleNodes: visibleNodes,
+                        isPreview:
+                            hoveredNodeId != null &&
+                            hoveredNodeId != activeSelectedNode.id,
+                      ),
                     ),
                   ),
                 ],
               );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 7,
-                  child: _Panel(
-                    child: _NetworkCanvasCard(
-                      dismissedDays: dismissedDays,
-                      selectedNodeId: selectedNode.id,
-                      hoveredNodeId: hoveredNodeId,
-                      focusNodeId: focusNode.id,
-                      compact: compact,
-                      onSelectNode: onSelectNode,
-                      onHoverNode: onHoverNode,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  flex: 4,
-                  child: _Panel(
-                    child: _NetworkDetailCard(
-                      node: focusNode,
-                      visibleNodes: visibleNodes,
-                      isPreview:
-                          hoveredNodeId != null &&
-                          hoveredNodeId != selectedNode.id,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+            },
+          ),
       ],
     );
   }
 }
 
-class _NetworkCanvasCard extends StatelessWidget {
+class _NetworkCanvasCard extends StatefulWidget {
   const _NetworkCanvasCard({
-    required this.dismissedDays,
+    required this.visibleNodes,
     required this.selectedNodeId,
     required this.hoveredNodeId,
     required this.focusNodeId,
@@ -1216,7 +1784,7 @@ class _NetworkCanvasCard extends StatelessWidget {
     required this.onHoverNode,
   });
 
-  final double dismissedDays;
+  final List<_GraphNode> visibleNodes;
   final String selectedNodeId;
   final String? hoveredNodeId;
   final String focusNodeId;
@@ -1225,12 +1793,73 @@ class _NetworkCanvasCard extends StatelessWidget {
   final ValueChanged<String?> onHoverNode;
 
   @override
+  State<_NetworkCanvasCard> createState() => _NetworkCanvasCardState();
+}
+
+class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
+    with SingleTickerProviderStateMixin {
+  final TransformationController _transformController =
+      TransformationController();
+  _NetworkZoomPreset _zoomPreset = _NetworkZoomPreset.overview;
+  _NetworkMapControlMode _controlMode = _NetworkMapControlMode.guided;
+  Size? _viewportSize;
+  bool _hasInitializedViewport = false;
+  late final AnimationController _cameraController;
+  Animation<Matrix4>? _cameraAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _cameraController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 260),
+        )..addListener(() {
+          final animation = _cameraAnimation;
+          if (animation != null) {
+            _transformController.value = animation.value;
+          }
+        });
+  }
+
+  @override
+  void didUpdateWidget(covariant _NetworkCanvasCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final visibleIdsChanged =
+        oldWidget.visibleNodes.map((node) => node.id).join('|') !=
+        widget.visibleNodes.map((node) => node.id).join('|');
+
+    if (visibleIdsChanged) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _applyZoomPreset(_zoomPreset);
+        }
+      });
+    } else if (oldWidget.selectedNodeId != widget.selectedNodeId &&
+        _zoomPreset != _NetworkZoomPreset.overview) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _centerOnNode(widget.selectedNodeId);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _cameraController.dispose();
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final visibleNodes = _visibleGraphNodes(dismissedDays);
-    final visibleEdges = _visibleGraphEdges(visibleNodes);
-    final relatedIds = _relatedNodeIds(focusNodeId, visibleEdges);
-    final canvasWidth = compact ? 860.0 : 980.0;
-    final canvasHeight = compact ? 440.0 : 540.0;
+    final visibleEdges = _visibleGraphEdges(widget.visibleNodes);
+    final relatedIds = _relatedNodeIds(widget.focusNodeId, visibleEdges);
+    final canvasWidth = widget.compact ? 1260.0 : 1500.0;
+    final canvasHeight = widget.compact ? 700.0 : 820.0;
+    final jumpNodes = _jumpNodes();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1248,15 +1877,17 @@ class _NetworkCanvasCard extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: [
+            const _EdgeLegendTag(type: _GraphEdgeType.portfolio),
+            const _EdgeLegendTag(type: _GraphEdgeType.origin),
             const _EdgeLegendTag(type: _GraphEdgeType.scope),
             const _EdgeLegendTag(type: _GraphEdgeType.allocation),
             const _EdgeLegendTag(type: _GraphEdgeType.dismissal),
             const _EdgeLegendTag(type: _GraphEdgeType.history),
             _Tag(
-              label: hoveredNodeId == null
+              label: widget.hoveredNodeId == null
                   ? 'clique para fixar foco'
                   : 'hover ativo',
-              icon: hoveredNodeId == null
+              icon: widget.hoveredNodeId == null
                   ? Icons.ads_click_outlined
                   : Icons.mouse_outlined,
               color: _slateColor,
@@ -1265,70 +1896,375 @@ class _NetworkCanvasCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 18),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            PopupMenuButton<String>(
+              tooltip: 'Ir para empresa ou foco',
+              onSelected: (nodeId) {
+                widget.onSelectNode(nodeId);
+                _centerOnNode(nodeId);
+              },
+              itemBuilder: (context) => [
+                for (final node in jumpNodes)
+                  PopupMenuItem<String>(
+                    value: node.id,
+                    child: Text(_jumpLabel(node)),
+                  ),
+              ],
+              child: const _CanvasToolbarButton(
+                icon: Icons.travel_explore_rounded,
+                label: 'Ir para empresa ou foco',
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _centerOnNode(widget.focusNodeId),
+              icon: const Icon(Icons.center_focus_strong_rounded),
+              label: const Text('Centralizar foco'),
+            ),
+            IconButton.filledTonal(
+              tooltip: 'Afastar zoom',
+              onPressed: () => _adjustZoom(-0.08),
+              icon: const Icon(Icons.zoom_out_rounded),
+            ),
+            IconButton.filledTonal(
+              tooltip: 'Aproximar zoom',
+              onPressed: () => _adjustZoom(0.08),
+              icon: const Icon(Icons.zoom_in_rounded),
+            ),
+            SegmentedButton<_NetworkMapControlMode>(
+              segments: [
+                for (final mode in _NetworkMapControlMode.values)
+                  ButtonSegment(value: mode, label: Text(mode.label)),
+              ],
+              selected: {_controlMode},
+              onSelectionChanged: (selection) {
+                setState(() {
+                  _controlMode = selection.first;
+                });
+              },
+            ),
+            SegmentedButton<_NetworkZoomPreset>(
+              segments: [
+                for (final preset in _NetworkZoomPreset.values)
+                  ButtonSegment(value: preset, label: Text(preset.label)),
+              ],
+              selected: {_zoomPreset},
+              onSelectionChanged: (selection) {
+                final preset = selection.first;
+                setState(() {
+                  _zoomPreset = preset;
+                });
+                _applyZoomPreset(
+                  preset,
+                  anchorNodeId: preset == _NetworkZoomPreset.overview
+                      ? null
+                      : widget.focusNodeId,
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _controlMode == _NetworkMapControlMode.guided
+              ? 'Mouse guiado ativo: o mapa nao arrasta nem amplia sem intencao. Use os botoes e presets para navegar.'
+              : 'Exploracao livre ativa: arrastar e zoom direto do mouse foram liberados para inspecao manual.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+        ),
+        const SizedBox(height: 18),
         ClipRRect(
           borderRadius: BorderRadius.circular(24),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Container(
-              width: canvasWidth,
-              height: canvasHeight,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFEDF5F1), Color(0xFFF8F5EE)],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: _lineColor),
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Stack(
-                    children: [
-                      CustomPaint(
-                        size: Size(constraints.maxWidth, constraints.maxHeight),
-                        painter: _NetworkLinkPainter(
-                          nodes: visibleNodes,
-                          edges: visibleEdges,
-                          focusNodeId: focusNodeId,
-                        ),
-                      ),
-                      Positioned(
-                        left: 16,
-                        top: 16,
-                        child: _CanvasHintCard(
-                          focusedLabel: _nodeLabelById(
-                            focusNodeId,
-                            visibleNodes,
+          child: SizedBox(
+            height: canvasHeight,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewportSize = Size(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
+                _handleViewportSize(viewportSize, canvasWidth, canvasHeight);
+
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFEDF5F1), Color(0xFFF8F5EE)],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: _lineColor),
+                  ),
+                  child: InteractiveViewer(
+                    transformationController: _transformController,
+                    boundaryMargin: const EdgeInsets.all(100),
+                    minScale: 0.55,
+                    maxScale: 2.35,
+                    panEnabled: _controlMode == _NetworkMapControlMode.direct,
+                    scaleEnabled: _controlMode == _NetworkMapControlMode.direct,
+                    panAxis: PanAxis.aligned,
+                    interactionEndFrictionCoefficient: 0.00008,
+                    scaleFactor: 420,
+                    trackpadScrollCausesScale: false,
+                    constrained: false,
+                    child: SizedBox(
+                      width: canvasWidth,
+                      height: canvasHeight,
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            size: Size(canvasWidth, canvasHeight),
+                            painter: _NetworkLinkPainter(
+                              nodes: widget.visibleNodes,
+                              edges: visibleEdges,
+                              focusNodeId: widget.focusNodeId,
+                            ),
                           ),
-                          relatedCount: relatedIds.length,
-                        ),
-                      ),
-                      for (final node in visibleNodes)
-                        _NetworkNodeWidget(
-                          node: node,
-                          selected: node.id == selectedNodeId,
-                          focused: node.id == focusNodeId,
-                          muted:
-                              focusNodeId.isNotEmpty &&
-                              node.id != focusNodeId &&
-                              !relatedIds.contains(node.id),
-                          parentSize: Size(
-                            constraints.maxWidth,
-                            constraints.maxHeight,
+                          Positioned(
+                            left: 18,
+                            top: 18,
+                            child: _CanvasHintCard(
+                              focusedLabel: _nodeLabelById(
+                                widget.focusNodeId,
+                                widget.visibleNodes,
+                              ),
+                              relatedCount: relatedIds.length,
+                            ),
                           ),
-                          onTap: () => onSelectNode(node.id),
-                          onHoverChanged: onHoverNode,
-                        ),
-                    ],
-                  );
-                },
-              ),
+                          for (final node in widget.visibleNodes)
+                            _NetworkNodeWidget(
+                              node: node,
+                              selected: node.id == widget.selectedNodeId,
+                              focused: node.id == widget.focusNodeId,
+                              muted:
+                                  widget.focusNodeId.isNotEmpty &&
+                                  node.id != widget.focusNodeId &&
+                                  !relatedIds.contains(node.id),
+                              parentSize: Size(canvasWidth, canvasHeight),
+                              onTap: () => widget.onSelectNode(node.id),
+                              onHoverChanged: widget.onHoverNode,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
       ],
     );
+  }
+
+  List<_GraphNode> _jumpNodes() {
+    final companies =
+        widget.visibleNodes
+            .where((node) => node.kind == _GraphNodeKind.company)
+            .toList()
+          ..sort((left, right) {
+            if (left.isRoot != right.isRoot) {
+              return left.isRoot ? -1 : 1;
+            }
+            return left.label.compareTo(right.label);
+          });
+
+    final nodesById = {for (final node in widget.visibleNodes) node.id: node};
+    final ordered = <_GraphNode>[];
+    final seen = <String>{};
+
+    void addNode(String? nodeId) {
+      if (nodeId == null ||
+          seen.contains(nodeId) ||
+          !nodesById.containsKey(nodeId)) {
+        return;
+      }
+      seen.add(nodeId);
+      ordered.add(nodesById[nodeId]!);
+    }
+
+    addNode(widget.selectedNodeId);
+    addNode(widget.focusNodeId);
+    for (final company in companies) {
+      addNode(company.id);
+    }
+
+    return ordered;
+  }
+
+  String _jumpLabel(_GraphNode node) {
+    if (node.id == widget.selectedNodeId) {
+      return 'Selecionado: ${node.label}';
+    }
+    if (node.id == widget.focusNodeId) {
+      return 'Foco atual: ${node.label}';
+    }
+    if (node.kind == _GraphNodeKind.company) {
+      return '${node.isRoot ? 'Carteira' : 'Empresa'}: ${node.label}';
+    }
+    return '${node.kindLabel}: ${node.label}';
+  }
+
+  void _handleViewportSize(
+    Size viewportSize,
+    double canvasWidth,
+    double canvasHeight,
+  ) {
+    if (_viewportSize == viewportSize && _hasInitializedViewport) {
+      return;
+    }
+
+    _viewportSize = viewportSize;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      if (!_hasInitializedViewport) {
+        _applyZoomPreset(_NetworkZoomPreset.overview, animated: false);
+        _hasInitializedViewport = true;
+      } else {
+        _applyZoomPreset(
+          _zoomPreset,
+          anchorNodeId: _zoomPreset == _NetworkZoomPreset.overview
+              ? null
+              : widget.focusNodeId,
+        );
+      }
+    });
+  }
+
+  void _applyZoomPreset(
+    _NetworkZoomPreset preset, {
+    String? anchorNodeId,
+    bool animated = true,
+  }) {
+    final viewportSize = _viewportSize;
+    if (viewportSize == null) {
+      return;
+    }
+
+    final canvasWidth = widget.compact ? 1260.0 : 1500.0;
+    final canvasHeight = widget.compact ? 700.0 : 820.0;
+    final fitScale = _fitScale(viewportSize, canvasWidth, canvasHeight);
+    final targetScale = (fitScale * preset.multiplier).clamp(0.55, 2.35);
+
+    if (preset == _NetworkZoomPreset.overview || anchorNodeId == null) {
+      final translateX = (viewportSize.width - (canvasWidth * fitScale)) / 2;
+      final translateY = (viewportSize.height - (canvasHeight * fitScale)) / 2;
+      _setTransform(translateX, translateY, fitScale, animated: animated);
+      return;
+    }
+
+    final target = _nodeCanvasCenter(anchorNodeId, canvasWidth, canvasHeight);
+    final translateX = (viewportSize.width / 2) - (target.dx * targetScale);
+    final translateY = (viewportSize.height / 2) - (target.dy * targetScale);
+
+    _setTransform(translateX, translateY, targetScale, animated: animated);
+  }
+
+  void _centerOnNode(String nodeId) {
+    final viewportSize = _viewportSize;
+    if (viewportSize == null) {
+      return;
+    }
+
+    final canvasWidth = widget.compact ? 1260.0 : 1500.0;
+    final canvasHeight = widget.compact ? 700.0 : 820.0;
+    final fitScale = _fitScale(viewportSize, canvasWidth, canvasHeight);
+    final currentScale = _transformController.value.getMaxScaleOnAxis();
+    final targetScale = currentScale < fitScale * 1.1
+        ? (fitScale * 1.2).clamp(0.55, 2.35)
+        : currentScale;
+    final target = _nodeCanvasCenter(nodeId, canvasWidth, canvasHeight);
+    final translateX = (viewportSize.width / 2) - (target.dx * targetScale);
+    final translateY = (viewportSize.height / 2) - (target.dy * targetScale);
+
+    _setTransform(translateX, translateY, targetScale);
+  }
+
+  void _adjustZoom(double delta) {
+    final viewportSize = _viewportSize;
+    if (viewportSize == null) {
+      return;
+    }
+
+    final canvasWidth = widget.compact ? 1260.0 : 1500.0;
+    final canvasHeight = widget.compact ? 700.0 : 820.0;
+    final targetScale = (_transformController.value.getMaxScaleOnAxis() + delta)
+        .clamp(0.55, 2.35);
+    final target = _nodeCanvasCenter(
+      widget.focusNodeId,
+      canvasWidth,
+      canvasHeight,
+    );
+    final translateX = (viewportSize.width / 2) - (target.dx * targetScale);
+    final translateY = (viewportSize.height / 2) - (target.dy * targetScale);
+
+    _setTransform(translateX, translateY, targetScale);
+  }
+
+  double _fitScale(Size viewportSize, double canvasWidth, double canvasHeight) {
+    final horizontalFit = viewportSize.width / canvasWidth;
+    final verticalFit = viewportSize.height / canvasHeight;
+    return (horizontalFit < verticalFit ? horizontalFit : verticalFit) * 0.94;
+  }
+
+  Offset _nodeCanvasCenter(
+    String nodeId,
+    double canvasWidth,
+    double canvasHeight,
+  ) {
+    final node = widget.visibleNodes.firstWhere(
+      (entry) => entry.id == nodeId,
+      orElse: () => widget.visibleNodes.first,
+    );
+    final size = _graphNodeCardSize(node);
+    final normalizedX = (node.position.x + 1) / 2;
+    final normalizedY = (node.position.y + 1) / 2;
+    final left = (canvasWidth - size.width) * normalizedX;
+    final top = (canvasHeight - size.height) * normalizedY;
+
+    return Offset(left + (size.width / 2), top + (size.height / 2));
+  }
+
+  Matrix4 _buildTransform(double translateX, double translateY, double scale) {
+    return Matrix4.diagonal3Values(scale, scale, 1)
+      ..setTranslationRaw(translateX, translateY, 0);
+  }
+
+  void _setTransform(
+    double translateX,
+    double translateY,
+    double scale, {
+    bool animated = true,
+  }) {
+    final target = _buildTransform(translateX, translateY, scale);
+
+    if (!animated) {
+      _cameraController.stop();
+      _transformController.value = target;
+      return;
+    }
+
+    _cameraController.stop();
+    _cameraAnimation =
+        Matrix4Tween(
+          begin: _transformController.value.clone(),
+          end: target,
+        ).animate(
+          CurvedAnimation(
+            parent: _cameraController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+    _cameraController
+      ..reset()
+      ..forward();
   }
 }
 
@@ -1396,6 +2332,34 @@ class _NetworkDetailCard extends StatelessWidget {
               color: _slateColor,
               background: _slateColor.withValues(alpha: 0.12),
             ),
+            if (node.sector != null)
+              _Tag(
+                label: node.sector!,
+                icon: Icons.layers_outlined,
+                color: _amberColor,
+                background: _amberColor.withValues(alpha: 0.12),
+              ),
+            if (node.jobTitle != null)
+              _Tag(
+                label: node.jobTitle!,
+                icon: Icons.work_outline_rounded,
+                color: _slateColor,
+                background: _slateColor.withValues(alpha: 0.12),
+              ),
+            if (node.tenureBand != null)
+              _Tag(
+                label: node.tenureBand!,
+                icon: Icons.timelapse_outlined,
+                color: _tealColor,
+                background: _tealColor.withValues(alpha: 0.12),
+              ),
+            if (node.hasWarnings)
+              _Tag(
+                label: 'com advertencias',
+                icon: Icons.warning_amber_rounded,
+                color: _roseColor,
+                background: _roseColor.withValues(alpha: 0.12),
+              ),
           ],
         ),
         const SizedBox(height: 18),
@@ -1908,6 +2872,37 @@ class _Tag extends StatelessWidget {
   }
 }
 
+class _NetworkFilterSection extends StatelessWidget {
+  const _NetworkFilterSection({
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+        ),
+        const SizedBox(height: 12),
+        Wrap(spacing: 10, runSpacing: 10, children: children),
+      ],
+    );
+  }
+}
+
 class _CompactRelationPill extends StatelessWidget {
   const _CompactRelationPill({required this.type});
 
@@ -1931,6 +2926,16 @@ class _CompactRelationPill extends StatelessWidget {
       ),
     );
   }
+}
+
+Set<String> _toggleValue(Set<String> values, String value) {
+  final next = {...values};
+  if (next.contains(value)) {
+    next.remove(value);
+  } else {
+    next.add(value);
+  }
+  return next;
 }
 
 class _EdgeLegendTag extends StatelessWidget {
@@ -2033,6 +3038,39 @@ class _CanvasHintCard extends StatelessWidget {
   }
 }
 
+class _CanvasToolbarButton extends StatelessWidget {
+  const _CanvasToolbarButton({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: _slateColor),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: _inkColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NodeKindBadge extends StatelessWidget {
   const _NodeKindBadge({required this.node});
 
@@ -2080,11 +3118,7 @@ class _NetworkNodeWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = switch (node.kind) {
-      _GraphNodeKind.company => const Size(176, 94),
-      _GraphNodeKind.contract => const Size(162, 84),
-      _GraphNodeKind.person => const Size(154, 82),
-    };
+    final size = _graphNodeCardSize(node);
 
     final normalizedX = (node.position.x + 1) / 2;
     final normalizedY = (node.position.y + 1) / 2;
@@ -2191,6 +3225,15 @@ class _NetworkNodeWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+Size _graphNodeCardSize(_GraphNode node) {
+  return switch (node.kind) {
+    _GraphNodeKind.company =>
+      node.isRoot ? const Size(194, 98) : const Size(182, 92),
+    _GraphNodeKind.contract => const Size(168, 86),
+    _GraphNodeKind.person => const Size(158, 84),
+  };
 }
 
 class _NetworkLinkPainter extends CustomPainter {
@@ -2384,10 +3427,12 @@ class _EntityItem {
 
 enum _GraphNodeKind { company, contract, person }
 
-enum _GraphEdgeType { scope, allocation, dismissal, history }
+enum _GraphEdgeType { portfolio, origin, scope, allocation, dismissal, history }
 
 extension on _GraphEdgeType {
   String get label => switch (this) {
+    _GraphEdgeType.portfolio => 'carteira empresarial',
+    _GraphEdgeType.origin => 'vinculo de origem',
     _GraphEdgeType.scope => 'escopo contratual',
     _GraphEdgeType.allocation => 'alocacao ativa',
     _GraphEdgeType.dismissal => 'desligamento recente',
@@ -2395,6 +3440,8 @@ extension on _GraphEdgeType {
   };
 
   Color get color => switch (this) {
+    _GraphEdgeType.portfolio => _slateColor,
+    _GraphEdgeType.origin => _deepTealColor,
     _GraphEdgeType.scope => _amberColor,
     _GraphEdgeType.allocation => _tealColor,
     _GraphEdgeType.dismissal => _roseColor,
@@ -2402,6 +3449,8 @@ extension on _GraphEdgeType {
   };
 
   bool get dashed => switch (this) {
+    _GraphEdgeType.portfolio => false,
+    _GraphEdgeType.origin => true,
     _GraphEdgeType.scope => false,
     _GraphEdgeType.allocation => false,
     _GraphEdgeType.dismissal => true,
@@ -2413,6 +3462,7 @@ class _GraphNode {
   const _GraphNode({
     required this.id,
     required this.kind,
+    required this.rootCompanyId,
     required this.label,
     required this.subtitle,
     required this.miniLabel,
@@ -2421,11 +3471,19 @@ class _GraphNode {
     required this.color,
     required this.icon,
     required this.highlights,
+    this.sector,
+    this.jobTitle,
+    this.gender,
+    this.race,
+    this.tenureMonths,
+    this.hasWarnings = false,
+    this.isRoot = false,
     this.dismissedDaysAgo,
   });
 
   final String id;
   final _GraphNodeKind kind;
+  final String rootCompanyId;
   final String label;
   final String subtitle;
   final String miniLabel;
@@ -2434,13 +3492,36 @@ class _GraphNode {
   final Color color;
   final IconData icon;
   final List<String> highlights;
+  final String? sector;
+  final String? jobTitle;
+  final String? gender;
+  final String? race;
+  final int? tenureMonths;
+  final bool hasWarnings;
+  final bool isRoot;
   final int? dismissedDaysAgo;
 
   String get kindLabel => switch (kind) {
-    _GraphNodeKind.company => 'empresa',
+    _GraphNodeKind.company => isRoot ? 'empresa-raiz' : 'empresa-cliente',
     _GraphNodeKind.contract => 'contrato',
     _GraphNodeKind.person => 'funcionario',
   };
+
+  String? get tenureBand {
+    if (tenureMonths == null) {
+      return null;
+    }
+    if (tenureMonths! < 12) {
+      return 'ate 1 ano';
+    }
+    if (tenureMonths! < 36) {
+      return '1 a 3 anos';
+    }
+    if (tenureMonths! < 60) {
+      return '3 a 5 anos';
+    }
+    return '5 anos ou mais';
+  }
 }
 
 class _GraphEdge {
@@ -2462,6 +3543,28 @@ class _GraphConnectionDetail {
 
   final _GraphNode node;
   final _GraphEdge edge;
+}
+
+class _NetworkFacetData {
+  const _NetworkFacetData({
+    required this.rootCompanies,
+    required this.sectors,
+    required this.jobTitles,
+    required this.tenureBands,
+    required this.genders,
+    required this.races,
+    required this.hasRecordsWithWarnings,
+    required this.hasRecordsWithoutWarnings,
+  });
+
+  final List<_GraphNode> rootCompanies;
+  final List<String> sectors;
+  final List<String> jobTitles;
+  final List<String> tenureBands;
+  final List<String> genders;
+  final List<String> races;
+  final bool hasRecordsWithWarnings;
+  final bool hasRecordsWithoutWarnings;
 }
 
 const _pageInfo = {
@@ -2510,9 +3613,9 @@ const _pageInfo = {
     shortLabel: 'Teia',
     title: 'Teia relacional',
     description:
-        'Visao clicavel de empresas, contratos, ativos e desligados recentes.',
-    kicker: 'Mapa visual de relacoes recentes',
-    sidebarHint: 'ativos e desligados recentes',
+        'Visao clicavel de empresas-raiz, clientes, contratos e historico de colaboradores.',
+    kicker: 'Mapa visual de carteiras, origens e historico',
+    sidebarHint: 'empresas-raiz, clientes e periodos historicos',
     icon: Icons.hub_outlined,
     accent: _slateColor,
   ),
@@ -2556,8 +3659,8 @@ const _choices = [
     target: _ChoiceTarget.network,
     title: 'Abrir teia visual',
     description:
-        'Ver ativos e desligados recentes em uma malha clicavel com empresas e contratos conectados.',
-    hint: 'slider de dias e foco clicavel',
+        'Ver empresas-raiz, clientes, contratos e colaboradores em uma malha clicavel com historico filtravel.',
+    hint: 'periodos historicos e foco clicavel',
     icon: Icons.hub_outlined,
     color: _slateColor,
     background: Color(0xFFF4F8FA),
@@ -2795,192 +3898,564 @@ const _entityData = {
 
 const _graphNodes = [
   _GraphNode(
-    id: 'company_pariflow',
+    id: 'company_jotabe',
     kind: _GraphNodeKind.company,
-    label: 'PariFlow Servicos',
-    subtitle: 'Prestadora principal com contratos ativos.',
-    miniLabel: 'empresa',
-    position: Alignment(-0.85, -0.62),
+    rootCompanyId: 'company_jotabe',
+    label: 'SEDE JOTABE',
+    subtitle:
+        'Empresa-raiz com carteira propria e quadro terceirizado rastreavel.',
+    miniLabel: 'empresa-raiz',
+    position: Alignment(-0.88, -0.72),
     status: 'ativo',
     color: _tealColor,
     icon: Icons.apartment_outlined,
     highlights: [
-      'Concentra contratos ativos e funcionarios em operacao.',
-      'Ponto de entrada para consulta empresarial e teia.',
-      'Pode levar para clientes, contratos e fichas individuais.',
+      'Tem o mesmo peso estrutural da VVG dentro da teia.',
+      'Ao ocultar esta raiz, clientes, contratos e colaboradores vinculados somem juntos.',
+      'Funciona como ancora de rastreabilidade para origem do colaborador.',
+    ],
+    isRoot: true,
+  ),
+  _GraphNode(
+    id: 'client_bela_vista',
+    kind: _GraphNodeKind.company,
+    rootCompanyId: 'company_jotabe',
+    label: 'Condominio Bela Vista',
+    subtitle: 'Cliente da carteira JOTABE com operacao de seguranca.',
+    miniLabel: 'cliente',
+    position: Alignment(-0.46, -0.58),
+    status: 'ativo',
+    color: _slateColor,
+    icon: Icons.business_outlined,
+    highlights: [
+      'Empresa-cliente conectada a uma raiz especifica.',
+      'Ajuda a deixar explicito para onde o colaborador foi subdirecionado.',
+      'Pode ser ocultada de forma indireta ao desligar a visibilidade da raiz.',
     ],
   ),
   _GraphNode(
     id: 'contract_portaria',
     kind: _GraphNodeKind.contract,
-    label: 'CTR-PORT-2026-001',
-    subtitle: 'Portaria e controle de acesso.',
+    rootCompanyId: 'company_jotabe',
+    label: 'CTR-SEG-2026-001',
+    subtitle: 'Controle de acesso e ronda leve no Bela Vista.',
     miniLabel: 'contrato',
-    position: Alignment(-0.18, -0.34),
+    position: Alignment(-0.04, -0.44),
     status: 'ativo',
     color: _amberColor,
     icon: Icons.description_outlined,
     highlights: [
-      'Contrato com quadro ativo e uma rotacao recente.',
-      'Conecta empresa, cliente e pessoas do turno.',
-      'Leva para postos, historico e desligamentos.',
+      'Amarra o cliente ao quadro de seguranca alocado pela JOTABE.',
+      'Permite filtrar a malha por setor e cargo sem perder a trilha da origem.',
+      'Serve como ponte entre empresa-cliente e colaborador terceirizado.',
     ],
   ),
   _GraphNode(
     id: 'person_ana',
     kind: _GraphNodeKind.person,
+    rootCompanyId: 'company_jotabe',
     label: 'Ana Paula Rocha',
-    subtitle: 'Ativa | portaria diurna.',
-    miniLabel: 'funcionaria ativa',
-    position: Alignment(0.24, -0.04),
+    subtitle: 'Origem JOTABE | alocada no Bela Vista.',
+    miniLabel: 'acesso',
+    position: Alignment(0.42, -0.48),
     status: 'ativo',
     color: _tealColor,
     icon: Icons.badge_outlined,
     highlights: [
-      'Pessoa-base com vinculo atual e historico anterior.',
-      'A ficha consolidada abre a partir daqui.',
-      'Relaciona empresa, contrato e passagens multiempresa.',
+      'Mostra o caso classico de colaboradora vinculada a uma raiz e enviada para cliente especifico.',
+      'Permite filtrar por setor, sexo, raca e tempo de servico sem perder a origem.',
+      'Pode abrir ficha consolidada com trilha completa da alocacao.',
+    ],
+    sector: 'Seguranca',
+    jobTitle: 'Controlador de Acesso',
+    gender: 'feminino',
+    race: 'branca',
+    tenureMonths: 26,
+  ),
+  _GraphNode(
+    id: 'client_horizonte',
+    kind: _GraphNodeKind.company,
+    rootCompanyId: 'company_jotabe',
+    label: 'Horizonte Offices',
+    subtitle: 'Cliente da carteira JOTABE com frente ADM e formacao.',
+    miniLabel: 'cliente',
+    position: Alignment(-0.46, -0.10),
+    status: 'ativo',
+    color: _slateColor,
+    icon: Icons.business_outlined,
+    highlights: [
+      'Expande a teia para uma segunda carteira cliente da mesma raiz.',
+      'Ajuda a provar que a ocultacao por raiz precisa derrubar toda a subarvore.',
+      'Mantem contratos de apoio administrativo e entrada de aprendizes.',
+    ],
+  ),
+  _GraphNode(
+    id: 'contract_adm',
+    kind: _GraphNodeKind.contract,
+    rootCompanyId: 'company_jotabe',
+    label: 'CTR-ADM-2026-014',
+    subtitle: 'Apoio administrativo e formacao em escritorio.',
+    miniLabel: 'contrato',
+    position: Alignment(-0.02, -0.04),
+    status: 'ativo',
+    color: _amberColor,
+    icon: Icons.description_outlined,
+    highlights: [
+      'Mantem cargos administrativos e de entrada no mesmo contexto contratual.',
+      'Ajuda a demonstrar filtros dinamicos para setor e emprego especifico.',
+      'Pode continuar visivel mesmo quando a leitura sai da seguranca.',
+    ],
+  ),
+  _GraphNode(
+    id: 'person_lucas',
+    kind: _GraphNodeKind.person,
+    rootCompanyId: 'company_jotabe',
+    label: 'Lucas Andrade',
+    subtitle: 'Origem JOTABE | frente administrativa ativa.',
+    miniLabel: 'adm',
+    position: Alignment(0.42, -0.08),
+    status: 'ativo',
+    color: _tealColor,
+    icon: Icons.badge_outlined,
+    highlights: [
+      'Representa colaborador com advertencia anexa e tempo de casa mais longo.',
+      'Ajuda a validar filtros de sexo, raca autodeclarada e advertencia.',
+      'Mostra que o contrato pode sustentar mais de um perfil ocupacional.',
+    ],
+    sector: 'Area ADM',
+    jobTitle: 'Supervisor Administrativo',
+    gender: 'masculino',
+    race: 'pardo',
+    tenureMonths: 49,
+    hasWarnings: true,
+  ),
+  _GraphNode(
+    id: 'person_mila',
+    kind: _GraphNodeKind.person,
+    rootCompanyId: 'company_jotabe',
+    label: 'Mila Santos',
+    subtitle: 'Origem JOTABE | trilha de aprendizagem em andamento.',
+    miniLabel: 'aprendiz',
+    position: Alignment(0.68, 0.16),
+    status: 'ativo',
+    color: _tealColor,
+    icon: Icons.school_outlined,
+    highlights: [
+      'Insere o eixo de estagiarios e jovens aprendizes na propria teia.',
+      'Permite validar tempo de servico curto e recortes mais recentes de entrada.',
+      'Mostra como a teia pode servir a contextos de formacao sem filtro fixo previo.',
+    ],
+    sector: 'Estagiarios + Jovens Aprendizes',
+    jobTitle: 'Estagiaria Administrativa',
+    gender: 'feminino',
+    race: 'preta',
+    tenureMonths: 7,
+  ),
+  _GraphNode(
+    id: 'company_vvg',
+    kind: _GraphNodeKind.company,
+    rootCompanyId: 'company_vvg',
+    label: 'VVG Servicos',
+    subtitle: 'Empresa-raiz com carteira propria e equipe rastreavel.',
+    miniLabel: 'empresa-raiz',
+    position: Alignment(-0.88, 0.42),
+    status: 'ativo',
+    color: _roseColor,
+    icon: Icons.apartment_outlined,
+    highlights: [
+      'Tem o mesmo peso estrutural da SEDE JOTABE.',
+      'Pode ser desligada da teia inteira sem afetar a outra raiz.',
+      'Explicita a necessidade de grupos empresariais independentes no mesmo mapa.',
+    ],
+    isRoot: true,
+  ),
+  _GraphNode(
+    id: 'client_aurora',
+    kind: _GraphNodeKind.company,
+    rootCompanyId: 'company_vvg',
+    label: 'Hospital Aurora',
+    subtitle: 'Cliente da carteira VVG com frente de governanca.',
+    miniLabel: 'cliente',
+    position: Alignment(-0.46, 0.32),
+    status: 'ativo',
+    color: _slateColor,
+    icon: Icons.local_hospital_outlined,
+    highlights: [
+      'Cliente conectado a uma segunda raiz de mesmo peso.',
+      'Ajuda a demonstrar como contratos e desligados antigos podem reaparecer.',
+      'Mantem a leitura de governanca, limpeza e historico na mesma subarvore.',
+    ],
+  ),
+  _GraphNode(
+    id: 'contract_governanca',
+    kind: _GraphNodeKind.contract,
+    rootCompanyId: 'company_vvg',
+    label: 'CTR-GOV-2026-021',
+    subtitle: 'Governanca operacional e lideranca de limpeza hospitalar.',
+    miniLabel: 'contrato',
+    position: Alignment(-0.02, 0.36),
+    status: 'ativo',
+    color: _amberColor,
+    icon: Icons.description_outlined,
+    highlights: [
+      'Contrato que concentra ativos e desligados de varias janelas temporais.',
+      'E um bom exemplo para habilitar 6 meses, 1 ano, 2 anos, 5 anos e todo o periodo.',
+      'Tambem sustenta historico multiempresa em casos de passagem anterior.',
     ],
   ),
   _GraphNode(
     id: 'person_carla',
     kind: _GraphNodeKind.person,
+    rootCompanyId: 'company_vvg',
     label: 'Carla Mendes',
-    subtitle: 'Ativa | transferencia recente.',
-    miniLabel: 'funcionaria ativa',
-    position: Alignment(0.54, -0.56),
+    subtitle: 'Origem VVG | lideranca ativa em governanca.',
+    miniLabel: 'governanca',
+    position: Alignment(0.42, 0.24),
     status: 'ativo',
     color: _tealColor,
     icon: Icons.badge_outlined,
     highlights: [
-      'Pessoa com mais de uma passagem visivel na teia.',
-      'Ajuda a validar historico multiempresa.',
-      'Exemplo de no clicavel que leva a uma ficha mais rica.',
+      'Mantem o setor de governanca vivo na teia atual.',
+      'Permite enxergar passagem anterior entre grupos empresariais.',
+      'E um caso bom para abrir detalhe de risco, historico e relacoes cruzadas.',
     ],
+    sector: 'Area de Governanca',
+    jobTitle: 'Lider de Limpeza',
+    gender: 'feminino',
+    race: 'parda',
+    tenureMonths: 18,
   ),
   _GraphNode(
     id: 'person_bruno',
     kind: _GraphNodeKind.person,
+    rootCompanyId: 'company_vvg',
     label: 'Bruno Tavares',
-    subtitle: 'Desligado ha 18 dias.',
-    miniLabel: 'desligado recente',
-    position: Alignment(0.56, 0.38),
+    subtitle: 'Desligado ha 18 dias | historico ainda quente.',
+    miniLabel: 'desligado',
+    position: Alignment(0.58, 0.56),
     status: 'desligado',
     color: _roseColor,
     icon: Icons.person_off_outlined,
     highlights: [
-      'Ainda aparece na teia por estar dentro da janela de dias configurada.',
-      'Leitura util para desligamento, risco e dossie futuro.',
-      'O filtro de dias controla a presenca dele na malha.',
+      'Permanece visivel nas janelas curtas e some quando o recorte fecha abaixo de 18 dias.',
+      'Ajuda a validar filtros de advertencia anexa e recortes juridicos.',
+      'Continua rastreavel ate a raiz VVG e ao contrato hospitalar.',
     ],
+    sector: 'Area de Governanca',
+    jobTitle: 'Auxiliar de Limpeza',
+    gender: 'masculino',
+    race: 'preto',
+    tenureMonths: 38,
+    hasWarnings: true,
     dismissedDaysAgo: 18,
   ),
   _GraphNode(
     id: 'person_vera',
     kind: _GraphNodeKind.person,
+    rootCompanyId: 'company_vvg',
     label: 'Vera Sousa',
-    subtitle: 'Desligada ha 52 dias.',
-    miniLabel: 'desligada recente',
-    position: Alignment(0.18, 0.58),
+    subtitle: 'Desligada ha 420 dias | historico remoto relevante.',
+    miniLabel: 'historico',
+    position: Alignment(0.26, 0.78),
     status: 'desligado',
     color: _roseColor,
     icon: Icons.person_off_outlined,
     highlights: [
-      'Sai da visualizacao quando o filtro cai abaixo de 52 dias.',
-      'Demonstra como a janela temporal muda a leitura da teia.',
-      'Permite revisar impactos recentes sem misturar historico remoto.',
+      'Volta para a malha quando o usuario sobe para 2 anos ou todo o periodo.',
+      'Prova que a teia nao pode limitar desligados antigos a um teto fixo de 90 dias.',
+      'Mantem rastreabilidade de origem mesmo em desligamentos remotos.',
     ],
-    dismissedDaysAgo: 52,
-  ),
-  _GraphNode(
-    id: 'company_alpha',
-    kind: _GraphNodeKind.company,
-    label: 'Alpha Facilities',
-    subtitle: 'Prestadora com rotacao elevada.',
-    miniLabel: 'empresa',
-    position: Alignment(-0.66, 0.34),
-    status: 'ativo',
-    color: _roseColor,
-    icon: Icons.apartment_outlined,
-    highlights: [
-      'Empresa associada a desligamentos recentes.',
-      'Funciona como ancora visual para investigar quadros e contratos.',
-      'Ajuda a decidir se vale abrir empresa, contrato ou ficha de pessoa.',
-    ],
-  ),
-  _GraphNode(
-    id: 'contract_limpeza',
-    kind: _GraphNodeKind.contract,
-    label: 'CTR-LIMP-2026-007',
-    subtitle: 'Limpeza tecnica com rotacao recente.',
-    miniLabel: 'contrato',
-    position: Alignment(-0.08, 0.34),
-    status: 'ativo',
-    color: _amberColor,
-    icon: Icons.description_outlined,
-    highlights: [
-      'Contrato com mais risco recente.',
-      'Conecta empresa, pessoa desligada e historico recente.',
-      'Bom candidato para mapa de risco futuro.',
-    ],
+    sector: 'Area de Governanca',
+    jobTitle: 'Governanta',
+    gender: 'feminino',
+    race: 'branca',
+    tenureMonths: 86,
+    dismissedDaysAgo: 420,
   ),
 ];
 
 const _graphEdges = [
   _GraphEdge(
-    from: 'company_pariflow',
+    from: 'company_jotabe',
+    to: 'client_bela_vista',
+    type: _GraphEdgeType.portfolio,
+    detail: 'A SEDE JOTABE sustenta esta carteira cliente.',
+  ),
+  _GraphEdge(
+    from: 'client_bela_vista',
     to: 'contract_portaria',
     type: _GraphEdgeType.scope,
-    detail: 'A empresa opera este contrato no ciclo atual.',
+    detail: 'Este cliente recebe o contrato de seguranca da JOTABE.',
+  ),
+  _GraphEdge(
+    from: 'company_jotabe',
+    to: 'person_ana',
+    type: _GraphEdgeType.origin,
+    detail: 'Ana esta vinculada diretamente a raiz JOTABE antes da alocacao.',
   ),
   _GraphEdge(
     from: 'contract_portaria',
     to: 'person_ana',
     type: _GraphEdgeType.allocation,
-    detail: 'Ana Paula Rocha esta alocada neste contrato.',
+    detail: 'Ana esta alocada no posto de controlador de acesso.',
   ),
   _GraphEdge(
-    from: 'contract_portaria',
+    from: 'company_jotabe',
+    to: 'client_horizonte',
+    type: _GraphEdgeType.portfolio,
+    detail: 'Horizonte Offices integra a carteira da SEDE JOTABE.',
+  ),
+  _GraphEdge(
+    from: 'client_horizonte',
+    to: 'contract_adm',
+    type: _GraphEdgeType.scope,
+    detail: 'A carteira JOTABE desdobra apoio administrativo neste cliente.',
+  ),
+  _GraphEdge(
+    from: 'company_jotabe',
+    to: 'person_lucas',
+    type: _GraphEdgeType.origin,
+    detail: 'Lucas esta vinculado a JOTABE e depois direcionado ao cliente.',
+  ),
+  _GraphEdge(
+    from: 'contract_adm',
+    to: 'person_lucas',
+    type: _GraphEdgeType.allocation,
+    detail: 'Lucas atua como supervisor administrativo neste contrato.',
+  ),
+  _GraphEdge(
+    from: 'contract_adm',
+    to: 'person_mila',
+    type: _GraphEdgeType.allocation,
+    detail: 'Mila entra pela trilha de aprendizagem dentro deste contrato.',
+  ),
+  _GraphEdge(
+    from: 'company_vvg',
+    to: 'client_aurora',
+    type: _GraphEdgeType.portfolio,
+    detail: 'A VVG controla esta carteira hospitalar.',
+  ),
+  _GraphEdge(
+    from: 'client_aurora',
+    to: 'contract_governanca',
+    type: _GraphEdgeType.scope,
+    detail: 'O cliente recebe o contrato hospitalar de governanca e limpeza.',
+  ),
+  _GraphEdge(
+    from: 'company_vvg',
+    to: 'person_carla',
+    type: _GraphEdgeType.origin,
+    detail: 'Carla esta vinculada a VVG antes da alocacao no hospital.',
+  ),
+  _GraphEdge(
+    from: 'contract_governanca',
     to: 'person_carla',
     type: _GraphEdgeType.allocation,
-    detail: 'Carla Mendes integra este contrato com movimentacao recente.',
+    detail: 'Carla lidera a frente operacional de governanca neste contrato.',
   ),
   _GraphEdge(
-    from: 'company_alpha',
-    to: 'contract_limpeza',
-    type: _GraphEdgeType.scope,
-    detail: 'A empresa responde pelo contrato de limpeza tecnica.',
-  ),
-  _GraphEdge(
-    from: 'contract_limpeza',
+    from: 'contract_governanca',
     to: 'person_bruno',
     type: _GraphEdgeType.dismissal,
-    detail: 'Bruno saiu deste contrato dentro da janela configurada.',
+    detail: 'Bruno saiu deste contrato dentro da janela curta ainda visivel.',
   ),
   _GraphEdge(
-    from: 'contract_limpeza',
+    from: 'contract_governanca',
     to: 'person_vera',
     type: _GraphEdgeType.dismissal,
-    detail: 'Vera permanece visivel enquanto estiver dentro do corte de dias.',
+    detail: 'Vera so volta quando a teia abre o recorte historico mais longo.',
   ),
   _GraphEdge(
     from: 'person_carla',
-    to: 'company_alpha',
+    to: 'company_jotabe',
     type: _GraphEdgeType.history,
-    detail: 'Carla teve passagem anterior por esta empresa.',
+    detail: 'Carla teve passagem anterior em uma carteira ligada a JOTABE.',
   ),
 ];
 
-List<_GraphNode> _visibleGraphNodes(double dismissedDays) {
+List<_GraphNode> _structuralGraphNodes(_NetworkFilterState filters) {
+  final maxDays = filters.maxDismissedDays;
+
   return _graphNodes.where((node) {
+    if (filters.hiddenRootCompanyIds.contains(node.rootCompanyId)) {
+      return false;
+    }
+    if (node.kind != _GraphNodeKind.person || node.dismissedDaysAgo == null) {
+      return true;
+    }
+    if (maxDays == null) {
+      return true;
+    }
+    return node.dismissedDaysAgo! <= maxDays;
+  }).toList();
+}
+
+_NetworkFacetData _networkFacets(List<_GraphNode> structuralNodes) {
+  final people = structuralNodes
+      .where((node) => node.kind == _GraphNodeKind.person)
+      .toList();
+  final tenureOrder = [
+    'ate 1 ano',
+    '1 a 3 anos',
+    '3 a 5 anos',
+    '5 anos ou mais',
+  ];
+
+  final sectors = <String>{};
+  final jobTitles = <String>{};
+  final genders = <String>{};
+  final races = <String>{};
+  final tenureBands = <String>{};
+
+  for (final person in people) {
+    if (person.sector != null) {
+      sectors.add(person.sector!);
+    }
+    if (person.jobTitle != null) {
+      jobTitles.add(person.jobTitle!);
+    }
+    if (person.gender != null) {
+      genders.add(person.gender!);
+    }
+    if (person.race != null) {
+      races.add(person.race!);
+    }
+    if (person.tenureBand != null) {
+      tenureBands.add(person.tenureBand!);
+    }
+  }
+
+  final orderedTenureBands = tenureBands.toList()
+    ..sort(
+      (left, right) =>
+          tenureOrder.indexOf(left).compareTo(tenureOrder.indexOf(right)),
+    );
+
+  return _NetworkFacetData(
+    rootCompanies: _graphNodes
+        .where((node) => node.kind == _GraphNodeKind.company && node.isRoot)
+        .toList(),
+    sectors: sectors.toList(),
+    jobTitles: jobTitles.toList(),
+    tenureBands: orderedTenureBands,
+    genders: genders.toList(),
+    races: races.toList(),
+    hasRecordsWithWarnings: people.any((person) => person.hasWarnings),
+    hasRecordsWithoutWarnings: people.any((person) => !person.hasWarnings),
+  );
+}
+
+List<_GraphNode> _visibleGraphNodes(_NetworkFilterState filters) {
+  final structuralNodes = _structuralGraphNodes(filters);
+  final facets = _networkFacets(structuralNodes);
+  final effectiveSectors = filters.selectedSectors.intersection(
+    facets.sectors.toSet(),
+  );
+  final effectiveJobTitles = filters.selectedJobTitles.intersection(
+    facets.jobTitles.toSet(),
+  );
+  final effectiveTenureBands = filters.selectedTenureBands.intersection(
+    facets.tenureBands.toSet(),
+  );
+  final effectiveGenders = filters.selectedGenders.intersection(
+    facets.genders.toSet(),
+  );
+  final effectiveRaces = filters.selectedRaces.intersection(
+    facets.races.toSet(),
+  );
+
+  final candidates = structuralNodes.where((node) {
     if (node.kind != _GraphNodeKind.person) {
       return true;
     }
-    if (node.dismissedDaysAgo == null) {
-      return true;
+    if (effectiveSectors.isNotEmpty &&
+        !effectiveSectors.contains(node.sector)) {
+      return false;
     }
-    return node.dismissedDaysAgo! <= dismissedDays.round();
+    if (effectiveJobTitles.isNotEmpty &&
+        !effectiveJobTitles.contains(node.jobTitle)) {
+      return false;
+    }
+    if (effectiveTenureBands.isNotEmpty &&
+        !effectiveTenureBands.contains(node.tenureBand)) {
+      return false;
+    }
+    if (effectiveGenders.isNotEmpty &&
+        !effectiveGenders.contains(node.gender)) {
+      return false;
+    }
+    if (effectiveRaces.isNotEmpty && !effectiveRaces.contains(node.race)) {
+      return false;
+    }
+    if (filters.requireWarnings != null &&
+        node.hasWarnings != filters.requireWarnings) {
+      return false;
+    }
+    return true;
   }).toList();
+
+  return _pruneGraphNodes(candidates);
+}
+
+List<_GraphNode> _pruneGraphNodes(List<_GraphNode> nodes) {
+  final nodesById = {for (final node in nodes) node.id: node};
+  var currentIds = nodesById.keys.toSet();
+  var changed = true;
+
+  while (changed) {
+    changed = false;
+    final visibleEdges = _graphEdges.where(
+      (edge) => currentIds.contains(edge.from) && currentIds.contains(edge.to),
+    );
+    final adjacency = <String, Set<String>>{
+      for (final id in currentIds) id: <String>{},
+    };
+
+    for (final edge in visibleEdges) {
+      adjacency[edge.from]!.add(edge.to);
+      adjacency[edge.to]!.add(edge.from);
+    }
+
+    final nextIds = <String>{};
+
+    for (final nodeId in currentIds) {
+      final node = nodesById[nodeId]!;
+      final neighbors = adjacency[nodeId] ?? const <String>{};
+
+      if (neighbors.isEmpty) {
+        continue;
+      }
+
+      if (node.kind == _GraphNodeKind.person) {
+        nextIds.add(nodeId);
+        continue;
+      }
+
+      if (node.kind == _GraphNodeKind.contract) {
+        final hasPersonNeighbor = neighbors.any(
+          (neighborId) => nodesById[neighborId]!.kind == _GraphNodeKind.person,
+        );
+        if (hasPersonNeighbor) {
+          nextIds.add(nodeId);
+        }
+        continue;
+      }
+
+      final hasNonCompanyNeighbor = neighbors.any(
+        (neighborId) => nodesById[neighborId]!.kind != _GraphNodeKind.company,
+      );
+      if (hasNonCompanyNeighbor) {
+        nextIds.add(nodeId);
+      }
+    }
+
+    if (nextIds.length != currentIds.length) {
+      currentIds = nextIds;
+      changed = true;
+    }
+  }
+
+  return nodes.where((node) => currentIds.contains(node.id)).toList();
 }
 
 List<_GraphEdge> _visibleGraphEdges(List<_GraphNode> visibleNodes) {
