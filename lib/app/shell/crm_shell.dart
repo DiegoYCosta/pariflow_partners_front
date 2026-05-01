@@ -470,6 +470,20 @@ class _CrmDashboardHero extends StatelessWidget {
             ? _crmBannerMobileAsset
             : _crmBannerWebAsset;
         final headlineSize = stacked ? 44.0 : 72.0;
+        final headlineColor = stacked ? _deepTealColor : Colors.white;
+        final headlineAccentColor = stacked
+            ? const Color(0xFFC8891F)
+            : const Color(0xFFE5A64C);
+        final summaryColor = stacked
+            ? _mutedColor.withValues(alpha: 0.92)
+            : const Color(0xFFF0F5F3);
+        final chipColor = stacked ? _deepTealColor : Colors.white;
+        final chipBackground = stacked
+            ? Colors.white.withValues(alpha: 0.78)
+            : Colors.white.withValues(alpha: 0.14);
+        final accentBarColor = stacked
+            ? const Color(0xFFC8891F)
+            : const Color(0xFFE5A64C);
 
         return Container(
           width: double.infinity,
@@ -488,53 +502,116 @@ class _CrmDashboardHero extends StatelessWidget {
             borderRadius: BorderRadius.circular(40),
             child: Stack(
               children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    bannerAsset,
-                    fit: BoxFit.cover,
-                    alignment: stacked
-                        ? Alignment.center
-                        : Alignment.centerRight,
+                if (stacked) ...[
+                  Positioned.fill(
+                    child: Image.asset(
+                      _crmBackgroundAsset,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                    ),
                   ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xF205262B),
-                          const Color(0xE2124B4E),
-                          const Color(0xB3124B4E),
-                          const Color(0x5C124B4E),
-                        ],
-                        stops: const [0.0, 0.34, 0.70, 1.0],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    width: constraints.maxWidth * 0.90,
+                    height: 352,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.82,
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: 0.9,
+                            sigmaY: 0.9,
+                          ),
+                          child: Image.asset(
+                            bannerAsset,
+                            fit: BoxFit.cover,
+                            alignment: const Alignment(0.42, 1.0),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: -8,
-                  height: stacked ? 126 : 152,
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.92,
-                      child: HighTechLightWaves(
-                        primaryColor: const Color(0xFF63E6E2),
-                        accentColor: const Color(0xFFE4A23B),
-                        numberOfWaves: stacked ? 4 : 6,
-                        waveAmplitude: stacked ? 0.14 : 0.12,
-                        waveFrequency: 0.040,
-                        waveSpeed: 0.0062,
-                        pulseSpeedMultiplier: 2.8,
-                        pulseSize: stacked ? 6.0 : 7.4,
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFDFFFDF8),
+                            const Color(0xF6FFF9F0),
+                            const Color(0xD9FFF7EE),
+                            const Color(0xA9FFF7EE),
+                          ],
+                          stops: const [0.0, 0.30, 0.70, 1.0],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: const Alignment(0.86, -0.18),
+                          radius: 0.86,
+                          colors: [
+                            const Color(0x58F3C97C),
+                            const Color(0x26F3C97C),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.34, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Positioned.fill(
+                    child: Image.asset(
+                      bannerAsset,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.centerRight,
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xF205262B),
+                            const Color(0xE2124B4E),
+                            const Color(0xB3124B4E),
+                            const Color(0x5C124B4E),
+                          ],
+                          stops: const [0.0, 0.34, 0.70, 1.0],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: -8,
+                    height: 152,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.92,
+                        child: HighTechLightWaves(
+                          primaryColor: const Color(0xFF63E6E2),
+                          accentColor: const Color(0xFFE4A23B),
+                          numberOfWaves: 6,
+                          waveAmplitude: 0.12,
+                          waveFrequency: 0.040,
+                          waveSpeed: 0.0062,
+                          pulseSpeedMultiplier: 2.8,
+                          pulseSize: 7.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 Positioned.fill(
                   child: Padding(
                     padding: EdgeInsets.all(stacked ? 28 : 42),
@@ -551,25 +628,27 @@ class _CrmDashboardHero extends StatelessWidget {
                             _Tag(
                               label: _ShellVariant.crm.label,
                               icon: Icons.auto_awesome_mosaic_outlined,
-                              color: Colors.white,
-                              background: Colors.white.withValues(alpha: 0.14),
+                              color: chipColor,
+                              background: chipBackground,
                             ),
                             const SizedBox(height: 24),
                             RichText(
                               text: TextSpan(
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: headlineColor,
                                   fontSize: headlineSize,
                                   fontWeight: FontWeight.w500,
                                   letterSpacing: -2.4,
                                   height: 0.98,
                                 ),
-                                children: const [
-                                  TextSpan(text: 'O que voce gostaria de\n'),
+                                children: [
+                                  const TextSpan(
+                                    text: 'O que voce gostaria de\n',
+                                  ),
                                   TextSpan(
                                     text: 'consultar hoje?',
                                     style: TextStyle(
-                                      color: Color(0xFFE5A64C),
+                                      color: headlineAccentColor,
                                       fontStyle: FontStyle.italic,
                                     ),
                                   ),
@@ -581,15 +660,15 @@ class _CrmDashboardHero extends StatelessWidget {
                               width: 92,
                               height: 4,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE5A64C),
+                                color: accentBarColor,
                                 borderRadius: BorderRadius.circular(999),
                               ),
                             ),
                             const SizedBox(height: 22),
-                            const Text(
+                            Text(
                               'A home agora herda a cidade do layout aprovado, com entrada direta para prestadoras, clientes, contratos, pessoas e rede visual.',
                               style: TextStyle(
-                                color: Color(0xFFF0F5F3),
+                                color: summaryColor,
                                 fontSize: 16,
                                 height: 1.6,
                               ),
@@ -604,29 +683,23 @@ class _CrmDashboardHero extends StatelessWidget {
                                   icon: viewerProfile.canViewSensitive
                                       ? Icons.lock_open_rounded
                                       : Icons.lock_outline_rounded,
-                                  color: Colors.white,
-                                  background: Colors.white.withValues(
-                                    alpha: 0.14,
-                                  ),
+                                  color: chipColor,
+                                  background: chipBackground,
                                 ),
                                 _Tag(
                                   label: _ShellFeatureFlags
                                       .activeVariant
                                       .rolloutSummary,
                                   icon: Icons.flag_outlined,
-                                  color: Colors.white,
-                                  background: Colors.white.withValues(
-                                    alpha: 0.14,
-                                  ),
+                                  color: chipColor,
+                                  background: chipBackground,
                                 ),
                                 _Tag(
                                   label:
                                       '${_networkGraphContractPreview.lanes.length} faixas da teia',
                                   icon: Icons.view_week_outlined,
-                                  color: Colors.white,
-                                  background: Colors.white.withValues(
-                                    alpha: 0.14,
-                                  ),
+                                  color: chipColor,
+                                  background: chipBackground,
                                 ),
                               ],
                             ),
