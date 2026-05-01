@@ -7,10 +7,19 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
   searchHint: 'buscar por razao social, fantasia ou documento',
   listHint:
       'A lista fica curta, clicavel e orientada por contexto. O detalhe aparece ao lado sem romper a navegacao.',
+  productionHint:
+      'Primeiro passo real: listar empresas por API, abrir detalhe autenticado e permitir memoria sensivel protegida sem poluir a consulta principal.',
+  integrationFocus: [
+    'lista paginada',
+    'detalhe autenticado',
+    'tags sensiveis',
+    'anexos formais',
+  ],
   filters: ['ativas', 'com contratos em aberto', 'multiempresa'],
   accent: _tealColor,
   items: [
     _EntityItem(
+      publicId: 'epr_01hcmp0000000000000001',
       title: 'PariFlow Servicos Ltda',
       subtitle: 'Prestadora principal com operacao ativa em 4 contratos.',
       meta: 'CNPJ estavel | 4 contratos | 61 funcionarios ativos',
@@ -46,6 +55,7 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
       ],
     ),
     _EntityItem(
+      publicId: 'epr_01hcmp0000000000000002',
       title: 'Alpha Facilities',
       subtitle: 'Prestadora com risco moderado e rotacao alta no ultimo ciclo.',
       meta: '2 contratos | 18 desligamentos em 45 dias | atencao operacional',
@@ -71,6 +81,7 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
       ],
     ),
     _EntityItem(
+      publicId: 'epr_01hcmp0000000000000003',
       title: 'Orbe Seguranca',
       subtitle: 'Prestadora com base pequena e contratos concentrados.',
       meta: '1 contrato | 12 funcionarios ativos | sem desligamentos recentes',

@@ -14,6 +14,13 @@ class _EntityWorkspace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectedItem = data.items[selectedIndex];
+    final protectedNoteCount = data.items.fold<int>(
+      0,
+      (total, item) => total + item.sensitiveNotes.length,
+    );
+    final itemsWithProtectedNotes = data.items
+        .where((item) => item.sensitiveNotes.isNotEmpty)
+        .length;
 
     return Column(
       children: [
@@ -41,6 +48,25 @@ class _EntityWorkspace extends StatelessWidget {
                     color: _mutedColor,
                     background: const Color(0xFFF4EEE5),
                   ),
+                  _Tag(
+                    label: '${data.items.length} registros no recorte',
+                    icon: Icons.dataset_outlined,
+                    color: data.accent,
+                    background: data.accent.withValues(alpha: 0.12),
+                  ),
+                  _Tag(
+                    label: '$protectedNoteCount tags protegidas',
+                    icon: Icons.lock_outline_rounded,
+                    color: _roseColor,
+                    background: _roseColor.withValues(alpha: 0.12),
+                  ),
+                  if (itemsWithProtectedNotes > 0)
+                    _Tag(
+                      label: '$itemsWithProtectedNotes fichas com memoria sensivel',
+                      icon: Icons.shield_outlined,
+                      color: _slateColor,
+                      background: _slateColor.withValues(alpha: 0.12),
+                    ),
                   for (final filter in data.filters)
                     _Tag(
                       label: filter,
@@ -49,6 +75,46 @@ class _EntityWorkspace extends StatelessWidget {
                       background: data.accent.withValues(alpha: 0.12),
                     ),
                 ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBF5),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: _lineColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Primeiro passo real',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      data.productionHint,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final focus in data.integrationFocus)
+                          _Tag(
+                            label: focus,
+                            icon: Icons.arrow_outward_rounded,
+                            color: data.accent,
+                            background: data.accent.withValues(alpha: 0.10),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -158,11 +224,24 @@ class _EntityDetailCard extends StatelessWidget {
           children: [
             Text('Preview do detalhe', style: theme.textTheme.titleLarge),
             _Tag(
+              label: item.publicId,
+              icon: Icons.tag_outlined,
+              color: _slateColor,
+              background: _slateColor.withValues(alpha: 0.12),
+            ),
+            _Tag(
               label: item.status,
               icon: item.icon,
               color: item.color,
               background: item.color.withValues(alpha: 0.12),
             ),
+            if (orderedNotes.isNotEmpty)
+              _Tag(
+                label: '${orderedNotes.length} tags protegidas',
+                icon: Icons.lock_outline_rounded,
+                color: _roseColor,
+                background: _roseColor.withValues(alpha: 0.12),
+              ),
           ],
         ),
         const SizedBox(height: 18),
@@ -373,6 +452,13 @@ class _EntityListTile extends StatelessWidget {
                 item.meta,
                 style: theme.textTheme.labelMedium?.copyWith(color: item.color),
               ),
+              const SizedBox(height: 6),
+              Text(
+                item.publicId,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: _mutedColor,
+                ),
+              ),
             ],
           ),
         ),
@@ -387,6 +473,8 @@ class _EntityWorkspaceData {
     required this.subtitle,
     required this.searchHint,
     required this.listHint,
+    required this.productionHint,
+    required this.integrationFocus,
     required this.filters,
     required this.items,
     required this.accent,
@@ -396,6 +484,8 @@ class _EntityWorkspaceData {
   final String subtitle;
   final String searchHint;
   final String listHint;
+  final String productionHint;
+  final List<String> integrationFocus;
   final List<String> filters;
   final List<_EntityItem> items;
   final Color accent;
@@ -403,6 +493,7 @@ class _EntityWorkspaceData {
 
 class _EntityItem {
   const _EntityItem({
+    required this.publicId,
     required this.title,
     required this.subtitle,
     required this.meta,
@@ -414,6 +505,7 @@ class _EntityItem {
     this.sensitiveNotes = const [],
   });
 
+  final String publicId;
   final String title;
   final String subtitle;
   final String meta;

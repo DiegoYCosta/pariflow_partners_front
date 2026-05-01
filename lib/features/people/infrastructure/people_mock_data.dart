@@ -7,10 +7,19 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
   searchHint: 'buscar por nome, cpf, email ou telefone',
   listHint:
       'A lista abre a ficha certa sem perder o contexto. A lateral antecipa historico, status e relacoes principais.',
+  productionHint:
+      'Primeiro passo real: combinar ficha base, vinculos e tags protegidas em uma leitura unica, sem quebrar a consulta humana do colaborador.',
+  integrationFocus: [
+    'ficha consolidada',
+    'vinculos',
+    'tags protegidas',
+    'historico',
+  ],
   filters: ['ativos', 'desligados recentes', 'mais de um vinculo'],
   accent: _roseColor,
   items: [
     _EntityItem(
+      publicId: 'pes_01hpes0000000000000001',
       title: 'Ana Paula Rocha',
       subtitle: 'Pessoa-base com vinculo ativo e historico anterior.',
       meta: 'ativo | 2 passagens | desligamento anterior em 2025',
@@ -46,6 +55,7 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
       ],
     ),
     _EntityItem(
+      publicId: 'pes_01hpes0000000000000002',
       title: 'Bruno Tavares',
       subtitle: 'Pessoa desligada recentemente e ainda relevante para a teia.',
       meta: 'desligado ha 18 dias | 1 contrato | risco juridico em revisao',
@@ -79,6 +89,7 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
       ],
     ),
     _EntityItem(
+      publicId: 'pes_01hpes0000000000000003',
       title: 'Carla Mendes',
       subtitle: 'Pessoa com historico multiempresa e movimentacoes recentes.',
       meta: 'ativo | 3 passagens | 1 transferencia neste mes',
