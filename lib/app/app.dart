@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import '../widgets/high_tech_light_waves.dart';
 
 part '../core/widgets/primitives.dart';
 part '../core/widgets/master_detail_workspace.dart';
 part '../shared/models/attachment_record.dart';
+part '../shared/models/network_graph_payload.dart';
 part '../shared/models/sensitive_note_tag.dart';
 part '../shared/models/viewer_access.dart';
 part '../features/companies/companies_feature.dart';
 part '../features/companies/infrastructure/companies_mock_data.dart';
+part '../features/client_companies/client_companies_feature.dart';
+part '../features/client_companies/infrastructure/client_companies_mock_data.dart';
 part '../features/contracts/contracts_feature.dart';
 part '../features/contracts/infrastructure/contracts_mock_data.dart';
 part '../features/people/people_feature.dart';
@@ -20,6 +24,7 @@ part '../features/home/home_feature.dart';
 part '../features/network/application/network_filter_state.dart';
 part '../features/network/domain/network_entities.dart';
 part '../features/network/domain/network_graph_engine.dart';
+part '../features/network/infrastructure/network_graph_payload_preview.dart';
 part '../features/network/infrastructure/network_mock_graph.dart';
 part '../features/network/presentation/network_workspace.dart';
 part '../features/network/presentation/network_canvas.dart';
@@ -37,6 +42,10 @@ const _deepTealColor = Color(0xFF143C38);
 const _amberColor = Color(0xFFBF6B2D);
 const _roseColor = Color(0xFFA35252);
 const _slateColor = Color(0xFF536A75);
+const _crmBannerWebAsset = 'assets/images/banner_web_clean.png';
+const _crmBannerMobileAsset = 'assets/images/banner_mobile_clean.png';
+const _crmBackgroundAsset = 'assets/images/background_abstract_warm.png';
+const _crmLogoAsset = 'assets/images/pariflow_logo.png';
 
 class PariFlowPartnersApp extends StatelessWidget {
   const PariFlowPartnersApp({super.key});

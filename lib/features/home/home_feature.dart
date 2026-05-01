@@ -571,7 +571,7 @@ class _ChoiceCardData {
   final Color borderColor;
 }
 
-enum _ChoiceTarget { companies, contracts, people, network }
+enum _ChoiceTarget { companies, clientCompanies, contracts, people, network }
 
 class _SummaryCardData {
   const _SummaryCardData({
@@ -608,7 +608,7 @@ class _ResumeItem {
 const _choices = [
   _ChoiceCardData(
     target: _ChoiceTarget.companies,
-    title: 'Consultar empresas',
+    title: 'Consultar prestadoras',
     description:
         'Abrir um workspace mais calmo para prestadoras, status e relacoes principais.',
     hint: 'lista curta, detalhe ao lado, sem poluicao',
@@ -616,6 +616,17 @@ const _choices = [
     color: _tealColor,
     background: Color(0xFFF4FBF8),
     borderColor: Color(0xFFCFE3DB),
+  ),
+  _ChoiceCardData(
+    target: _ChoiceTarget.clientCompanies,
+    title: 'Consultar clientes',
+    description:
+        'Abrir a carteira de clientes sem esconder transicoes, multi-prestadora e contexto operacional.',
+    hint: 'cliente como modulo proprio, nao como reflexo da prestadora',
+    icon: Icons.business_outlined,
+    color: _slateColor,
+    background: Color(0xFFF4F8FA),
+    borderColor: Color(0xFFD2DDE4),
   ),
   _ChoiceCardData(
     target: _ChoiceTarget.contracts,
@@ -654,11 +665,19 @@ const _choices = [
 
 const _summaryCards = [
   _SummaryCardData(
-    label: 'Empresas monitoradas',
+    label: 'Prestadoras monitoradas',
     value: '6',
     description: 'Prestadoras simuladas no recorte atual do workspace.',
     icon: Icons.business_outlined,
     color: _tealColor,
+  ),
+  _SummaryCardData(
+    label: 'Clientes em carteira',
+    value: '6',
+    description:
+        'Empresas clientes tratadas como modulo proprio no shell novo.',
+    icon: Icons.business_center_outlined,
+    color: _slateColor,
   ),
   _SummaryCardData(
     label: 'Contratos ativos',
@@ -684,6 +703,14 @@ const _resumeItems = [
         'Retomar uma lista curta de empresas que impactam contratos e postos.',
     icon: Icons.domain_verification_outlined,
     color: _tealColor,
+  ),
+  _ResumeItem(
+    target: _ChoiceTarget.clientCompanies,
+    title: 'Clientes com transicao de atendimento',
+    description:
+        'Abrir direto a carteira quando a leitura central for o cliente, e nao a prestadora.',
+    icon: Icons.business_center_outlined,
+    color: _slateColor,
   ),
   _ResumeItem(
     target: _ChoiceTarget.contracts,

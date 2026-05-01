@@ -1,14 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pariflow_partners/main.dart';
+import 'package:pariflow_partners/widgets/high_tech_light_waves.dart';
 
 void main() {
   testWidgets('renders the initial layout shell', (tester) async {
     await tester.pumpWidget(const PariFlowPartnersApp());
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.text('PariFlow Partners'), findsOneWidget);
-    expect(find.text('O que voce deseja consultar hoje?'), findsOneWidget);
-    expect(find.text('Leitura de rollout'), findsOneWidget);
+    expect(find.byType(HighTechLightWaves), findsOneWidget);
+    expect(find.text('Empresas'), findsWidgets);
+    expect(find.text('Contratos'), findsWidgets);
+    expect(find.text('Teia Visual'), findsOneWidget);
   });
 }

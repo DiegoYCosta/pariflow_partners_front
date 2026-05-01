@@ -1,6 +1,13 @@
 part of '../app.dart';
 
-enum _Destination { home, companies, contracts, people, network }
+enum _Destination {
+  home,
+  companies,
+  clientCompanies,
+  contracts,
+  people,
+  network,
+}
 
 enum _HomeMode { overview, network }
 
@@ -35,6 +42,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   String? _hoveredNetworkNodeId;
   final Map<_Destination, int> _selectedItemIndex = {
     _Destination.companies: 0,
+    _Destination.clientCompanies: 0,
     _Destination.contracts: 0,
     _Destination.people: 0,
   };
@@ -142,6 +150,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
               child: SafeArea(
                 child: _CrmSidebar(
                   current: _destination,
+                  viewerProfile: _viewerProfile,
                   onSelect: _handleDestination,
                 ),
               ),
@@ -173,36 +182,52 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                 color: _deepTealColor,
                 child: _CrmSidebar(
                   current: _destination,
+                  viewerProfile: _viewerProfile,
                   onSelect: _handleDestination,
                 ),
               ),
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  showSidebar ? 32 : 18,
-                  18,
-                  showSidebar ? 32 : 18,
-                  showSidebar ? 32 : 104,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: _paperColor,
+                  image: DecorationImage(
+                    image: const AssetImage(_crmBackgroundAsset),
+                    fit: BoxFit.cover,
+                    opacity: _destination == _Destination.home ? 0.40 : 0.88,
+                  ),
                 ),
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1560),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _CrmTopBar(
-                          page: page,
-                          viewerProfile: _viewerProfile,
-                          showMenuButton: !showSidebar,
-                        ),
-                        const SizedBox(height: 30),
-                        if (_destination != _Destination.home) ...[
-                          _CrmSectionHeader(page: page),
-                          const SizedBox(height: 24),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    showSidebar ? 32 : 18,
+                    18,
+                    showSidebar ? 32 : 18,
+                    showSidebar ? 32 : 104,
+                  ),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1560),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _CrmTopBar(
+                            page: page,
+                            viewerProfile: _viewerProfile,
+                            showMenuButton: !showSidebar,
+                            onViewerChanged: (value) {
+                              setState(() {
+                                _viewerProfile = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 30),
+                          if (_destination != _Destination.home) ...[
+                            _CrmSectionHeader(page: page),
+                            const SizedBox(height: 24),
+                          ],
+                          _buildWorkspaceContent(page, width),
                         ],
-                        _buildWorkspaceContent(page, width),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -242,8 +267,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                 },
                 onToggleAdvancedFilters: () {
                   setState(() {
-                    _showAdvancedNetworkFilters =
-                        !_showAdvancedNetworkFilters;
+                    _showAdvancedNetworkFilters = !_showAdvancedNetworkFilters;
                   });
                 },
                 onSelectNode: _handleNetworkNodeSelection,
@@ -295,6 +319,16 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
             });
           },
         );
+      case _Destination.clientCompanies:
+        return _ClientCompaniesWorkspace(
+          viewerProfile: _viewerProfile,
+          selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          onSelectItem: (index) {
+            setState(() {
+              _selectedItemIndex[_destination] = index;
+            });
+          },
+        );
       case _Destination.contracts:
         return _ContractsWorkspace(
           viewerProfile: _viewerProfile,
@@ -334,6 +368,9 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     switch (target) {
       case _ChoiceTarget.companies:
         _handleDestination(_Destination.companies);
+        return;
+      case _ChoiceTarget.clientCompanies:
+        _handleDestination(_Destination.clientCompanies);
         return;
       case _ChoiceTarget.contracts:
         _handleDestination(_Destination.contracts);
@@ -708,7 +745,8 @@ const _pageInfo = {
     shortLabel: 'Inicio',
     title: 'Inicio',
     description: 'Escolha enxuta entre consulta direta e teia relacional.',
-    kicker: 'Escolha direta para empresas, contratos, funcionarios ou teia',
+    kicker:
+        'Escolha direta para prestadoras, clientes, contratos, pessoas ou teia',
     sidebarHint: 'escolha o caminho inicial',
     icon: Icons.home_outlined,
     accent: _tealColor,
@@ -722,6 +760,17 @@ const _pageInfo = {
     sidebarHint: 'contexto empresarial e contratual',
     icon: Icons.apartment_outlined,
     accent: _tealColor,
+  ),
+  _Destination.clientCompanies: _PageInfo(
+    destination: _Destination.clientCompanies,
+    shortLabel: 'Clientes',
+    title: 'Empresas clientes',
+    description:
+        'Workspace focado em carteira, multi-prestadora e contexto operacional do cliente.',
+    kicker: 'Consulta focada em clientes e carteira ativa',
+    sidebarHint: 'carteira, transicao e operacao por cliente',
+    icon: Icons.business_outlined,
+    accent: _slateColor,
   ),
   _Destination.contracts: _PageInfo(
     destination: _Destination.contracts,
