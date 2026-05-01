@@ -5,9 +5,10 @@ import 'package:pariflow_partners/main.dart';
 void main() {
   testWidgets('renders the initial layout shell', (tester) async {
     await tester.pumpWidget(const PariFlowPartnersApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('PariFlow Partners'), findsOneWidget);
-    expect(find.text('Escolha por onde comecar.'), findsOneWidget);
-    expect(find.text('Ver previa da teia'), findsOneWidget);
+    expect(find.text('O que voce deseja consultar hoje?'), findsOneWidget);
+    expect(find.text('Leitura de rollout'), findsOneWidget);
   });
 }

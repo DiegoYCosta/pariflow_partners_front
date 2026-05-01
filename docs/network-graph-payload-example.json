@@ -1,0 +1,756 @@
+{
+  "data": {
+    "period": {
+      "preset": "1y",
+      "from": "2025-01-01",
+      "to": "2025-12-31"
+    },
+    "lanes": [
+      "root_company",
+      "client_company",
+      "contract",
+      "employee"
+    ],
+    "nodes": [
+      {
+        "publicId": "egr_01hroot0000000000000001",
+        "nodeType": "root_company",
+        "lane": "root_company",
+        "displayName": "Summit Holdings",
+        "subtitle": "Holding company",
+        "status": "active",
+        "badges": [
+          "2 client companies",
+          "2 active contracts"
+        ],
+        "detailSnapshot": {
+          "kind": "root_company",
+          "summary": "Holding com carteira ativa e cruzamento historico com outro grupo empresarial.",
+          "activeClientCompanies": 2,
+          "activeContracts": 2,
+          "activeEmployees": 2,
+          "historicalEmployees": 1,
+          "cta": {
+            "label": "Ver grupo completo",
+            "targetPublicId": "egr_01hroot0000000000000001"
+          }
+        }
+      },
+      {
+        "publicId": "egr_01hroot0000000000000002",
+        "nodeType": "root_company",
+        "lane": "root_company",
+        "displayName": "Pioneer Group",
+        "subtitle": "Holding company",
+        "status": "active",
+        "badges": [
+          "3 client companies",
+          "3 contracts in view"
+        ],
+        "detailSnapshot": {
+          "kind": "root_company",
+          "summary": "Holding com carteira ativa, contratos correntes e historico compartilhado com a malha da Summit.",
+          "activeClientCompanies": 3,
+          "activeContracts": 3,
+          "activeEmployees": 3,
+          "historicalEmployees": 2,
+          "cta": {
+            "label": "Ver grupo completo",
+            "targetPublicId": "egr_01hroot0000000000000002"
+          }
+        }
+      },
+      {
+        "publicId": "cli_01hcli0000000000000001",
+        "nodeType": "client_company",
+        "lane": "client_company",
+        "displayName": "Summit Retail LLC",
+        "subtitle": "Client company",
+        "status": "active",
+        "badges": [
+          "1 active contract"
+        ],
+        "detailSnapshot": {
+          "kind": "client_company",
+          "summary": "Cliente operacional conectado a uma raiz principal e a um contrato ativo de retail ops.",
+          "rootCompanies": [
+            "Summit Holdings"
+          ],
+          "activeContracts": 1,
+          "activeEmployees": 1,
+          "cta": {
+            "label": "Abrir empresa cliente",
+            "targetPublicId": "cli_01hcli0000000000000001"
+          }
+        }
+      },
+      {
+        "publicId": "cli_01hcli0000000000000002",
+        "nodeType": "client_company",
+        "lane": "client_company",
+        "displayName": "Summit Solutions Inc.",
+        "subtitle": "Client company",
+        "status": "active",
+        "badges": [
+          "1 active contract",
+          "1 indirect bridge"
+        ],
+        "detailSnapshot": {
+          "kind": "client_company",
+          "summary": "Cliente operacional da Summit com ponte indireta para Pioneer Services.",
+          "rootCompanies": [
+            "Summit Holdings"
+          ],
+          "activeContracts": 1,
+          "indirectConnections": 1,
+          "cta": {
+            "label": "Abrir empresa cliente",
+            "targetPublicId": "cli_01hcli0000000000000002"
+          }
+        }
+      },
+      {
+        "publicId": "cli_01hcli0000000000000003",
+        "nodeType": "client_company",
+        "lane": "client_company",
+        "displayName": "Pioneer Services LLC",
+        "subtitle": "Client company",
+        "status": "active",
+        "badges": [
+          "2 relevant contracts"
+        ],
+        "detailSnapshot": {
+          "kind": "client_company",
+          "summary": "Cliente operacional com contrato ativo de maintenance e historico relacionado a consulting.",
+          "rootCompanies": [
+            "Pioneer Group"
+          ],
+          "activeContracts": 2,
+          "activeEmployees": 2,
+          "cta": {
+            "label": "Abrir empresa cliente",
+            "targetPublicId": "cli_01hcli0000000000000003"
+          }
+        }
+      },
+      {
+        "publicId": "cli_01hcli0000000000000004",
+        "nodeType": "client_company",
+        "lane": "client_company",
+        "displayName": "Pioneer Retail Inc.",
+        "subtitle": "Client company",
+        "status": "active",
+        "badges": [
+          "1 historical contract"
+        ],
+        "detailSnapshot": {
+          "kind": "client_company",
+          "summary": "Cliente com relacao historica ainda relevante para o contrato de maintenance.",
+          "rootCompanies": [
+            "Pioneer Group"
+          ],
+          "historicalContracts": 1,
+          "cta": {
+            "label": "Abrir empresa cliente",
+            "targetPublicId": "cli_01hcli0000000000000004"
+          }
+        }
+      },
+      {
+        "publicId": "cli_01hcli0000000000000005",
+        "nodeType": "client_company",
+        "lane": "client_company",
+        "displayName": "Pioneer Tech LLC",
+        "subtitle": "Client company",
+        "status": "active",
+        "badges": [
+          "1 expired contract"
+        ],
+        "detailSnapshot": {
+          "kind": "client_company",
+          "summary": "Cliente com supply agreement expirado ainda visivel no recorte historico.",
+          "rootCompanies": [
+            "Pioneer Group"
+          ],
+          "historicalContracts": 1,
+          "cta": {
+            "label": "Abrir empresa cliente",
+            "targetPublicId": "cli_01hcli0000000000000005"
+          }
+        }
+      },
+      {
+        "publicId": "ctr_01hctr0000000000000001",
+        "nodeType": "contract",
+        "lane": "contract",
+        "displayName": "Retail Ops Agreement",
+        "subtitle": "Active",
+        "status": "active",
+        "badges": [
+          "1 employee"
+        ],
+        "detailSnapshot": {
+          "kind": "contract",
+          "summary": "Contrato ativo de operacao de retail conectado a uma company e a uma colaboradora.",
+          "contractStatus": "active",
+          "clientCompanies": [
+            "Summit Retail LLC"
+          ],
+          "activeEmployees": 1,
+          "cta": {
+            "label": "Abrir contrato",
+            "targetPublicId": "ctr_01hctr0000000000000001"
+          }
+        }
+      },
+      {
+        "publicId": "ctr_01hctr0000000000000002",
+        "nodeType": "contract",
+        "lane": "contract",
+        "displayName": "IT Services Contract",
+        "subtitle": "Active",
+        "status": "active",
+        "badges": [
+          "1 employee"
+        ],
+        "detailSnapshot": {
+          "kind": "contract",
+          "summary": "Contrato ativo de servicos de TI ligado a Summit Solutions.",
+          "contractStatus": "active",
+          "clientCompanies": [
+            "Summit Solutions Inc."
+          ],
+          "activeEmployees": 1,
+          "cta": {
+            "label": "Abrir contrato",
+            "targetPublicId": "ctr_01hctr0000000000000002"
+          }
+        }
+      },
+      {
+        "publicId": "ctr_01hctr0000000000000003",
+        "nodeType": "contract",
+        "lane": "contract",
+        "displayName": "Consulting Agreement",
+        "subtitle": "Expired",
+        "status": "expired",
+        "badges": [
+          "historical relation"
+        ],
+        "detailSnapshot": {
+          "kind": "contract",
+          "summary": "Contrato expirado que ainda compoe a leitura historica de Sarah Johnson.",
+          "contractStatus": "expired",
+          "clientCompanies": [
+            "Pioneer Services LLC"
+          ],
+          "historicalEmployees": 1,
+          "cta": {
+            "label": "Abrir contrato",
+            "targetPublicId": "ctr_01hctr0000000000000003"
+          }
+        }
+      },
+      {
+        "publicId": "ctr_01hctr0000000000000004",
+        "nodeType": "contract",
+        "lane": "contract",
+        "displayName": "Maintenance Contract",
+        "subtitle": "Active",
+        "status": "active",
+        "badges": [
+          "2 employees",
+          "2 client contexts"
+        ],
+        "detailSnapshot": {
+          "kind": "contract",
+          "summary": "Contrato ativo que mostra que um contrato pode carregar mais de uma company relevante no mesmo recorte.",
+          "contractStatus": "active",
+          "clientCompanies": [
+            "Pioneer Services LLC",
+            "Pioneer Retail Inc."
+          ],
+          "activeEmployees": 2,
+          "cta": {
+            "label": "Abrir contrato",
+            "targetPublicId": "ctr_01hctr0000000000000004"
+          }
+        }
+      },
+      {
+        "publicId": "ctr_01hctr0000000000000005",
+        "nodeType": "contract",
+        "lane": "contract",
+        "displayName": "Supply Agreement",
+        "subtitle": "Expired",
+        "status": "expired",
+        "badges": [
+          "historical employee"
+        ],
+        "detailSnapshot": {
+          "kind": "contract",
+          "summary": "Contrato expirado de supply ainda visivel em historico ampliado.",
+          "contractStatus": "expired",
+          "clientCompanies": [
+            "Pioneer Tech LLC"
+          ],
+          "historicalEmployees": 1,
+          "cta": {
+            "label": "Abrir contrato",
+            "targetPublicId": "ctr_01hctr0000000000000005"
+          }
+        }
+      },
+      {
+        "publicId": "pes_01hpes0000000000000001",
+        "nodeType": "employee",
+        "lane": "employee",
+        "displayName": "Jessica Lee",
+        "subtitle": "Project Manager",
+        "status": "active",
+        "badges": [
+          "1 active contract"
+        ],
+        "detailSnapshot": {
+          "kind": "employee",
+          "employeeId": "EMP-10431",
+          "email": "jessica.lee@summitretail.com",
+          "phone": "+1 (555) 234-5601",
+          "department": "Retail Operations",
+          "manager": "Olivia Carter",
+          "clientCompany": "Summit Retail LLC",
+          "contract": "Retail Ops Agreement",
+          "status": "Active",
+          "startDate": "2023-02-01",
+          "location": "Chicago, IL",
+          "cta": {
+            "label": "View Full Profile",
+            "targetPublicId": "pes_01hpes0000000000000001"
+          }
+        }
+      },
+      {
+        "publicId": "pes_01hpes0000000000000002",
+        "nodeType": "employee",
+        "lane": "employee",
+        "displayName": "Michael Chen",
+        "subtitle": "IT Specialist",
+        "status": "active",
+        "badges": [
+          "1 active contract"
+        ],
+        "detailSnapshot": {
+          "kind": "employee",
+          "employeeId": "EMP-10432",
+          "email": "michael.chen@summitsolutions.com",
+          "phone": "+1 (555) 234-5670",
+          "department": "Technology",
+          "manager": "Helen Brooks",
+          "clientCompany": "Summit Solutions Inc.",
+          "contract": "IT Services Contract",
+          "status": "Active",
+          "startDate": "2022-08-15",
+          "location": "Austin, TX",
+          "cta": {
+            "label": "View Full Profile",
+            "targetPublicId": "pes_01hpes0000000000000002"
+          }
+        }
+      },
+      {
+        "publicId": "pes_01hpes0000000000000003",
+        "nodeType": "employee",
+        "lane": "employee",
+        "displayName": "Sarah Johnson",
+        "subtitle": "Senior Analyst",
+        "status": "active",
+        "badges": [
+          "1 active contract",
+          "1 historical contract"
+        ],
+        "detailSnapshot": {
+          "kind": "employee",
+          "employeeId": "EMP-10432",
+          "email": "sarah.johnson@pioneerservices.com",
+          "phone": "+1 (555) 234-5678",
+          "department": "Analytics",
+          "manager": "David Williams",
+          "clientCompany": "Pioneer Services LLC",
+          "contract": "Maintenance Contract",
+          "status": "Active",
+          "startDate": "2022-01-15",
+          "location": "Chicago, IL",
+          "historicalContracts": [
+            "Consulting Agreement"
+          ],
+          "cta": {
+            "label": "View Full Profile",
+            "targetPublicId": "pes_01hpes0000000000000003"
+          }
+        }
+      },
+      {
+        "publicId": "pes_01hpes0000000000000004",
+        "nodeType": "employee",
+        "lane": "employee",
+        "displayName": "David Williams",
+        "subtitle": "Account Manager",
+        "status": "active",
+        "badges": [
+          "1 active contract"
+        ],
+        "detailSnapshot": {
+          "kind": "employee",
+          "employeeId": "EMP-10433",
+          "email": "david.williams@pioneerservices.com",
+          "phone": "+1 (555) 234-5681",
+          "department": "Client Services",
+          "manager": "Sophia Turner",
+          "clientCompany": "Pioneer Services LLC",
+          "contract": "Maintenance Contract",
+          "status": "Active",
+          "startDate": "2021-04-04",
+          "location": "Chicago, IL",
+          "cta": {
+            "label": "View Full Profile",
+            "targetPublicId": "pes_01hpes0000000000000004"
+          }
+        }
+      },
+      {
+        "publicId": "pes_01hpes0000000000000005",
+        "nodeType": "employee",
+        "lane": "employee",
+        "displayName": "Emily Davis",
+        "subtitle": "Operations Lead",
+        "status": "historical",
+        "badges": [
+          "expired contract"
+        ],
+        "detailSnapshot": {
+          "kind": "employee",
+          "employeeId": "EMP-10434",
+          "email": "emily.davis@pioneertech.com",
+          "phone": "+1 (555) 234-5690",
+          "department": "Operations",
+          "manager": "Liam Foster",
+          "clientCompany": "Pioneer Tech LLC",
+          "contract": "Supply Agreement",
+          "status": "Historical",
+          "startDate": "2020-03-12",
+          "endDate": "2024-11-30",
+          "location": "Denver, CO",
+          "cta": {
+            "label": "View Full Profile",
+            "targetPublicId": "pes_01hpes0000000000000005"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "publicId": "rel_01hrel0000000000000001",
+        "fromPublicId": "egr_01hroot0000000000000001",
+        "toPublicId": "egr_01hroot0000000000000002",
+        "relationshipKind": "historical_association",
+        "relationshipState": "historical",
+        "periodStart": "2021-01-01",
+        "periodEnd": "2022-12-31",
+        "metadata": {
+          "label": "legacy strategic overlap"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000002",
+        "fromPublicId": "egr_01hroot0000000000000001",
+        "toPublicId": "cli_01hcli0000000000000001",
+        "relationshipKind": "client_membership",
+        "relationshipState": "active",
+        "periodStart": "2024-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000003",
+        "fromPublicId": "egr_01hroot0000000000000001",
+        "toPublicId": "cli_01hcli0000000000000002",
+        "relationshipKind": "client_membership",
+        "relationshipState": "active",
+        "periodStart": "2024-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000004",
+        "fromPublicId": "egr_01hroot0000000000000002",
+        "toPublicId": "cli_01hcli0000000000000003",
+        "relationshipKind": "client_membership",
+        "relationshipState": "active",
+        "periodStart": "2024-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000005",
+        "fromPublicId": "egr_01hroot0000000000000002",
+        "toPublicId": "cli_01hcli0000000000000004",
+        "relationshipKind": "client_membership",
+        "relationshipState": "active",
+        "periodStart": "2024-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000006",
+        "fromPublicId": "egr_01hroot0000000000000002",
+        "toPublicId": "cli_01hcli0000000000000005",
+        "relationshipKind": "client_membership",
+        "relationshipState": "active",
+        "periodStart": "2024-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000007",
+        "fromPublicId": "cli_01hcli0000000000000002",
+        "toPublicId": "cli_01hcli0000000000000003",
+        "relationshipKind": "indirect_association",
+        "relationshipState": "indirect",
+        "periodStart": "2025-01-01",
+        "periodEnd": null,
+        "metadata": {
+          "label": "shared delivery context"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000008",
+        "fromPublicId": "cli_01hcli0000000000000001",
+        "toPublicId": "ctr_01hctr0000000000000001",
+        "relationshipKind": "contract_scope",
+        "relationshipState": "active",
+        "periodStart": "2025-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000009",
+        "fromPublicId": "cli_01hcli0000000000000002",
+        "toPublicId": "ctr_01hctr0000000000000002",
+        "relationshipKind": "contract_scope",
+        "relationshipState": "active",
+        "periodStart": "2025-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000010",
+        "fromPublicId": "cli_01hcli0000000000000003",
+        "toPublicId": "ctr_01hctr0000000000000003",
+        "relationshipKind": "contract_scope",
+        "relationshipState": "historical",
+        "periodStart": "2023-01-01",
+        "periodEnd": "2024-12-31",
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000011",
+        "fromPublicId": "cli_01hcli0000000000000003",
+        "toPublicId": "ctr_01hctr0000000000000004",
+        "relationshipKind": "contract_scope",
+        "relationshipState": "active",
+        "periodStart": "2025-01-01",
+        "periodEnd": null,
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000012",
+        "fromPublicId": "cli_01hcli0000000000000004",
+        "toPublicId": "ctr_01hctr0000000000000004",
+        "relationshipKind": "historical_association",
+        "relationshipState": "historical",
+        "periodStart": "2024-01-01",
+        "periodEnd": "2024-12-31",
+        "metadata": {
+          "label": "previous operating context"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000013",
+        "fromPublicId": "cli_01hcli0000000000000005",
+        "toPublicId": "ctr_01hctr0000000000000005",
+        "relationshipKind": "contract_scope",
+        "relationshipState": "historical",
+        "periodStart": "2023-01-01",
+        "periodEnd": "2024-11-30",
+        "metadata": {}
+      },
+      {
+        "publicId": "rel_01hrel0000000000000014",
+        "fromPublicId": "ctr_01hctr0000000000000001",
+        "toPublicId": "pes_01hpes0000000000000001",
+        "relationshipKind": "active_allocation",
+        "relationshipState": "active",
+        "periodStart": "2023-02-01",
+        "periodEnd": null,
+        "metadata": {
+          "employmentLinkPublicId": "vin_01hvin0000000000000001"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000015",
+        "fromPublicId": "ctr_01hctr0000000000000002",
+        "toPublicId": "pes_01hpes0000000000000002",
+        "relationshipKind": "active_allocation",
+        "relationshipState": "active",
+        "periodStart": "2022-08-15",
+        "periodEnd": null,
+        "metadata": {
+          "employmentLinkPublicId": "vin_01hvin0000000000000002"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000016",
+        "fromPublicId": "ctr_01hctr0000000000000003",
+        "toPublicId": "pes_01hpes0000000000000003",
+        "relationshipKind": "historical_allocation",
+        "relationshipState": "historical",
+        "periodStart": "2023-03-01",
+        "periodEnd": "2024-12-31",
+        "metadata": {
+          "employmentLinkPublicId": "vin_01hvin0000000000000003"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000017",
+        "fromPublicId": "ctr_01hctr0000000000000004",
+        "toPublicId": "pes_01hpes0000000000000003",
+        "relationshipKind": "active_allocation",
+        "relationshipState": "active",
+        "periodStart": "2025-01-15",
+        "periodEnd": null,
+        "metadata": {
+          "employmentLinkPublicId": "vin_01hvin0000000000000004"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000018",
+        "fromPublicId": "ctr_01hctr0000000000000004",
+        "toPublicId": "pes_01hpes0000000000000004",
+        "relationshipKind": "active_allocation",
+        "relationshipState": "active",
+        "periodStart": "2021-04-04",
+        "periodEnd": null,
+        "metadata": {
+          "employmentLinkPublicId": "vin_01hvin0000000000000005"
+        }
+      },
+      {
+        "publicId": "rel_01hrel0000000000000019",
+        "fromPublicId": "ctr_01hctr0000000000000005",
+        "toPublicId": "pes_01hpes0000000000000005",
+        "relationshipKind": "historical_allocation",
+        "relationshipState": "historical",
+        "periodStart": "2020-03-12",
+        "periodEnd": "2024-11-30",
+        "metadata": {
+          "employmentLinkPublicId": "vin_01hvin0000000000000006"
+        }
+      }
+    ],
+    "filters": {
+      "search": "",
+      "applied": {
+        "periodPreset": "1y",
+        "rootCompanyPublicIds": [],
+        "clientCompanyPublicIds": [],
+        "contractStatuses": [
+          "active",
+          "expired"
+        ],
+        "employeeStatuses": [
+          "active",
+          "historical"
+        ],
+        "includeHistorical": true,
+        "includeIndirect": true
+      },
+      "available": {
+        "periodPresets": [
+          "6m",
+          "1y",
+          "2y",
+          "all"
+        ],
+        "rootCompanies": [
+          {
+            "publicId": "egr_01hroot0000000000000001",
+            "label": "Summit Holdings"
+          },
+          {
+            "publicId": "egr_01hroot0000000000000002",
+            "label": "Pioneer Group"
+          }
+        ],
+        "clientCompanies": [
+          {
+            "publicId": "cli_01hcli0000000000000001",
+            "label": "Summit Retail LLC"
+          },
+          {
+            "publicId": "cli_01hcli0000000000000002",
+            "label": "Summit Solutions Inc."
+          },
+          {
+            "publicId": "cli_01hcli0000000000000003",
+            "label": "Pioneer Services LLC"
+          },
+          {
+            "publicId": "cli_01hcli0000000000000004",
+            "label": "Pioneer Retail Inc."
+          },
+          {
+            "publicId": "cli_01hcli0000000000000005",
+            "label": "Pioneer Tech LLC"
+          }
+        ],
+        "contractStatuses": [
+          "active",
+          "expired"
+        ],
+        "employeeStatuses": [
+          "active",
+          "historical"
+        ],
+        "relationshipStates": [
+          "active",
+          "historical",
+          "indirect"
+        ]
+      }
+    },
+    "legend": {
+      "relationshipStates": [
+        {
+          "value": "active",
+          "label": "Active Relationship"
+        },
+        {
+          "value": "historical",
+          "label": "Historical Relationship"
+        },
+        {
+          "value": "indirect",
+          "label": "Indirect Relationship"
+        }
+      ]
+    },
+    "focus": {
+      "selectedNodePublicId": "pes_01hpes0000000000000003",
+      "hoveredNodePublicId": null,
+      "viewportAnchorPublicId": "pes_01hpes0000000000000003"
+    }
+  },
+  "meta": {
+    "traceId": "req_01hnetworkpayloadexample0001"
+  }
+}

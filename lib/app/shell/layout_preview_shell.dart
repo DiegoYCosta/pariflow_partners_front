@@ -4,14 +4,28 @@ enum _Destination { home, companies, contracts, people, network }
 
 enum _HomeMode { overview, network }
 
-class LayoutPreviewPage extends StatefulWidget {
+class LayoutPreviewPage extends StatelessWidget {
   const LayoutPreviewPage({super.key});
 
   @override
-  State<LayoutPreviewPage> createState() => _LayoutPreviewPageState();
+  Widget build(BuildContext context) {
+    return switch (_ShellFeatureFlags.activeVariant) {
+      _ShellVariant.legacy => const _LegacyShellPage(),
+      _ShellVariant.crm => const _CrmShellPage(),
+    };
+  }
 }
 
-class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
+class _ShellPreviewPage extends StatefulWidget {
+  const _ShellPreviewPage({required this.variant});
+
+  final _ShellVariant variant;
+
+  @override
+  State<_ShellPreviewPage> createState() => _ShellPreviewPageState();
+}
+
+class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   _Destination _destination = _Destination.home;
   _HomeMode _homeMode = _HomeMode.overview;
   _ViewerAccessProfile _viewerProfile = _diegoViewerProfile;
@@ -31,6 +45,13 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
     final showSidebar = width >= 1120;
     final page = _pageInfo[_destination]!;
 
+    return switch (widget.variant) {
+      _ShellVariant.legacy => _buildLegacyShell(page, width, showSidebar),
+      _ShellVariant.crm => _buildCrmShell(page, width, showSidebar),
+    };
+  }
+
+  Widget _buildLegacyShell(_PageInfo page, double width, bool showSidebar) {
     return Scaffold(
       drawer: showSidebar
           ? null
@@ -99,7 +120,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
                           },
                         ),
                         const SizedBox(height: 24),
-                        _buildContent(page, width),
+                        _buildWorkspaceContent(page, width),
                       ],
                     ),
                   ),
@@ -112,41 +133,129 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
     );
   }
 
-  Widget _buildContent(_PageInfo page, double width) {
+  Widget _buildCrmShell(_PageInfo page, double width, bool showSidebar) {
+    return Scaffold(
+      drawer: showSidebar
+          ? null
+          : Drawer(
+              backgroundColor: _deepTealColor,
+              child: SafeArea(
+                child: _CrmSidebar(
+                  current: _destination,
+                  onSelect: _handleDestination,
+                ),
+              ),
+            ),
+      bottomNavigationBar: showSidebar
+          ? null
+          : NavigationBar(
+              selectedIndex: _Destination.values.indexOf(_destination),
+              onDestinationSelected: (index) {
+                _handleDestination(_Destination.values[index]);
+              },
+              backgroundColor: _paperColor,
+              indicatorColor: page.accent.withValues(alpha: 0.14),
+              destinations: [
+                for (final item in _pageInfo.values)
+                  NavigationDestination(
+                    icon: Icon(item.icon),
+                    selectedIcon: Icon(item.icon, color: page.accent),
+                    label: item.shortLabel,
+                  ),
+              ],
+            ),
+      body: SafeArea(
+        child: Row(
+          children: [
+            if (showSidebar)
+              Container(
+                width: 296,
+                color: _deepTealColor,
+                child: _CrmSidebar(
+                  current: _destination,
+                  onSelect: _handleDestination,
+                ),
+              ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  showSidebar ? 32 : 18,
+                  18,
+                  showSidebar ? 32 : 18,
+                  showSidebar ? 32 : 104,
+                ),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1560),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _CrmTopBar(
+                          page: page,
+                          viewerProfile: _viewerProfile,
+                          showMenuButton: !showSidebar,
+                        ),
+                        const SizedBox(height: 30),
+                        if (_destination != _Destination.home) ...[
+                          _CrmSectionHeader(page: page),
+                          const SizedBox(height: 24),
+                        ],
+                        _buildWorkspaceContent(page, width),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkspaceContent(_PageInfo page, double width) {
     switch (_destination) {
       case _Destination.home:
-        return _HomeContent(
-          mode: _homeMode,
-          viewerProfile: _viewerProfile,
-          filters: _networkFilters,
-          showAdvancedFilters: _showAdvancedNetworkFilters,
-          selectedNodeId: _selectedNetworkNodeId,
-          hoveredNodeId: _hoveredNetworkNodeId,
-          onChangeMode: (mode) {
-            setState(() {
-              _homeMode = mode;
-            });
-          },
-          onFiltersChanged: (filters) {
-            setState(() {
-              _networkFilters = filters;
-            });
-          },
-          onToggleAdvancedFilters: () {
-            setState(() {
-              _showAdvancedNetworkFilters = !_showAdvancedNetworkFilters;
-            });
-          },
-          onSelectNode: _handleNetworkNodeSelection,
-          onHoverNode: _handleNetworkNodeHover,
-          onChooseDestination: _handleChoice,
-          onOpenFullNetwork: () {
-            setState(() {
-              _destination = _Destination.network;
-            });
-          },
-          pageWidth: width,
-        );
+        return widget.variant == _ShellVariant.crm
+            ? _CrmDashboardContent(
+                viewerProfile: _viewerProfile,
+                onChooseDestination: _handleChoice,
+                pageWidth: width,
+              )
+            : _HomeContent(
+                mode: _homeMode,
+                viewerProfile: _viewerProfile,
+                filters: _networkFilters,
+                showAdvancedFilters: _showAdvancedNetworkFilters,
+                selectedNodeId: _selectedNetworkNodeId,
+                hoveredNodeId: _hoveredNetworkNodeId,
+                onChangeMode: (mode) {
+                  setState(() {
+                    _homeMode = mode;
+                  });
+                },
+                onFiltersChanged: (filters) {
+                  setState(() {
+                    _networkFilters = filters;
+                  });
+                },
+                onToggleAdvancedFilters: () {
+                  setState(() {
+                    _showAdvancedNetworkFilters =
+                        !_showAdvancedNetworkFilters;
+                  });
+                },
+                onSelectNode: _handleNetworkNodeSelection,
+                onHoverNode: _handleNetworkNodeHover,
+                onChooseDestination: _handleChoice,
+                onOpenFullNetwork: () {
+                  setState(() {
+                    _destination = _Destination.network;
+                  });
+                },
+                pageWidth: width,
+              );
       case _Destination.network:
         return _NetworkWorkspace(
           title: page.title,
