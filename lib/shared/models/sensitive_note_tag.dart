@@ -39,8 +39,7 @@ class _SensitiveNoteTag {
     required this.classification,
     required this.color,
     required this.sortOrder,
-    this.requiresLoginToView = true,
-    this.requiresLoginToCreate = false,
+    required this.accessPolicy,
   }) : assert(note.length <= 350);
 
   final String label;
@@ -48,16 +47,7 @@ class _SensitiveNoteTag {
   final _SensitiveNoteClassification classification;
   final Color color;
   final int sortOrder;
-  final bool requiresLoginToView;
-  final bool requiresLoginToCreate;
+  final _ProtectedAccessPolicy accessPolicy;
 
-  String get accessSummary {
-    final createSummary = requiresLoginToCreate
-        ? 'envio com sessao'
-        : 'envio sem login';
-    final viewSummary = requiresLoginToView
-        ? 'consulta protegida'
-        : 'consulta livre';
-    return '$createSummary | $viewSummary';
-  }
+  String get accessSummary => 'envio sem login | leitura protegida';
 }

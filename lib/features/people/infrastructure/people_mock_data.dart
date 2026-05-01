@@ -42,6 +42,11 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
               'Documento formal ligado ao dossie base do colaborador.',
           status: 'vigente',
           updatedAtLabel: 'atualizado em 01/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceCamila,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+            allowedPeople: [_audienceMarta],
+          ),
         ),
       ],
       sensitiveNotes: [
@@ -52,8 +57,10 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.familyContext,
           color: _roseColor,
           sortOrder: 1,
-          requiresLoginToView: true,
-          requiresLoginToCreate: false,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceMarta,
+            allowedPeople: [_audienceDiego],
+          ),
         ),
         _SensitiveNoteTag(
           label: 'faz krav maga',
@@ -62,6 +69,11 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.trainingOrSkill,
           color: _tealColor,
           sortOrder: 2,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceCamila,
+            allowedGroups: [_CollaboratorAudienceGroup.supervision],
+            allowedPeople: [_audienceLucas],
+          ),
         ),
       ],
     ),
@@ -89,6 +101,11 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
               'Arquivo protegido com contexto complementar ao desligamento recente.',
           status: 'restrito',
           updatedAtLabel: 'atualizado em 04/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceDiego,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+            allowedPeople: [_audienceMarta],
+          ),
           canDownload: false,
         ),
       ],
@@ -100,6 +117,9 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.behavioralSignal,
           color: _amberColor,
           sortOrder: 1,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceLucas,
+          ),
         ),
         _SensitiveNoteTag(
           label: 'mente sobre justificativas',
@@ -108,6 +128,10 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.behavioralSignal,
           color: _roseColor,
           sortOrder: 2,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceMarta,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+          ),
         ),
       ],
     ),
@@ -135,6 +159,11 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
               'Referencia de apoio para leitura rapida da movimentacao recente.',
           status: 'ativo',
           updatedAtLabel: 'atualizado em 03/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceLucas,
+            allowedGroups: [_CollaboratorAudienceGroup.auxiliary],
+            allowedPeople: [_audienceMarta],
+          ),
         ),
       ],
       sensitiveNotes: [
@@ -145,6 +174,11 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.personalContext,
           color: _slateColor,
           sortOrder: 1,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceCamila,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+            allowedPeople: [_audienceMarta],
+          ),
         ),
       ],
     ),

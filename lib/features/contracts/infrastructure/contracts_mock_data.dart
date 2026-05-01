@@ -42,6 +42,13 @@ const _contractsWorkspaceData = _EntityWorkspaceData(
               'Documento principal de vigencia e escopo do contrato.',
           status: 'vigente',
           updatedAtLabel: 'atualizado em 01/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceDiego,
+            allowedGroups: [
+              _CollaboratorAudienceGroup.board,
+              _CollaboratorAudienceGroup.supervision,
+            ],
+          ),
         ),
         _AttachmentRecord(
           publicId: 'anx_01hctrref000000000001',
@@ -51,6 +58,11 @@ const _contractsWorkspaceData = _EntityWorkspaceData(
               'Referencia operacional usada para acelerar a leitura do contexto.',
           status: 'ativo',
           updatedAtLabel: 'atualizado em 02/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceMarta,
+            allowedGroups: [_CollaboratorAudienceGroup.supervision],
+            allowedPeople: [_audienceLucas],
+          ),
         ),
       ],
     ),
@@ -78,6 +90,11 @@ const _contractsWorkspaceData = _EntityWorkspaceData(
               'Arquivo lateral com leitura controlada para quem precisa atuar no risco contratual.',
           status: 'restrito',
           updatedAtLabel: 'atualizado em 04/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceMarta,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+            allowedPeople: [_audienceCamila],
+          ),
           canDownload: false,
         ),
       ],
@@ -106,6 +123,11 @@ const _contractsWorkspaceData = _EntityWorkspaceData(
               'Complemento contratual para leitura objetiva de escopo e vigencia.',
           status: 'vigente',
           updatedAtLabel: 'atualizado em 03/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceDiego,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+            allowedPeople: [_audienceMarta],
+          ),
         ),
       ],
     ),

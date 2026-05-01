@@ -3,30 +3,48 @@ part of '../../app/app.dart';
 class _EntityWorkspace extends StatelessWidget {
   const _EntityWorkspace({
     required this.data,
-    required this.accessLevel,
+    required this.viewerProfile,
     required this.selectedIndex,
     required this.onSelectItem,
   });
 
   final _EntityWorkspaceData data;
-  final _ViewerAccessLevel accessLevel;
+  final _ViewerAccessProfile viewerProfile;
   final int selectedIndex;
   final ValueChanged<int> onSelectItem;
 
   @override
   Widget build(BuildContext context) {
     final selectedItem = data.items[selectedIndex];
-    final protectedNoteCount = data.items.fold<int>(
+    final readableNoteCount = data.items.fold<int>(
       0,
-      (total, item) => total + item.sensitiveNotes.length,
+      (total, item) =>
+          total +
+          item.sensitiveNotes
+              .where((note) => note.accessPolicy.canViewerRead(viewerProfile))
+              .length,
     );
-    final itemsWithProtectedNotes = data.items
-        .where((item) => item.sensitiveNotes.isNotEmpty)
-        .length;
-    final attachmentCount = data.items.fold<int>(
+    final readableAttachmentCount = data.items.fold<int>(
       0,
-      (total, item) => total + item.attachments.length,
+      (total, item) =>
+          total +
+          item.attachments
+              .where(
+                (attachment) => attachment.accessPolicy.canViewerRead(
+                  viewerProfile,
+                ),
+              )
+              .length,
     );
+    final itemsWithReadableSensitiveContent = data.items.where((item) {
+      final noteMatch = item.sensitiveNotes.any(
+        (note) => note.accessPolicy.canViewerRead(viewerProfile),
+      );
+      final attachmentMatch = item.attachments.any(
+        (attachment) => attachment.accessPolicy.canViewerRead(viewerProfile),
+      );
+      return noteMatch || attachmentMatch;
+    }).length;
 
     return Column(
       children: [
@@ -60,22 +78,26 @@ class _EntityWorkspace extends StatelessWidget {
                     color: data.accent,
                     background: data.accent.withValues(alpha: 0.12),
                   ),
-                  _Tag(
-                    label: '$protectedNoteCount tags protegidas',
-                    icon: Icons.lock_outline_rounded,
-                    color: _roseColor,
-                    background: _roseColor.withValues(alpha: 0.12),
-                  ),
-                  if (attachmentCount > 0)
+                  if (viewerProfile.isAuthenticated && readableNoteCount > 0)
                     _Tag(
-                      label: '$attachmentCount anexos classificados',
+                      label: '$readableNoteCount tags visiveis para este perfil',
+                      icon: Icons.lock_open_rounded,
+                      color: _roseColor,
+                      background: _roseColor.withValues(alpha: 0.12),
+                    ),
+                  if (viewerProfile.isAuthenticated && readableAttachmentCount > 0)
+                    _Tag(
+                      label:
+                          '$readableAttachmentCount anexos visiveis para este perfil',
                       icon: Icons.attach_file_rounded,
                       color: _amberColor,
                       background: _amberColor.withValues(alpha: 0.12),
                     ),
-                  if (itemsWithProtectedNotes > 0)
+                  if (viewerProfile.isAuthenticated &&
+                      itemsWithReadableSensitiveContent > 0)
                     _Tag(
-                      label: '$itemsWithProtectedNotes fichas com memoria sensivel',
+                      label:
+                          '$itemsWithReadableSensitiveContent fichas com compartilhamento ativo',
                       icon: Icons.shield_outlined,
                       color: _slateColor,
                       background: _slateColor.withValues(alpha: 0.12),
@@ -151,7 +173,7 @@ class _EntityWorkspace extends StatelessWidget {
                   _Panel(
                     child: _EntityDetailCard(
                       item: selectedItem,
-                      accessLevel: accessLevel,
+                      viewerProfile: viewerProfile,
                     ),
                   ),
                 ],
@@ -177,7 +199,7 @@ class _EntityWorkspace extends StatelessWidget {
                   child: _Panel(
                     child: _EntityDetailCard(
                       item: selectedItem,
-                      accessLevel: accessLevel,
+                      viewerProfile: viewerProfile,
                     ),
                   ),
                 ),
@@ -229,17 +251,21 @@ class _EntityListCard extends StatelessWidget {
 class _EntityDetailCard extends StatelessWidget {
   const _EntityDetailCard({
     required this.item,
-    required this.accessLevel,
+    required this.viewerProfile,
   });
 
   final _EntityItem item;
-  final _ViewerAccessLevel accessLevel;
+  final _ViewerAccessProfile viewerProfile;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final orderedNotes = [...item.sensitiveNotes]
+    final visibleNotes = [...item.sensitiveNotes]
+      ..retainWhere((note) => note.accessPolicy.canViewerRead(viewerProfile))
       ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+    final visibleAttachments = item.attachments
+        .where((attachment) => attachment.accessPolicy.canViewerRead(viewerProfile))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,17 +288,17 @@ class _EntityDetailCard extends StatelessWidget {
               color: item.color,
               background: item.color.withValues(alpha: 0.12),
             ),
-            if (item.attachments.isNotEmpty)
+            if (visibleAttachments.isNotEmpty)
               _Tag(
-                label: '${item.attachments.length} anexos',
+                label: '${visibleAttachments.length} anexos acessiveis',
                 icon: Icons.attach_file_rounded,
                 color: _amberColor,
                 background: _amberColor.withValues(alpha: 0.12),
               ),
-            if (orderedNotes.isNotEmpty)
+            if (visibleNotes.isNotEmpty)
               _Tag(
-                label: '${orderedNotes.length} tags protegidas',
-                icon: Icons.lock_outline_rounded,
+                label: '${visibleNotes.length} tags acessiveis',
+                icon: Icons.lock_open_rounded,
                 color: _roseColor,
                 background: _roseColor.withValues(alpha: 0.12),
               ),
@@ -303,7 +329,7 @@ class _EntityDetailCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                accessLevel.description,
+                viewerProfile.description,
                 style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
               ),
               const SizedBox(height: 12),
@@ -312,31 +338,37 @@ class _EntityDetailCard extends StatelessWidget {
                 runSpacing: 10,
                 children: [
                   _Tag(
-                    label: accessLevel.label,
-                    icon: accessLevel.icon,
-                    color: accessLevel.color,
-                    background: accessLevel.color.withValues(alpha: 0.12),
+                    label: viewerProfile.label,
+                    icon: viewerProfile.icon,
+                    color: viewerProfile.color,
+                    background: viewerProfile.color.withValues(alpha: 0.12),
                   ),
                   _Tag(
-                    label: accessLevel.consultationSummary,
-                    icon: accessLevel.canViewSensitive
+                    label: viewerProfile.consultationSummary,
+                    icon: viewerProfile.canViewSensitive
                         ? Icons.lock_open_rounded
                         : Icons.lock_outline_rounded,
-                    color: accessLevel.canViewSensitive
+                    color: viewerProfile.canViewSensitive
                         ? _tealColor
                         : _roseColor,
-                    background: (accessLevel.canViewSensitive
+                    background: (viewerProfile.canViewSensitive
                             ? _tealColor
                             : _roseColor)
                         .withValues(alpha: 0.12),
                   ),
                   _Tag(
-                    label: accessLevel.managementSummary,
-                    icon: accessLevel.canManageSensitive
-                        ? Icons.settings_suggest_outlined
-                        : Icons.rule_outlined,
+                    label: viewerProfile.managementSummary,
+                    icon: viewerProfile.isAuthenticated
+                        ? Icons.rule_folder_outlined
+                        : Icons.outbox_outlined,
                     color: _slateColor,
                     background: _slateColor.withValues(alpha: 0.12),
+                  ),
+                  _Tag(
+                    label: 'visibilidade por autora/or, grupo ou pessoa',
+                    icon: Icons.people_alt_outlined,
+                    color: _amberColor,
+                    background: _amberColor.withValues(alpha: 0.12),
                   ),
                 ],
               ),
@@ -344,34 +376,59 @@ class _EntityDetailCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F1E7),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: _lineColor),
+        if (!viewerProfile.isAuthenticated)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF5),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: _lineColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Entrada publica',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Quem nao esta logado pode enviar observacoes curtas para esta ficha. Leitura, edicao e exclusao continuam restritas a sessao autenticada e ao compartilhamento definido pela autora ou pelo autor.',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: _inkColor),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F1E7),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: _lineColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Por que esta tela existe',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  item.detailSummary,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: _inkColor),
+                ),
+              ],
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Por que esta tela existe',
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                item.detailSummary,
-                style: theme.textTheme.bodyMedium?.copyWith(color: _inkColor),
-              ),
-            ],
-          ),
-        ),
-        if (item.attachments.isNotEmpty) ...[
+        if (visibleAttachments.isNotEmpty) ...[
           const SizedBox(height: 18),
           Text('Anexos e referencias', style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
-          for (final attachment in item.attachments)
+          for (final attachment in visibleAttachments)
             Container(
               width: double.infinity,
               margin: const EdgeInsets.only(bottom: 10),
@@ -411,10 +468,7 @@ class _EntityDetailCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    attachment.classification.requiresAuthenticatedView &&
-                            !accessLevel.canViewSensitive
-                        ? 'Conteudo oculto ate existir sessao autenticada. O prototipo expande a classificacao sem expor o arquivo.'
-                        : attachment.summary,
+                    attachment.summary,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: _inkColor,
                     ),
@@ -444,20 +498,26 @@ class _EntityDetailCard extends StatelessWidget {
                         background: _slateColor.withValues(alpha: 0.12),
                       ),
                       _Tag(
-                        label: attachment.accessSummary(accessLevel),
-                        icon: attachment.classification.requiresAuthenticatedView
-                            ? Icons.shield_outlined
-                            : Icons.visibility_outlined,
-                        color: attachment.classification.requiresAuthenticatedView
-                            ? _roseColor
-                            : _tealColor,
-                        background:
-                            (attachment.classification.requiresAuthenticatedView
-                                    ? _roseColor
-                                    : _tealColor)
-                                .withValues(alpha: 0.12),
+                        label: attachment.accessSummary(viewerProfile),
+                        icon: Icons.visibility_outlined,
+                        color: _tealColor,
+                        background: _tealColor.withValues(alpha: 0.12),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Compartilhamento',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: _buildAccessPolicyTags(
+                      attachment.accessPolicy,
+                      attachment.accessPolicy.canViewerManage(viewerProfile),
+                    ),
                   ),
                 ],
               ),
@@ -480,7 +540,7 @@ class _EntityDetailCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(color: _inkColor),
             ),
           ),
-        if (orderedNotes.isNotEmpty) ...[
+        if (visibleNotes.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
             'Tags sensiveis e anotacoes protegidas',
@@ -503,13 +563,13 @@ class _EntityDetailCard extends StatelessWidget {
                   runSpacing: 10,
                   children: [
                     _Tag(
-                      label: 'envio sem login',
+                      label: 'envio sem login permitido',
                       icon: Icons.outbox_outlined,
                       color: _slateColor,
                       background: _slateColor.withValues(alpha: 0.12),
                     ),
                     _Tag(
-                      label: 'consulta exige sessao',
+                      label: 'consulta exige autenticacao',
                       icon: Icons.lock_outline_rounded,
                       color: _roseColor,
                       background: _roseColor.withValues(alpha: 0.12),
@@ -523,9 +583,9 @@ class _EntityDetailCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                if (!accessLevel.canViewSensitive)
+                for (final note in visibleNotes)
                   Container(
-                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -535,127 +595,163 @@ class _EntityDetailCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Conteudo bloqueado na consulta publica',
-                          style: theme.textTheme.titleMedium,
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _Tag(
+                              label: note.label,
+                              icon: note.classification.icon,
+                              color: note.color,
+                              background: note.color.withValues(alpha: 0.12),
+                            ),
+                            _Tag(
+                              label: note.classification.label,
+                              icon: Icons.label_important_outline_rounded,
+                              color: _slateColor,
+                              background: _slateColor.withValues(alpha: 0.10),
+                            ),
+                            _Tag(
+                              label: 'ordem ${note.sortOrder}',
+                              icon: Icons.swap_vert_rounded,
+                              color: _amberColor,
+                              background: _amberColor.withValues(alpha: 0.12),
+                            ),
+                            if (note.accessPolicy.canViewerManage(viewerProfile))
+                              _Tag(
+                                label: 'voce gerencia esta tag',
+                                icon: Icons.settings_suggest_outlined,
+                                color: _tealColor,
+                                background: _tealColor.withValues(alpha: 0.12),
+                              ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Text(
-                          'Esta area aceita submissao sem login, mas a leitura das tags depende de sessao autenticada porque o conteudo pode conter contexto pessoal, familiar ou risco operacional.',
+                          note.note,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: _inkColor,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         Wrap(
                           spacing: 10,
                           runSpacing: 10,
                           children: [
                             _Tag(
-                              label: '${orderedNotes.length} tags ocultas',
-                              icon: Icons.visibility_off_outlined,
-                              color: _roseColor,
-                              background: _roseColor.withValues(alpha: 0.12),
+                              label: note.accessSummary,
+                              icon: Icons.lock_open_rounded,
+                              color: _slateColor,
+                              background: _slateColor.withValues(alpha: 0.12),
                             ),
-                            _Tag(
-                              label: 'envio sem login permanece disponivel',
-                              icon: Icons.outbox_outlined,
-                              color: _amberColor,
-                              background: _amberColor.withValues(alpha: 0.12),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  for (final note in orderedNotes)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: _lineColor),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
+                            if (note.accessPolicy.canViewerManage(viewerProfile))
                               _Tag(
-                                label: note.label,
-                                icon: note.classification.icon,
-                                color: note.color,
-                                background: note.color.withValues(alpha: 0.12),
-                              ),
-                              _Tag(
-                                label: note.classification.label,
-                                icon: Icons.label_important_outline_rounded,
-                                color: _slateColor,
-                                background: _slateColor.withValues(alpha: 0.10),
-                              ),
-                              _Tag(
-                                label: 'ordem ${note.sortOrder}',
-                                icon: Icons.swap_vert_rounded,
+                                label: 'cor e ordem editaveis',
+                                icon: Icons.palette_outlined,
                                 color: _amberColor,
                                 background: _amberColor.withValues(alpha: 0.12),
                               ),
-                              if (accessLevel.canManageSensitive)
-                                _Tag(
-                                  label: 'gestao interna',
-                                  icon: Icons.settings_suggest_outlined,
-                                  color: _tealColor,
-                                  background: _tealColor.withValues(alpha: 0.12),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            note.note,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: _inkColor,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
+                            if (note.accessPolicy.canViewerManage(viewerProfile))
                               _Tag(
-                                label: note.accessSummary,
-                                icon: Icons.lock_open_rounded,
-                                color: _slateColor,
-                                background: _slateColor.withValues(alpha: 0.12),
+                                label: 'exclusao restrita a autoria',
+                                icon: Icons.delete_sweep_outlined,
+                                color: _roseColor,
+                                background: _roseColor.withValues(alpha: 0.12),
                               ),
-                              if (accessLevel.canManageSensitive)
-                                _Tag(
-                                  label: 'cor e ordem editaveis',
-                                  icon: Icons.palette_outlined,
-                                  color: _amberColor,
-                                  background: _amberColor.withValues(alpha: 0.12),
-                                ),
-                              if (accessLevel.canManageSensitive)
-                                _Tag(
-                                  label: 'remocao logica',
-                                  icon: Icons.delete_sweep_outlined,
-                                  color: _roseColor,
-                                  background: _roseColor.withValues(alpha: 0.12),
-                                ),
-                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Compartilhamento',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: _buildAccessPolicyTags(
+                            note.accessPolicy,
+                            note.accessPolicy.canViewerManage(viewerProfile),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+                  ),
               ],
             ),
           ),
         ],
       ],
     );
+  }
+
+  List<Widget> _buildAccessPolicyTags(
+    _ProtectedAccessPolicy policy,
+    bool canManage,
+  ) {
+    final widgets = <Widget>[
+      _Tag(
+        label: 'autoria ${policy.owner.name}',
+        icon: Icons.person_pin_circle_outlined,
+        color: policy.owner.group.color,
+        background: policy.owner.group.color.withValues(alpha: 0.12),
+      ),
+    ];
+
+    if (policy.isOwnerOnly) {
+      widgets.add(
+        _Tag(
+          label: 'somente autora/or',
+          icon: Icons.key_outlined,
+          color: _roseColor,
+          background: _roseColor.withValues(alpha: 0.12),
+        ),
+      );
+    } else {
+      for (final group in policy.allowedGroups) {
+        widgets.add(
+          _Tag(
+            label: group.label,
+            icon: group.icon,
+            color: group.color,
+            background: group.color.withValues(alpha: 0.12),
+          ),
+        );
+      }
+      for (final person in policy.allowedPeople) {
+        widgets.add(
+          _Tag(
+            label: person.name,
+            icon: Icons.alternate_email_outlined,
+            color: person.group.color,
+            background: person.group.color.withValues(alpha: 0.12),
+          ),
+        );
+      }
+    }
+
+    widgets.add(
+      _Tag(
+        label: policy.audienceSummary,
+        icon: Icons.visibility_outlined,
+        color: _slateColor,
+        background: _slateColor.withValues(alpha: 0.12),
+      ),
+    );
+
+    if (canManage) {
+      widgets.add(
+        _Tag(
+          label: 'voce pode redefinir o acesso',
+          icon: Icons.tune_outlined,
+          color: _tealColor,
+          background: _tealColor.withValues(alpha: 0.12),
+        ),
+      );
+    }
+
+    return widgets;
   }
 }
 

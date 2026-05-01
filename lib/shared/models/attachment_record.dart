@@ -37,8 +37,6 @@ extension on _AttachmentClassification {
     _AttachmentClassification.supportingReference => _amberColor,
   };
 
-  bool get requiresAuthenticatedView =>
-      this == _AttachmentClassification.sensitiveAttachment;
 }
 
 class _AttachmentRecord {
@@ -49,6 +47,7 @@ class _AttachmentRecord {
     required this.summary,
     required this.status,
     required this.updatedAtLabel,
+    required this.accessPolicy,
     this.canDownload = true,
   });
 
@@ -58,12 +57,12 @@ class _AttachmentRecord {
   final String summary;
   final String status;
   final String updatedAtLabel;
+  final _ProtectedAccessPolicy accessPolicy;
   final bool canDownload;
 
-  String accessSummary(_ViewerAccessLevel accessLevel) {
-    if (classification.requiresAuthenticatedView &&
-        !accessLevel.canViewSensitive) {
-      return 'consulta bloqueada sem sessao autenticada';
+  String accessSummary(_ViewerAccessProfile viewer) {
+    if (!accessPolicy.canViewerRead(viewer)) {
+      return 'conteudo nao compartilhado com este perfil';
     }
     return canDownload
         ? 'consulta liberada | download rastreavel'

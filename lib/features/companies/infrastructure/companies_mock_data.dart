@@ -42,6 +42,13 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
               'Arquivo oficial usado para leitura cadastral e conciliacao de dados da prestadora.',
           status: 'vigente',
           updatedAtLabel: 'atualizado em 04/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceDiego,
+            allowedGroups: [
+              _CollaboratorAudienceGroup.board,
+              _CollaboratorAudienceGroup.supervision,
+            ],
+          ),
         ),
         _AttachmentRecord(
           publicId: 'anx_01hcmpsens000000000001',
@@ -51,6 +58,11 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
               'Arquivo sensivel com leitura restrita para quem precisa contextualizar risco e recorrencia interna.',
           status: 'restrito',
           updatedAtLabel: 'atualizado em 04/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceMarta,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+            allowedPeople: [_audienceCamila],
+          ),
           canDownload: false,
         ),
       ],
@@ -62,8 +74,10 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.operationalRisk,
           color: _amberColor,
           sortOrder: 1,
-          requiresLoginToView: true,
-          requiresLoginToCreate: false,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceMarta,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+          ),
         ),
         _SensitiveNoteTag(
           label: 'documentacao parcial',
@@ -72,6 +86,11 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.routineContext,
           color: _slateColor,
           sortOrder: 2,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceDiego,
+            allowedGroups: [_CollaboratorAudienceGroup.supervision],
+            allowedPeople: [_audienceLucas],
+          ),
         ),
       ],
     ),
@@ -99,6 +118,10 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
               'Base documental para conciliacao financeira e renovacao cadastral.',
           status: 'em analise',
           updatedAtLabel: 'atualizado em 03/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceCamila,
+            allowedGroups: [_CollaboratorAudienceGroup.board],
+          ),
         ),
       ],
       sensitiveNotes: [
@@ -109,6 +132,10 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
           classification: _SensitiveNoteClassification.operationalRisk,
           color: _roseColor,
           sortOrder: 1,
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceCamila,
+            allowedPeople: [_audienceDiego, _audienceMarta],
+          ),
         ),
       ],
     ),
@@ -136,6 +163,11 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
               'Referencia de apoio para leitura operacional rapida sem virar documento formal.',
           status: 'ativo',
           updatedAtLabel: 'atualizado em 02/2026',
+          accessPolicy: _ProtectedAccessPolicy(
+            owner: _audienceLucas,
+            allowedGroups: [_CollaboratorAudienceGroup.auxiliary],
+            allowedPeople: [_audienceMarta],
+          ),
         ),
       ],
     ),

@@ -14,8 +14,7 @@ class LayoutPreviewPage extends StatefulWidget {
 class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
   _Destination _destination = _Destination.home;
   _HomeMode _homeMode = _HomeMode.overview;
-  _ViewerAccessLevel _viewerAccessLevel =
-      _ViewerAccessLevel.privilegedOperator;
+  _ViewerAccessProfile _viewerProfile = _diegoViewerProfile;
   _NetworkFilterState _networkFilters = const _NetworkFilterState();
   bool _showAdvancedNetworkFilters = false;
   String _selectedNetworkNodeId = 'person_ana';
@@ -92,10 +91,10 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
                         _TopBar(
                           page: page,
                           showMenuButton: !showSidebar,
-                          accessLevel: _viewerAccessLevel,
-                          onAccessLevelChanged: (value) {
+                          viewerProfile: _viewerProfile,
+                          onViewerChanged: (value) {
                             setState(() {
-                              _viewerAccessLevel = value;
+                              _viewerProfile = value;
                             });
                           },
                         ),
@@ -118,7 +117,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
       case _Destination.home:
         return _HomeContent(
           mode: _homeMode,
-          accessLevel: _viewerAccessLevel,
+          viewerProfile: _viewerProfile,
           filters: _networkFilters,
           showAdvancedFilters: _showAdvancedNetworkFilters,
           selectedNodeId: _selectedNetworkNodeId,
@@ -179,7 +178,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
         );
       case _Destination.companies:
         return _CompaniesWorkspace(
-          accessLevel: _viewerAccessLevel,
+          viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
           onSelectItem: (index) {
             setState(() {
@@ -189,7 +188,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
         );
       case _Destination.contracts:
         return _ContractsWorkspace(
-          accessLevel: _viewerAccessLevel,
+          viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
           onSelectItem: (index) {
             setState(() {
@@ -199,7 +198,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
         );
       case _Destination.people:
         return _PeopleWorkspace(
-          accessLevel: _viewerAccessLevel,
+          viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
           onSelectItem: (index) {
             setState(() {
@@ -260,14 +259,14 @@ class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.page,
     required this.showMenuButton,
-    required this.accessLevel,
-    required this.onAccessLevelChanged,
+    required this.viewerProfile,
+    required this.onViewerChanged,
   });
 
   final _PageInfo page;
   final bool showMenuButton;
-  final _ViewerAccessLevel accessLevel;
-  final ValueChanged<_ViewerAccessLevel> onAccessLevelChanged;
+  final _ViewerAccessProfile viewerProfile;
+  final ValueChanged<_ViewerAccessProfile> onViewerChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -326,10 +325,10 @@ class _TopBar extends StatelessWidget {
                   background: Colors.white,
                 ),
                 _Tag(
-                  label: accessLevel.label,
+                  label: viewerProfile.label,
                   icon: Icons.security_outlined,
-                  color: accessLevel.color,
-                  background: accessLevel.color.withValues(alpha: 0.12),
+                  color: viewerProfile.color,
+                  background: viewerProfile.color.withValues(alpha: 0.12),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -342,20 +341,20 @@ class _TopBar extends StatelessWidget {
                     border: Border.all(color: _lineColor),
                   ),
                   child: DropdownButtonHideUnderline(
-                    child: DropdownButton<_ViewerAccessLevel>(
-                      value: accessLevel,
+                    child: DropdownButton<_ViewerAccessProfile>(
+                      value: viewerProfile,
                       borderRadius: BorderRadius.circular(18),
                       icon: Icon(
                         Icons.keyboard_arrow_down_rounded,
-                        color: accessLevel.color,
+                        color: viewerProfile.color,
                       ),
                       onChanged: (value) {
                         if (value != null) {
-                          onAccessLevelChanged(value);
+                          onViewerChanged(value);
                         }
                       },
                       items: [
-                        for (final value in _ViewerAccessLevel.values)
+                        for (final value in _viewerProfiles)
                           DropdownMenuItem(
                             value: value,
                             child: Row(
@@ -386,11 +385,9 @@ class _TopBar extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 16,
-                        backgroundColor: accessLevel.color,
+                        backgroundColor: viewerProfile.color,
                         child: Text(
-                          accessLevel == _ViewerAccessLevel.publicSubmission
-                              ? 'PG'
-                              : 'DC',
+                          viewerProfile.badge,
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -402,13 +399,11 @@ class _TopBar extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            accessLevel == _ViewerAccessLevel.publicSubmission
-                                ? 'Entrada publica'
-                                : 'Diego Costa',
+                            viewerProfile.name,
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           Text(
-                            accessLevel.consultationSummary,
+                            viewerProfile.consultationSummary,
                             style: const TextStyle(
                               color: _mutedColor,
                               fontSize: 12,

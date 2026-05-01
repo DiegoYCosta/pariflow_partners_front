@@ -3,7 +3,7 @@ part of '../../app/app.dart';
 class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.mode,
-    required this.accessLevel,
+    required this.viewerProfile,
     required this.filters,
     required this.showAdvancedFilters,
     required this.selectedNodeId,
@@ -19,7 +19,7 @@ class _HomeContent extends StatelessWidget {
   });
 
   final _HomeMode mode;
-  final _ViewerAccessLevel accessLevel;
+  final _ViewerAccessProfile viewerProfile;
   final _NetworkFilterState filters;
   final bool showAdvancedFilters;
   final String selectedNodeId;
@@ -45,7 +45,7 @@ class _HomeContent extends StatelessWidget {
         const SizedBox(height: 24),
         if (mode == _HomeMode.overview)
           _HomeOverview(
-            accessLevel: accessLevel,
+            viewerProfile: viewerProfile,
             onChooseDestination: onChooseDestination,
             pageWidth: pageWidth,
           )
@@ -193,12 +193,12 @@ class _ChoiceGrid extends StatelessWidget {
 
 class _HomeOverview extends StatelessWidget {
   const _HomeOverview({
-    required this.accessLevel,
+    required this.viewerProfile,
     required this.onChooseDestination,
     required this.pageWidth,
   });
 
-  final _ViewerAccessLevel accessLevel;
+  final _ViewerAccessProfile viewerProfile;
   final ValueChanged<_ChoiceTarget> onChooseDestination;
   final double pageWidth;
 
@@ -238,14 +238,16 @@ class _HomeOverview extends StatelessWidget {
               const SizedBox(width: 24),
               Expanded(
                 flex: 4,
-                child: _Panel(child: _AccessContextPanel(accessLevel: accessLevel)),
+                child: _Panel(
+                  child: _AccessContextPanel(viewerProfile: viewerProfile),
+                ),
               ),
             ],
           )
         else
           Column(
             children: [
-              _Panel(child: _AccessContextPanel(accessLevel: accessLevel)),
+              _Panel(child: _AccessContextPanel(viewerProfile: viewerProfile)),
               const SizedBox(height: 24),
             ],
           ),
@@ -286,9 +288,9 @@ class _ResumeList extends StatelessWidget {
 }
 
 class _AccessContextPanel extends StatelessWidget {
-  const _AccessContextPanel({required this.accessLevel});
+  const _AccessContextPanel({required this.viewerProfile});
 
-  final _ViewerAccessLevel accessLevel;
+  final _ViewerAccessProfile viewerProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -312,10 +314,10 @@ class _AccessContextPanel extends StatelessWidget {
           runSpacing: 10,
           children: [
             _Tag(
-              label: accessLevel.label,
-              icon: accessLevel.icon,
-              color: accessLevel.color,
-              background: accessLevel.color.withValues(alpha: 0.12),
+              label: viewerProfile.label,
+              icon: viewerProfile.icon,
+              color: viewerProfile.color,
+              background: viewerProfile.color.withValues(alpha: 0.12),
             ),
             _Tag(
               label: 'envio anonimo permitido',
@@ -324,16 +326,23 @@ class _AccessContextPanel extends StatelessWidget {
               background: _amberColor.withValues(alpha: 0.12),
             ),
             _Tag(
-              label: accessLevel.consultationSummary,
-              icon: accessLevel.canViewSensitive
+              label: viewerProfile.consultationSummary,
+              icon: viewerProfile.canViewSensitive
                   ? Icons.lock_open_rounded
                   : Icons.lock_outline_rounded,
-              color: accessLevel.canViewSensitive ? _tealColor : _roseColor,
-              background: (accessLevel.canViewSensitive
+              color: viewerProfile.canViewSensitive ? _tealColor : _roseColor,
+              background: (viewerProfile.canViewSensitive
                       ? _tealColor
                       : _roseColor)
                   .withValues(alpha: 0.12),
             ),
+            if (viewerProfile.isAuthenticated)
+              _Tag(
+                label: 'compartilhamento por grupo ou pessoa',
+                icon: Icons.rule_folder_outlined,
+                color: _slateColor,
+                background: _slateColor.withValues(alpha: 0.12),
+              ),
           ],
         ),
         const SizedBox(height: 18),
