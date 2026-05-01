@@ -33,6 +33,17 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
         'Contrato atual: CTR-PORT-2026-001',
         'Leitura futura: dossie e anexos sensiveis por ocorrencia',
       ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hpesformal000000000001',
+          title: 'ASO admissional',
+          classification: _AttachmentClassification.formalDocument,
+          summary:
+              'Documento formal ligado ao dossie base do colaborador.',
+          status: 'vigente',
+          updatedAtLabel: 'atualizado em 01/2026',
+        ),
+      ],
       sensitiveNotes: [
         _SensitiveNoteTag(
           label: 'filha com consulta nas segundas',
@@ -69,6 +80,18 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
         'Contrato relacionado: CTR-LIMP-2026-007',
         'Leitura futura: rastreio de downloads e historico de acesso',
       ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hpessens000000000002',
+          title: 'Relato interno de desligamento',
+          classification: _AttachmentClassification.sensitiveAttachment,
+          summary:
+              'Arquivo protegido com contexto complementar ao desligamento recente.',
+          status: 'restrito',
+          updatedAtLabel: 'atualizado em 04/2026',
+          canDownload: false,
+        ),
+      ],
       sensitiveNotes: [
         _SensitiveNoteTag(
           label: 'costuma atrasar',
@@ -102,6 +125,17 @@ const _peopleWorkspaceData = _EntityWorkspaceData(
         'Prestadora atual: PariFlow Servicos Ltda',
         'Passagem anterior: Orbe Seguranca',
         'Leitura futura: mapa de riscos e historico consolidado',
+      ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hpesref000000000003',
+          title: 'Resumo de transicao de posto',
+          classification: _AttachmentClassification.supportingReference,
+          summary:
+              'Referencia de apoio para leitura rapida da movimentacao recente.',
+          status: 'ativo',
+          updatedAtLabel: 'atualizado em 03/2026',
+        ),
       ],
       sensitiveNotes: [
         _SensitiveNoteTag(

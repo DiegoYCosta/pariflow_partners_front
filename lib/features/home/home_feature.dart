@@ -3,6 +3,7 @@ part of '../../app/app.dart';
 class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.mode,
+    required this.accessLevel,
     required this.filters,
     required this.showAdvancedFilters,
     required this.selectedNodeId,
@@ -18,6 +19,7 @@ class _HomeContent extends StatelessWidget {
   });
 
   final _HomeMode mode;
+  final _ViewerAccessLevel accessLevel;
   final _NetworkFilterState filters;
   final bool showAdvancedFilters;
   final String selectedNodeId;
@@ -43,6 +45,7 @@ class _HomeContent extends StatelessWidget {
         const SizedBox(height: 24),
         if (mode == _HomeMode.overview)
           _HomeOverview(
+            accessLevel: accessLevel,
             onChooseDestination: onChooseDestination,
             pageWidth: pageWidth,
           )
@@ -190,10 +193,12 @@ class _ChoiceGrid extends StatelessWidget {
 
 class _HomeOverview extends StatelessWidget {
   const _HomeOverview({
+    required this.accessLevel,
     required this.onChooseDestination,
     required this.pageWidth,
   });
 
+  final _ViewerAccessLevel accessLevel;
   final ValueChanged<_ChoiceTarget> onChooseDestination;
   final double pageWidth;
 
@@ -231,17 +236,17 @@ class _HomeOverview extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 24),
-              const Expanded(
+              Expanded(
                 flex: 4,
-                child: _Panel(child: _AccessContextPanel()),
+                child: _Panel(child: _AccessContextPanel(accessLevel: accessLevel)),
               ),
             ],
           )
         else
-          const Column(
+          Column(
             children: [
-              _Panel(child: _AccessContextPanel()),
-              SizedBox(height: 24),
+              _Panel(child: _AccessContextPanel(accessLevel: accessLevel)),
+              const SizedBox(height: 24),
             ],
           ),
         if (!twoColumns)
@@ -281,7 +286,9 @@ class _ResumeList extends StatelessWidget {
 }
 
 class _AccessContextPanel extends StatelessWidget {
-  const _AccessContextPanel();
+  const _AccessContextPanel({required this.accessLevel});
+
+  final _ViewerAccessLevel accessLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -298,6 +305,36 @@ class _AccessContextPanel extends StatelessWidget {
         Text(
           'A home fica mais calma porque dossie, auditoria e conteudo sensivel nao ocupam o centro o tempo todo. Eles aparecem no momento certo.',
           style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
+        ),
+        const SizedBox(height: 18),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _Tag(
+              label: accessLevel.label,
+              icon: accessLevel.icon,
+              color: accessLevel.color,
+              background: accessLevel.color.withValues(alpha: 0.12),
+            ),
+            _Tag(
+              label: 'envio anonimo permitido',
+              icon: Icons.outbox_outlined,
+              color: _amberColor,
+              background: _amberColor.withValues(alpha: 0.12),
+            ),
+            _Tag(
+              label: accessLevel.consultationSummary,
+              icon: accessLevel.canViewSensitive
+                  ? Icons.lock_open_rounded
+                  : Icons.lock_outline_rounded,
+              color: accessLevel.canViewSensitive ? _tealColor : _roseColor,
+              background: (accessLevel.canViewSensitive
+                      ? _tealColor
+                      : _roseColor)
+                  .withValues(alpha: 0.12),
+            ),
+          ],
         ),
         const SizedBox(height: 18),
         const _ContextBullet(

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 part '../core/widgets/primitives.dart';
 part '../core/widgets/master_detail_workspace.dart';
+part '../shared/models/attachment_record.dart';
 part '../shared/models/sensitive_note_tag.dart';
+part '../shared/models/viewer_access.dart';
 part '../features/companies/companies_feature.dart';
 part '../features/companies/infrastructure/companies_mock_data.dart';
 part '../features/contracts/contracts_feature.dart';

@@ -33,6 +33,26 @@ const _contractsWorkspaceData = _EntityWorkspaceData(
         'Cliente: Condominio Bela Vista',
         'Postos principais: Portaria diurna e noturna',
       ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hctrformal000000000001',
+          title: 'Contrato assinado',
+          classification: _AttachmentClassification.formalDocument,
+          summary:
+              'Documento principal de vigencia e escopo do contrato.',
+          status: 'vigente',
+          updatedAtLabel: 'atualizado em 01/2026',
+        ),
+        _AttachmentRecord(
+          publicId: 'anx_01hctrref000000000001',
+          title: 'Memoria de implantacao do posto',
+          classification: _AttachmentClassification.supportingReference,
+          summary:
+              'Referencia operacional usada para acelerar a leitura do contexto.',
+          status: 'ativo',
+          updatedAtLabel: 'atualizado em 02/2026',
+        ),
+      ],
     ),
     _EntityItem(
       publicId: 'ctr_01hctr0000000000000002',
@@ -49,6 +69,18 @@ const _contractsWorkspaceData = _EntityWorkspaceData(
         'Cliente: Reserva Mirante',
         'Leitura futura: ocorrencias e dossie por contrato',
       ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hctrsens000000000002',
+          title: 'Parecer interno sobre risco de rotacao',
+          classification: _AttachmentClassification.sensitiveAttachment,
+          summary:
+              'Arquivo lateral com leitura controlada para quem precisa atuar no risco contratual.',
+          status: 'restrito',
+          updatedAtLabel: 'atualizado em 04/2026',
+          canDownload: false,
+        ),
+      ],
     ),
     _EntityItem(
       publicId: 'ctr_01hctr0000000000000003',
@@ -64,6 +96,17 @@ const _contractsWorkspaceData = _EntityWorkspaceData(
         'Prestadora: Orbe Seguranca',
         'Cliente: Torre Nascente',
         'Leitura futura: historico de acesso sensivel ao contrato',
+      ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hctrformal000000000003',
+          title: 'Aditivo de cobertura patrimonial',
+          classification: _AttachmentClassification.formalDocument,
+          summary:
+              'Complemento contratual para leitura objetiva de escopo e vigencia.',
+          status: 'vigente',
+          updatedAtLabel: 'atualizado em 03/2026',
+        ),
       ],
     ),
   ],

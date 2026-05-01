@@ -33,6 +33,27 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
         'Contrato em foco: Portaria e controle de acesso',
         'Fila relacionada: 3 mudancas de quadro nesta semana',
       ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hcmpformal000000000001',
+          title: 'Contrato social atualizado',
+          classification: _AttachmentClassification.formalDocument,
+          summary:
+              'Arquivo oficial usado para leitura cadastral e conciliacao de dados da prestadora.',
+          status: 'vigente',
+          updatedAtLabel: 'atualizado em 04/2026',
+        ),
+        _AttachmentRecord(
+          publicId: 'anx_01hcmpsens000000000001',
+          title: 'Relato interno de auditoria operacional',
+          classification: _AttachmentClassification.sensitiveAttachment,
+          summary:
+              'Arquivo sensivel com leitura restrita para quem precisa contextualizar risco e recorrencia interna.',
+          status: 'restrito',
+          updatedAtLabel: 'atualizado em 04/2026',
+          canDownload: false,
+        ),
+      ],
       sensitiveNotes: [
         _SensitiveNoteTag(
           label: 'preposto atrasa resposta',
@@ -69,6 +90,17 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
         'Contrato em foco: Limpeza tecnica',
         'Leitura futura: mapa de riscos e ocorrencias criticas',
       ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hcmpformal000000000002',
+          title: 'Comprovante fiscal trimestral',
+          classification: _AttachmentClassification.formalDocument,
+          summary:
+              'Base documental para conciliacao financeira e renovacao cadastral.',
+          status: 'em analise',
+          updatedAtLabel: 'atualizado em 03/2026',
+        ),
+      ],
       sensitiveNotes: [
         _SensitiveNoteTag(
           label: 'turnover alto',
@@ -94,6 +126,17 @@ const _companiesWorkspaceData = _EntityWorkspaceData(
         'Cliente conectado: Torre Nascente',
         'Contrato em foco: Vigilancia patrimonial',
         'Leitura futura: auditoria e anexos sensiveis por vinculo',
+      ],
+      attachments: [
+        _AttachmentRecord(
+          publicId: 'anx_01hcmpref000000000003',
+          title: 'Checklist de onboarding do posto',
+          classification: _AttachmentClassification.supportingReference,
+          summary:
+              'Referencia de apoio para leitura operacional rapida sem virar documento formal.',
+          status: 'ativo',
+          updatedAtLabel: 'atualizado em 02/2026',
+        ),
       ],
     ),
   ],

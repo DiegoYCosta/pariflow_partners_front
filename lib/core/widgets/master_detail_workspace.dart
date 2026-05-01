@@ -3,11 +3,13 @@ part of '../../app/app.dart';
 class _EntityWorkspace extends StatelessWidget {
   const _EntityWorkspace({
     required this.data,
+    required this.accessLevel,
     required this.selectedIndex,
     required this.onSelectItem,
   });
 
   final _EntityWorkspaceData data;
+  final _ViewerAccessLevel accessLevel;
   final int selectedIndex;
   final ValueChanged<int> onSelectItem;
 
@@ -21,6 +23,10 @@ class _EntityWorkspace extends StatelessWidget {
     final itemsWithProtectedNotes = data.items
         .where((item) => item.sensitiveNotes.isNotEmpty)
         .length;
+    final attachmentCount = data.items.fold<int>(
+      0,
+      (total, item) => total + item.attachments.length,
+    );
 
     return Column(
       children: [
@@ -60,6 +66,13 @@ class _EntityWorkspace extends StatelessWidget {
                     color: _roseColor,
                     background: _roseColor.withValues(alpha: 0.12),
                   ),
+                  if (attachmentCount > 0)
+                    _Tag(
+                      label: '$attachmentCount anexos classificados',
+                      icon: Icons.attach_file_rounded,
+                      color: _amberColor,
+                      background: _amberColor.withValues(alpha: 0.12),
+                    ),
                   if (itemsWithProtectedNotes > 0)
                     _Tag(
                       label: '$itemsWithProtectedNotes fichas com memoria sensivel',
@@ -135,7 +148,12 @@ class _EntityWorkspace extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _Panel(child: _EntityDetailCard(item: selectedItem)),
+                  _Panel(
+                    child: _EntityDetailCard(
+                      item: selectedItem,
+                      accessLevel: accessLevel,
+                    ),
+                  ),
                 ],
               );
             }
@@ -156,7 +174,12 @@ class _EntityWorkspace extends StatelessWidget {
                 const SizedBox(width: 24),
                 Expanded(
                   flex: 5,
-                  child: _Panel(child: _EntityDetailCard(item: selectedItem)),
+                  child: _Panel(
+                    child: _EntityDetailCard(
+                      item: selectedItem,
+                      accessLevel: accessLevel,
+                    ),
+                  ),
                 ),
               ],
             );
@@ -204,9 +227,13 @@ class _EntityListCard extends StatelessWidget {
 }
 
 class _EntityDetailCard extends StatelessWidget {
-  const _EntityDetailCard({required this.item});
+  const _EntityDetailCard({
+    required this.item,
+    required this.accessLevel,
+  });
 
   final _EntityItem item;
+  final _ViewerAccessLevel accessLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +262,13 @@ class _EntityDetailCard extends StatelessWidget {
               color: item.color,
               background: item.color.withValues(alpha: 0.12),
             ),
+            if (item.attachments.isNotEmpty)
+              _Tag(
+                label: '${item.attachments.length} anexos',
+                icon: Icons.attach_file_rounded,
+                color: _amberColor,
+                background: _amberColor.withValues(alpha: 0.12),
+              ),
             if (orderedNotes.isNotEmpty)
               _Tag(
                 label: '${orderedNotes.length} tags protegidas',
@@ -250,6 +284,64 @@ class _EntityDetailCard extends StatelessWidget {
         Text(
           item.subtitle,
           style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
+        ),
+        const SizedBox(height: 18),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFCF7EF),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: _lineColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Acesso sensivel em vigor',
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                accessLevel.description,
+                style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _Tag(
+                    label: accessLevel.label,
+                    icon: accessLevel.icon,
+                    color: accessLevel.color,
+                    background: accessLevel.color.withValues(alpha: 0.12),
+                  ),
+                  _Tag(
+                    label: accessLevel.consultationSummary,
+                    icon: accessLevel.canViewSensitive
+                        ? Icons.lock_open_rounded
+                        : Icons.lock_outline_rounded,
+                    color: accessLevel.canViewSensitive
+                        ? _tealColor
+                        : _roseColor,
+                    background: (accessLevel.canViewSensitive
+                            ? _tealColor
+                            : _roseColor)
+                        .withValues(alpha: 0.12),
+                  ),
+                  _Tag(
+                    label: accessLevel.managementSummary,
+                    icon: accessLevel.canManageSensitive
+                        ? Icons.settings_suggest_outlined
+                        : Icons.rule_outlined,
+                    color: _slateColor,
+                    background: _slateColor.withValues(alpha: 0.12),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 18),
         Container(
@@ -275,6 +367,102 @@ class _EntityDetailCard extends StatelessWidget {
             ],
           ),
         ),
+        if (item.attachments.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Text('Anexos e referencias', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 10),
+          for (final attachment in item.attachments)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: _lineColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        attachment.title,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      _Tag(
+                        label: attachment.classification.label,
+                        icon: attachment.classification.icon,
+                        color: attachment.classification.color,
+                        background: attachment.classification.color.withValues(
+                          alpha: 0.12,
+                        ),
+                      ),
+                      _Tag(
+                        label: attachment.publicId,
+                        icon: Icons.tag_outlined,
+                        color: _slateColor,
+                        background: _slateColor.withValues(alpha: 0.12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    attachment.classification.requiresAuthenticatedView &&
+                            !accessLevel.canViewSensitive
+                        ? 'Conteudo oculto ate existir sessao autenticada. O prototipo expande a classificacao sem expor o arquivo.'
+                        : attachment.summary,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: _inkColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    attachment.classification.description,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: _mutedColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _Tag(
+                        label: attachment.status,
+                        icon: Icons.inventory_2_outlined,
+                        color: _amberColor,
+                        background: _amberColor.withValues(alpha: 0.12),
+                      ),
+                      _Tag(
+                        label: attachment.updatedAtLabel,
+                        icon: Icons.update_outlined,
+                        color: _slateColor,
+                        background: _slateColor.withValues(alpha: 0.12),
+                      ),
+                      _Tag(
+                        label: attachment.accessSummary(accessLevel),
+                        icon: attachment.classification.requiresAuthenticatedView
+                            ? Icons.shield_outlined
+                            : Icons.visibility_outlined,
+                        color: attachment.classification.requiresAuthenticatedView
+                            ? _roseColor
+                            : _tealColor,
+                        background:
+                            (attachment.classification.requiresAuthenticatedView
+                                    ? _roseColor
+                                    : _tealColor)
+                                .withValues(alpha: 0.12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
         const SizedBox(height: 18),
         Text('Relacoes principais', style: theme.textTheme.titleMedium),
         const SizedBox(height: 10),
@@ -335,9 +523,9 @@ class _EntityDetailCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                for (final note in orderedNotes)
+                if (!accessLevel.canViewSensitive)
                   Container(
-                    margin: const EdgeInsets.only(bottom: 10),
+                    width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -347,48 +535,121 @@ class _EntityDetailCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(
+                          'Conteudo bloqueado na consulta publica',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Esta area aceita submissao sem login, mas a leitura das tags depende de sessao autenticada porque o conteudo pode conter contexto pessoal, familiar ou risco operacional.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: _inkColor,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
                         Wrap(
                           spacing: 10,
                           runSpacing: 10,
-                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             _Tag(
-                              label: note.label,
-                              icon: note.classification.icon,
-                              color: note.color,
-                              background: note.color.withValues(alpha: 0.12),
+                              label: '${orderedNotes.length} tags ocultas',
+                              icon: Icons.visibility_off_outlined,
+                              color: _roseColor,
+                              background: _roseColor.withValues(alpha: 0.12),
                             ),
                             _Tag(
-                              label: note.classification.label,
-                              icon: Icons.label_important_outline_rounded,
-                              color: _slateColor,
-                              background: _slateColor.withValues(alpha: 0.10),
-                            ),
-                            _Tag(
-                              label: 'ordem ${note.sortOrder}',
-                              icon: Icons.swap_vert_rounded,
+                              label: 'envio sem login permanece disponivel',
+                              icon: Icons.outbox_outlined,
                               color: _amberColor,
                               background: _amberColor.withValues(alpha: 0.12),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          note.note,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: _inkColor,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          note.accessSummary,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: _mutedColor,
-                          ),
-                        ),
                       ],
                     ),
-                  ),
+                  )
+                else
+                  for (final note in orderedNotes)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: _lineColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _Tag(
+                                label: note.label,
+                                icon: note.classification.icon,
+                                color: note.color,
+                                background: note.color.withValues(alpha: 0.12),
+                              ),
+                              _Tag(
+                                label: note.classification.label,
+                                icon: Icons.label_important_outline_rounded,
+                                color: _slateColor,
+                                background: _slateColor.withValues(alpha: 0.10),
+                              ),
+                              _Tag(
+                                label: 'ordem ${note.sortOrder}',
+                                icon: Icons.swap_vert_rounded,
+                                color: _amberColor,
+                                background: _amberColor.withValues(alpha: 0.12),
+                              ),
+                              if (accessLevel.canManageSensitive)
+                                _Tag(
+                                  label: 'gestao interna',
+                                  icon: Icons.settings_suggest_outlined,
+                                  color: _tealColor,
+                                  background: _tealColor.withValues(alpha: 0.12),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            note.note,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: _inkColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              _Tag(
+                                label: note.accessSummary,
+                                icon: Icons.lock_open_rounded,
+                                color: _slateColor,
+                                background: _slateColor.withValues(alpha: 0.12),
+                              ),
+                              if (accessLevel.canManageSensitive)
+                                _Tag(
+                                  label: 'cor e ordem editaveis',
+                                  icon: Icons.palette_outlined,
+                                  color: _amberColor,
+                                  background: _amberColor.withValues(alpha: 0.12),
+                                ),
+                              if (accessLevel.canManageSensitive)
+                                _Tag(
+                                  label: 'remocao logica',
+                                  icon: Icons.delete_sweep_outlined,
+                                  color: _roseColor,
+                                  background: _roseColor.withValues(alpha: 0.12),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
               ],
             ),
           ),
@@ -502,6 +763,7 @@ class _EntityItem {
     required this.color,
     required this.detailSummary,
     required this.relations,
+    this.attachments = const [],
     this.sensitiveNotes = const [],
   });
 
@@ -514,5 +776,6 @@ class _EntityItem {
   final Color color;
   final String detailSummary;
   final List<String> relations;
+  final List<_AttachmentRecord> attachments;
   final List<_SensitiveNoteTag> sensitiveNotes;
 }

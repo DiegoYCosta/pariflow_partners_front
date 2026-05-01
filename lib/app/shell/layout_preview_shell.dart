@@ -14,6 +14,8 @@ class LayoutPreviewPage extends StatefulWidget {
 class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
   _Destination _destination = _Destination.home;
   _HomeMode _homeMode = _HomeMode.overview;
+  _ViewerAccessLevel _viewerAccessLevel =
+      _ViewerAccessLevel.privilegedOperator;
   _NetworkFilterState _networkFilters = const _NetworkFilterState();
   bool _showAdvancedNetworkFilters = false;
   String _selectedNetworkNodeId = 'person_ana';
@@ -87,7 +89,16 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _TopBar(page: page, showMenuButton: !showSidebar),
+                        _TopBar(
+                          page: page,
+                          showMenuButton: !showSidebar,
+                          accessLevel: _viewerAccessLevel,
+                          onAccessLevelChanged: (value) {
+                            setState(() {
+                              _viewerAccessLevel = value;
+                            });
+                          },
+                        ),
                         const SizedBox(height: 24),
                         _buildContent(page, width),
                       ],
@@ -107,6 +118,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
       case _Destination.home:
         return _HomeContent(
           mode: _homeMode,
+          accessLevel: _viewerAccessLevel,
           filters: _networkFilters,
           showAdvancedFilters: _showAdvancedNetworkFilters,
           selectedNodeId: _selectedNetworkNodeId,
@@ -167,6 +179,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
         );
       case _Destination.companies:
         return _CompaniesWorkspace(
+          accessLevel: _viewerAccessLevel,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
           onSelectItem: (index) {
             setState(() {
@@ -176,6 +189,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
         );
       case _Destination.contracts:
         return _ContractsWorkspace(
+          accessLevel: _viewerAccessLevel,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
           onSelectItem: (index) {
             setState(() {
@@ -185,6 +199,7 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
         );
       case _Destination.people:
         return _PeopleWorkspace(
+          accessLevel: _viewerAccessLevel,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
           onSelectItem: (index) {
             setState(() {
@@ -242,10 +257,17 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.page, required this.showMenuButton});
+  const _TopBar({
+    required this.page,
+    required this.showMenuButton,
+    required this.accessLevel,
+    required this.onAccessLevelChanged,
+  });
 
   final _PageInfo page;
   final bool showMenuButton;
+  final _ViewerAccessLevel accessLevel;
+  final ValueChanged<_ViewerAccessLevel> onAccessLevelChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -304,10 +326,10 @@ class _TopBar extends StatelessWidget {
                   background: Colors.white,
                 ),
                 _Tag(
-                  label: 'sessao privilegiada',
+                  label: accessLevel.label,
                   icon: Icons.security_outlined,
-                  color: page.accent,
-                  background: page.accent.withValues(alpha: 0.12),
+                  color: accessLevel.color,
+                  background: accessLevel.color.withValues(alpha: 0.12),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -319,14 +341,56 @@ class _TopBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: _lineColor),
                   ),
-                  child: const Row(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<_ViewerAccessLevel>(
+                      value: accessLevel,
+                      borderRadius: BorderRadius.circular(18),
+                      icon: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: accessLevel.color,
+                      ),
+                      onChanged: (value) {
+                        if (value != null) {
+                          onAccessLevelChanged(value);
+                        }
+                      },
+                      items: [
+                        for (final value in _ViewerAccessLevel.values)
+                          DropdownMenuItem(
+                            value: value,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(value.icon, color: value.color, size: 18),
+                                const SizedBox(width: 8),
+                                Text(value.label),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: _lineColor),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       CircleAvatar(
                         radius: 16,
-                        backgroundColor: _deepTealColor,
+                        backgroundColor: accessLevel.color,
                         child: Text(
-                          'DC',
+                          accessLevel == _ViewerAccessLevel.publicSubmission
+                              ? 'PG'
+                              : 'DC',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -338,12 +402,17 @@ class _TopBar extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Diego Costa',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                            accessLevel == _ViewerAccessLevel.publicSubmission
+                                ? 'Entrada publica'
+                                : 'Diego Costa',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           Text(
-                            'admin | traceavel',
-                            style: TextStyle(color: _mutedColor, fontSize: 12),
+                            accessLevel.consultationSummary,
+                            style: const TextStyle(
+                              color: _mutedColor,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
