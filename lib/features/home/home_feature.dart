@@ -655,22 +655,22 @@ const _choices = [
 const _summaryCards = [
   _SummaryCardData(
     label: 'Empresas monitoradas',
-    value: '18',
-    description: 'Prestadoras prontas para consulta e conexao com contratos.',
+    value: '6',
+    description: 'Prestadoras simuladas no recorte atual do workspace.',
     icon: Icons.business_outlined,
     color: _tealColor,
   ),
   _SummaryCardData(
     label: 'Contratos ativos',
-    value: '42',
-    description: 'Contratos com leitura focada em vigencia, cliente e risco.',
+    value: '14',
+    description: 'Contratos ativos distribuidos entre as empresas do mock.',
     icon: Icons.assignment_turned_in_outlined,
     color: _amberColor,
   ),
   _SummaryCardData(
     label: 'Funcionarios em foco',
-    value: '342',
-    description: 'Registros com historico e passagens multiempresa.',
+    value: '68',
+    description: 'Pessoas simuladas com mistura de ativos, historico e desligamento recente.',
     icon: Icons.badge_outlined,
     color: _roseColor,
   ),

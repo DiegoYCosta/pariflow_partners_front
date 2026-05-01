@@ -3,6 +3,12 @@ part of '../../app/app.dart';
 enum _CollaboratorAudienceGroup { board, supervision, auxiliary }
 
 extension on _CollaboratorAudienceGroup {
+  String get key => switch (this) {
+    _CollaboratorAudienceGroup.board => 'DIRECTOR',
+    _CollaboratorAudienceGroup.supervision => 'SUPERVISION',
+    _CollaboratorAudienceGroup.auxiliary => 'AUXILIARY',
+  };
+
   String get label => switch (this) {
     _CollaboratorAudienceGroup.board => 'Diretoria',
     _CollaboratorAudienceGroup.supervision => 'Supervisao',
@@ -87,11 +93,11 @@ class _ViewerAccessProfile {
       isAuthenticated ? 'consulta autenticada' : 'entrada publica';
 
   String get consultationSummary => isAuthenticated
-      ? 'leitura depende do compartilhamento'
+      ? 'leitura so do que a API liberar'
       : 'somente envio sem login';
 
   String get managementSummary => isAuthenticated
-      ? 'edicao e exclusao so do proprio conteudo'
+      ? 'gestao restrita a autoria autenticada'
       : 'sem leitura, edicao ou exclusao';
 }
 
@@ -129,6 +135,18 @@ const _martaViewerProfile = _ViewerAccessProfile(
   groups: [_CollaboratorAudienceGroup.supervision],
 );
 
+const _camilaViewerProfile = _ViewerAccessProfile(
+  key: 'camila',
+  name: 'Camila Prado',
+  badge: 'CP',
+  description:
+      'Perfil autenticado usado para validar compartilhamento por pessoa especifica, sem depender de todo o grupo de Supervisao.',
+  icon: Icons.alternate_email_outlined,
+  color: _roseColor,
+  publicId: 'usr_01hcml0000000000000003',
+  groups: [_CollaboratorAudienceGroup.supervision],
+);
+
 const _lucasViewerProfile = _ViewerAccessProfile(
   key: 'lucas',
   name: 'Lucas Lima',
@@ -145,6 +163,7 @@ const _viewerProfiles = [
   _publicViewerProfile,
   _diegoViewerProfile,
   _martaViewerProfile,
+  _camilaViewerProfile,
   _lucasViewerProfile,
 ];
 
@@ -158,6 +177,16 @@ class _ProtectedAccessPolicy {
   final _AudiencePerson owner;
   final List<_CollaboratorAudienceGroup> allowedGroups;
   final List<_AudiencePerson> allowedPeople;
+
+  String get ownerUserPublicId => owner.publicId;
+
+  List<String> get allowedGroupKeys => allowedGroups
+      .map((group) => group.key)
+      .toList(growable: false);
+
+  List<String> get allowedUserPublicIds => allowedPeople
+      .map((person) => person.publicId)
+      .toList(growable: false);
 
   bool get isOwnerOnly =>
       allowedGroups.isEmpty && allowedPeople.isEmpty;
@@ -182,6 +211,10 @@ class _ProtectedAccessPolicy {
 
   bool canViewerManage(_ViewerAccessProfile viewer) =>
       viewer.publicId != null && viewer.publicId == owner.publicId;
+
+  bool canViewerEdit(_ViewerAccessProfile viewer) => canViewerManage(viewer);
+
+  bool canViewerDelete(_ViewerAccessProfile viewer) => canViewerManage(viewer);
 
   String get audienceSummary => isOwnerOnly
       ? 'somente a autora ou o autor'

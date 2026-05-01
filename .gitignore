@@ -44,9 +44,3 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-/docs/front-architecture.md
-/docs/front-backend-integration.md
-/docs/front-implementation-roadmap.md
-/docs/front-layout-concept.md
-/docs/front-planning.md
-/docs/README.md
