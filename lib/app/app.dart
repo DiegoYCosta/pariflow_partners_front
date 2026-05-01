@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
 
 part '../core/widgets/primitives.dart';
+part '../core/widgets/master_detail_workspace.dart';
+part '../shared/models/sensitive_note_tag.dart';
+part '../features/companies/companies_feature.dart';
+part '../features/companies/infrastructure/companies_mock_data.dart';
+part '../features/contracts/contracts_feature.dart';
+part '../features/contracts/infrastructure/contracts_mock_data.dart';
+part '../features/people/people_feature.dart';
+part '../features/people/infrastructure/people_mock_data.dart';
 part 'shell/layout_preview_shell.dart';
 part '../features/home/home_feature.dart';
-part '../features/network/network_presentation.dart';
-part '../features/network/network_domain.dart';
+part '../features/network/application/network_filter_state.dart';
+part '../features/network/domain/network_entities.dart';
+part '../features/network/domain/network_graph_engine.dart';
+part '../features/network/infrastructure/network_mock_graph.dart';
+part '../features/network/presentation/network_workspace.dart';
+part '../features/network/presentation/network_canvas.dart';
+part '../features/network/presentation/network_detail.dart';
+part '../features/network/presentation/network_widgets.dart';
+part '../features/network/presentation/painters/network_link_painter.dart';
 
 const _canvasColor = Color(0xFFF4EFE6);
 const _paperColor = Color(0xFFFFFCF7);

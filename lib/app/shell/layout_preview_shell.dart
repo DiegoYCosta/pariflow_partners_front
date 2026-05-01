@@ -166,13 +166,26 @@ class _LayoutPreviewPageState extends State<LayoutPreviewPage> {
           },
         );
       case _Destination.companies:
+        return _CompaniesWorkspace(
+          selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          onSelectItem: (index) {
+            setState(() {
+              _selectedItemIndex[_destination] = index;
+            });
+          },
+        );
       case _Destination.contracts:
+        return _ContractsWorkspace(
+          selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          onSelectItem: (index) {
+            setState(() {
+              _selectedItemIndex[_destination] = index;
+            });
+          },
+        );
       case _Destination.people:
-        final data = _entityData[_destination]!;
-        final selectedIndex = _selectedItemIndex[_destination] ?? 0;
-        return _EntityWorkspace(
-          data: data,
-          selectedIndex: selectedIndex,
+        return _PeopleWorkspace(
+          selectedIndex: _selectedItemIndex[_destination] ?? 0,
           onSelectItem: (index) {
             setState(() {
               _selectedItemIndex[_destination] = index;

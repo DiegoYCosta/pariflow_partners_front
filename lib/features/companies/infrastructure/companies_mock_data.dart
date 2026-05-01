@@ -1,0 +1,89 @@
+part of '../../../app/app.dart';
+
+const _companiesWorkspaceData = _EntityWorkspaceData(
+  title: 'Empresas com workspace focado',
+  subtitle:
+      'Aqui a interface para de tentar mostrar tudo ao mesmo tempo. A consulta empresarial fica limpa, com lista e detalhe no mesmo contexto.',
+  searchHint: 'buscar por razao social, fantasia ou documento',
+  listHint:
+      'A lista fica curta, clicavel e orientada por contexto. O detalhe aparece ao lado sem romper a navegacao.',
+  filters: ['ativas', 'com contratos em aberto', 'multiempresa'],
+  accent: _tealColor,
+  items: [
+    _EntityItem(
+      title: 'PariFlow Servicos Ltda',
+      subtitle: 'Prestadora principal com operacao ativa em 4 contratos.',
+      meta: 'CNPJ estavel | 4 contratos | 61 funcionarios ativos',
+      status: 'ativa',
+      icon: Icons.apartment_outlined,
+      color: _tealColor,
+      detailSummary:
+          'O detalhe de empresa precisa sustentar busca, leitura de contratos e acesso rapido aos funcionarios relacionados.',
+      relations: [
+        'Cliente conectado: Condominio Bela Vista',
+        'Contrato em foco: Portaria e controle de acesso',
+        'Fila relacionada: 3 mudancas de quadro nesta semana',
+      ],
+      sensitiveNotes: [
+        _SensitiveNoteTag(
+          label: 'preposto atrasa resposta',
+          note:
+              'O preposto costuma responder fora da janela combinada nas segundas e quintas. Registrar para leitura do time autenticado, sem expor isso na consulta publica.',
+          classification: _SensitiveNoteClassification.operationalRisk,
+          color: _amberColor,
+          sortOrder: 1,
+          requiresLoginToView: true,
+          requiresLoginToCreate: false,
+        ),
+        _SensitiveNoteTag(
+          label: 'documentacao parcial',
+          note:
+              'Financeiro envia anexos complementares em lotes. Essa anotacao serve como memoria operacional para quem consulta a conta logado.',
+          classification: _SensitiveNoteClassification.routineContext,
+          color: _slateColor,
+          sortOrder: 2,
+        ),
+      ],
+    ),
+    _EntityItem(
+      title: 'Alpha Facilities',
+      subtitle: 'Prestadora com risco moderado e rotacao alta no ultimo ciclo.',
+      meta: '2 contratos | 18 desligamentos em 45 dias | atencao operacional',
+      status: 'atencao',
+      icon: Icons.apartment_outlined,
+      color: _amberColor,
+      detailSummary:
+          'Esse tipo de detalhe ajuda a cruzar historico de desligamento, risco e contratos ativos sem abrir a teia inteira.',
+      relations: [
+        'Cliente conectado: Reserva Mirante',
+        'Contrato em foco: Limpeza tecnica',
+        'Leitura futura: mapa de riscos e ocorrencias criticas',
+      ],
+      sensitiveNotes: [
+        _SensitiveNoteTag(
+          label: 'turnover alto',
+          note:
+              'A conta acumula observacoes internas sobre perda de quadro e retrabalho em escala. Segue sensivel porque pode afetar negociacao e leitura de risco.',
+          classification: _SensitiveNoteClassification.operationalRisk,
+          color: _roseColor,
+          sortOrder: 1,
+        ),
+      ],
+    ),
+    _EntityItem(
+      title: 'Orbe Seguranca',
+      subtitle: 'Prestadora com base pequena e contratos concentrados.',
+      meta: '1 contrato | 12 funcionarios ativos | sem desligamentos recentes',
+      status: 'estavel',
+      icon: Icons.apartment_outlined,
+      color: _slateColor,
+      detailSummary:
+          'O workspace continua simples mesmo quando o contexto e menor. O usuario nao precisa atravessar uma home cheia para chegar aqui.',
+      relations: [
+        'Cliente conectado: Torre Nascente',
+        'Contrato em foco: Vigilancia patrimonial',
+        'Leitura futura: auditoria e anexos sensiveis por vinculo',
+      ],
+    ),
+  ],
+);
