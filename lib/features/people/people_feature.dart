@@ -1070,7 +1070,8 @@ IconData _attachmentIconFor(String title) {
   }
   if (lower.endsWith('.jpg') ||
       lower.endsWith('.jpeg') ||
-      lower.endsWith('.png')) {
+      lower.endsWith('.png') ||
+      lower.endsWith('.webp')) {
     return Icons.image_outlined;
   }
   return Icons.insert_drive_file_outlined;
