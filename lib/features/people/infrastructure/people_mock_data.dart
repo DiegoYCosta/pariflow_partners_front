@@ -222,7 +222,960 @@ _EntityItem _buildVisualNetworkEmployeeItem(_NetworkGraphNode node) {
       'Departamento: $department',
       'Marcador visual: $primaryBadge',
     ],
+    attachments: _visualNetworkEmployeeAttachments(node),
+    sensitiveNotes: _visualNetworkEmployeeNotes(node),
   );
+}
+
+List<_AttachmentRecord> _visualNetworkEmployeeAttachments(
+  _NetworkGraphNode node,
+) {
+  final owner = switch (node.publicId) {
+    'employee_jessica_lee' => _audienceCamila,
+    'employee_michael_chen' => _audienceLucas,
+    'employee_sarah_johnson' => _audienceMarta,
+    'employee_david_williams' => _audienceDiego,
+    'employee_emily_davis' => _audienceCamila,
+    _ => _audienceCamila,
+  };
+
+  final company = node.displayName.split(' ').first;
+  return [
+    _AttachmentRecord(
+      publicId: 'anx_${node.publicId}_offer',
+      title: 'Offer Letter - $company.pdf',
+      classification: _AttachmentClassification.formalDocument,
+      summary: 'Documento formal do vinculo atual do colaborador.',
+      status: 'ativo',
+      updatedAtLabel: 'updated on 08/2024',
+      accessPolicy: _ProtectedAccessPolicy(
+        owner: owner,
+        allowedGroups: const [_CollaboratorAudienceGroup.board],
+        allowedPeople: const [_audienceMarta],
+      ),
+    ),
+    _AttachmentRecord(
+      publicId: 'anx_${node.publicId}_agreement',
+      title: 'Employment Agreement.pdf',
+      classification: _AttachmentClassification.formalDocument,
+      summary: 'Contrato de trabalho armazenado no dossie base.',
+      status: 'ativo',
+      updatedAtLabel: 'updated on 01/2025',
+      accessPolicy: _ProtectedAccessPolicy(
+        owner: owner,
+        allowedGroups: const [_CollaboratorAudienceGroup.supervision],
+      ),
+    ),
+    _AttachmentRecord(
+      publicId: 'anx_${node.publicId}_review',
+      title: 'Performance Review - 2025.xlsx',
+      classification: _AttachmentClassification.supportingReference,
+      summary:
+          'Planilha de acompanhamento de desempenho com leitura rastreavel.',
+      status: 'restrito',
+      updatedAtLabel: 'updated on 03/2026',
+      accessPolicy: _ProtectedAccessPolicy(
+        owner: owner,
+        allowedPeople: const [_audienceDiego, _audienceMarta],
+      ),
+      canDownload: false,
+    ),
+  ];
+}
+
+List<_SensitiveNoteTag> _visualNetworkEmployeeNotes(_NetworkGraphNode node) {
+  return switch (node.publicId) {
+    'employee_jessica_lee' => [
+      _SensitiveNoteTag(
+        label: 'cross-team escalation',
+        note:
+            'Atua como ponto de escalacao entre cliente e operacao. A nota permanece protegida porque mistura percepcao de lideranca e rotina da conta.',
+        classification: _SensitiveNoteClassification.behavioralSignal,
+        color: _tealColor,
+        sortOrder: 1,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceCamila,
+          allowedGroups: [_CollaboratorAudienceGroup.supervision],
+        ),
+      ),
+      _SensitiveNoteTag(
+        label: 'relocated for role',
+        note:
+            'Mudanca de cidade registrada no onboarding e relevante para decisoes de mobilidade e cobertura.',
+        classification: _SensitiveNoteClassification.personalContext,
+        color: _amberColor,
+        sortOrder: 2,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceCamila,
+          allowedPeople: [_audienceMarta],
+        ),
+      ),
+    ],
+    'employee_michael_chen' => [
+      _SensitiveNoteTag(
+        label: 'infra access overlap',
+        note:
+            'Acesso compartilhado com dois contratos exige trilha de auditoria e validacao adicional em trocas de alocacao.',
+        classification: _SensitiveNoteClassification.operationalRisk,
+        color: _roseColor,
+        sortOrder: 1,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceLucas,
+          allowedGroups: [_CollaboratorAudienceGroup.board],
+        ),
+      ),
+    ],
+    'employee_sarah_johnson' => [
+      _SensitiveNoteTag(
+        label: 'performance concern (2025)',
+        note:
+            'Ponto de atencao de performance ligado a volume de entregas durante a transicao entre maintenance e consulting.',
+        classification: _SensitiveNoteClassification.behavioralSignal,
+        color: _tealColor,
+        sortOrder: 1,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceMarta,
+          allowedGroups: [_CollaboratorAudienceGroup.board],
+          allowedPeople: [_audienceDiego],
+        ),
+      ),
+      _SensitiveNoteTag(
+        label: 'family caregiver',
+        note:
+            'Contexto familiar relevante para agendas presenciais e composicao de jornada, com leitura limitada ao grupo autorizado.',
+        classification: _SensitiveNoteClassification.familyContext,
+        color: _amberColor,
+        sortOrder: 2,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceMarta,
+          allowedPeople: [_audienceCamila],
+        ),
+      ),
+      _SensitiveNoteTag(
+        label: 'confidential medical note',
+        note:
+            'Observacao clinica protegida que nao deve ser refletida fora do fluxo autorizado pela API.',
+        classification: _SensitiveNoteClassification.personalContext,
+        color: _slateColor,
+        sortOrder: 3,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceDiego,
+          allowedGroups: [_CollaboratorAudienceGroup.board],
+        ),
+      ),
+    ],
+    'employee_david_williams' => [
+      _SensitiveNoteTag(
+        label: 'client recovery lead',
+        note:
+            'Historico de atuacao em recuperacao de conta com cliente critico. A leitura e mantida em camada protegida por envolver risco comercial.',
+        classification: _SensitiveNoteClassification.trainingOrSkill,
+        color: _tealColor,
+        sortOrder: 1,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceDiego,
+          allowedGroups: [_CollaboratorAudienceGroup.supervision],
+        ),
+      ),
+    ],
+    'employee_emily_davis' => [
+      _SensitiveNoteTag(
+        label: 'feedback required',
+        note:
+            'Feedback estruturado pendente apos a fase de preservacao operacional no contrato expirado.',
+        classification: _SensitiveNoteClassification.behavioralSignal,
+        color: _amberColor,
+        sortOrder: 1,
+        accessPolicy: _ProtectedAccessPolicy(
+          owner: _audienceCamila,
+          allowedGroups: [_CollaboratorAudienceGroup.supervision],
+          allowedPeople: [_audienceMarta],
+        ),
+      ),
+    ],
+    _ => const [],
+  };
+}
+
+_PersonProfileData _personProfileFor(_EntityItem item) {
+  switch (item.publicId) {
+    case 'pes_01hpes0000000000000001':
+      return const _PersonProfileData(
+        roleTitle: 'Site Operations Supervisor',
+        statusLabel: 'Active',
+        statusColor: _tealColor,
+        profileFields: [
+          _PersonInfoField(
+            icon: Icons.mail_outline_rounded,
+            label: 'Email',
+            value: 'ana.rocha@pariflow.com.br',
+          ),
+          _PersonInfoField(
+            icon: Icons.call_outlined,
+            label: 'Phone',
+            value: '+55 (11) 98921-4450',
+          ),
+          _PersonInfoField(
+            icon: Icons.location_on_outlined,
+            label: 'Location',
+            value: 'Sao Paulo, SP',
+          ),
+          _PersonInfoField(
+            icon: Icons.link_rounded,
+            label: 'LinkedIn',
+            value: 'linkedin.com/in/ana-paula-rocha',
+          ),
+          _PersonInfoField(
+            icon: Icons.badge_outlined,
+            label: 'Employee ID',
+            value: 'PFP-02184',
+          ),
+          _PersonInfoField(
+            icon: Icons.cake_outlined,
+            label: 'Date of Birth',
+            value: 'May 14, 1988 (37)',
+          ),
+          _PersonInfoField(
+            icon: Icons.public_outlined,
+            label: 'Nationality',
+            value: 'Brazilian',
+          ),
+          _PersonInfoField(
+            icon: Icons.verified_user_outlined,
+            label: 'Work Authorization',
+            value: 'Authorized to work in Brazil',
+          ),
+        ],
+        managerName: 'Sarah Mitchell',
+        managerRole: 'Regional Operations Director',
+        teamLabel: 'Operations Excellence',
+        departmentLabel: 'Field Operations',
+        timelineSummary: 'Timeline of Ana current and past company links.',
+        employmentLinks: [
+          _EmploymentLinkRecord(
+            periodLabel: 'Jan 2025\n- Present',
+            companyName: 'PariFlow Servicos Ltda',
+            roleTitle: 'Site Operations Supervisor',
+            fullDateLabel: 'Jan 06, 2025 - Present',
+            locationLabel: 'Sao Paulo, SP',
+            brandMonogram: 'PF',
+            accent: _tealColor,
+            isCurrent: true,
+          ),
+          _EmploymentLinkRecord(
+            periodLabel: 'Aug 2022\n- Dec 2024',
+            companyName: 'Orbe Seguranca',
+            roleTitle: 'Operations Coordinator',
+            fullDateLabel: 'Aug 15, 2022 - Dec 18, 2024',
+            locationLabel: 'Barueri, SP',
+            brandMonogram: 'OS',
+            accent: _slateColor,
+          ),
+          _EmploymentLinkRecord(
+            periodLabel: 'Feb 2019\n- Jul 2022',
+            companyName: 'Atlas Portaria e Servicos',
+            roleTitle: 'Team Lead',
+            fullDateLabel: 'Feb 04, 2019 - Jul 29, 2022',
+            locationLabel: 'Guarulhos, SP',
+            brandMonogram: 'AT',
+            accent: _amberColor,
+          ),
+        ],
+      );
+    case 'pes_01hpes0000000000000002':
+      return const _PersonProfileData(
+        roleTitle: 'Field Support Assistant',
+        statusLabel: 'Dismissed',
+        statusColor: _roseColor,
+        profileFields: [
+          _PersonInfoField(
+            icon: Icons.mail_outline_rounded,
+            label: 'Email',
+            value: 'bruno.tavares@alphafacilities.com.br',
+          ),
+          _PersonInfoField(
+            icon: Icons.call_outlined,
+            label: 'Phone',
+            value: '+55 (21) 98114-2205',
+          ),
+          _PersonInfoField(
+            icon: Icons.location_on_outlined,
+            label: 'Location',
+            value: 'Rio de Janeiro, RJ',
+          ),
+          _PersonInfoField(
+            icon: Icons.link_rounded,
+            label: 'LinkedIn',
+            value: 'linkedin.com/in/bruno-tavares',
+          ),
+          _PersonInfoField(
+            icon: Icons.badge_outlined,
+            label: 'Employee ID',
+            value: 'ALF-07442',
+          ),
+          _PersonInfoField(
+            icon: Icons.cake_outlined,
+            label: 'Date of Birth',
+            value: 'Nov 03, 1992 (33)',
+          ),
+          _PersonInfoField(
+            icon: Icons.public_outlined,
+            label: 'Nationality',
+            value: 'Brazilian',
+          ),
+          _PersonInfoField(
+            icon: Icons.verified_user_outlined,
+            label: 'Work Authorization',
+            value: 'Authorized to work in Brazil',
+          ),
+        ],
+        managerName: 'Diego Costa',
+        managerRole: 'People & Risk Director',
+        teamLabel: 'Risk Follow-up',
+        departmentLabel: 'Field Support',
+        timelineSummary: 'Timeline of Bruno most recent employment links.',
+        employmentLinks: [
+          _EmploymentLinkRecord(
+            periodLabel: 'Jun 2025\n- Apr 2026',
+            companyName: 'Alpha Facilities',
+            roleTitle: 'Field Support Assistant',
+            fullDateLabel: 'Jun 10, 2025 - Apr 14, 2026',
+            locationLabel: 'Rio de Janeiro, RJ',
+            brandMonogram: 'AF',
+            accent: _roseColor,
+          ),
+          _EmploymentLinkRecord(
+            periodLabel: 'Jan 2023\n- May 2025',
+            companyName: 'Atlas Portaria e Servicos',
+            roleTitle: 'Coverage Analyst',
+            fullDateLabel: 'Jan 09, 2023 - May 30, 2025',
+            locationLabel: 'Niteroi, RJ',
+            brandMonogram: 'AT',
+            accent: _amberColor,
+          ),
+        ],
+      );
+    case 'pes_01hpes0000000000000003':
+      return const _PersonProfileData(
+        roleTitle: 'Talent Mobility Analyst',
+        statusLabel: 'Historical Link',
+        statusColor: _amberColor,
+        profileFields: [
+          _PersonInfoField(
+            icon: Icons.mail_outline_rounded,
+            label: 'Email',
+            value: 'carla.mendes@pariflow.com.br',
+          ),
+          _PersonInfoField(
+            icon: Icons.call_outlined,
+            label: 'Phone',
+            value: '+55 (31) 98831-9120',
+          ),
+          _PersonInfoField(
+            icon: Icons.location_on_outlined,
+            label: 'Location',
+            value: 'Belo Horizonte, MG',
+          ),
+          _PersonInfoField(
+            icon: Icons.link_rounded,
+            label: 'LinkedIn',
+            value: 'linkedin.com/in/carla-mendes',
+          ),
+          _PersonInfoField(
+            icon: Icons.badge_outlined,
+            label: 'Employee ID',
+            value: 'PFP-05410',
+          ),
+          _PersonInfoField(
+            icon: Icons.cake_outlined,
+            label: 'Date of Birth',
+            value: 'Jul 21, 1990 (35)',
+          ),
+          _PersonInfoField(
+            icon: Icons.public_outlined,
+            label: 'Nationality',
+            value: 'Brazilian',
+          ),
+          _PersonInfoField(
+            icon: Icons.verified_user_outlined,
+            label: 'Work Authorization',
+            value: 'Authorized to work in Brazil',
+          ),
+        ],
+        managerName: 'Camila Prado',
+        managerRole: 'Mobility Program Manager',
+        teamLabel: 'People Mobility',
+        departmentLabel: 'People Operations',
+        timelineSummary: 'Timeline of Carla current and past company links.',
+        employmentLinks: [
+          _EmploymentLinkRecord(
+            periodLabel: 'Feb 2026\n- Present',
+            companyName: 'PariFlow Servicos Ltda',
+            roleTitle: 'Talent Mobility Analyst',
+            fullDateLabel: 'Feb 03, 2026 - Present',
+            locationLabel: 'Belo Horizonte, MG',
+            brandMonogram: 'PF',
+            accent: _tealColor,
+            isCurrent: true,
+          ),
+          _EmploymentLinkRecord(
+            periodLabel: 'May 2024\n- Jan 2026',
+            companyName: 'Orbe Seguranca',
+            roleTitle: 'Transition Coordinator',
+            fullDateLabel: 'May 06, 2024 - Jan 24, 2026',
+            locationLabel: 'Contagem, MG',
+            brandMonogram: 'OS',
+            accent: _slateColor,
+          ),
+          _EmploymentLinkRecord(
+            periodLabel: 'Mar 2022\n- Apr 2024',
+            companyName: 'Nova Horizonte Apoio Operacional',
+            roleTitle: 'People Analyst',
+            fullDateLabel: 'Mar 14, 2022 - Apr 30, 2024',
+            locationLabel: 'Belo Horizonte, MG',
+            brandMonogram: 'NH',
+            accent: _amberColor,
+          ),
+        ],
+      );
+    default:
+      if (item.publicId.startsWith('employee_')) {
+        final node = _networkGraphContractPreview.nodeByPublicId(item.publicId);
+        if (node != null) {
+          return _visualNetworkPersonProfile(node, item);
+        }
+      }
+      return _generatedPersonProfile(item);
+  }
+}
+
+_PersonProfileData _visualNetworkPersonProfile(
+  _NetworkGraphNode node,
+  _EntityItem item,
+) {
+  final extras = node.detailSnapshot.extras;
+  final department = '${extras['department'] ?? 'Operations'}';
+  final manager = '${extras['manager'] ?? 'Team Lead'}';
+  final location = '${extras['location'] ?? 'Austin, Texas, USA'}';
+  final employeeId = '${extras['employeeId'] ?? item.publicId}';
+  final email =
+      '${extras['email'] ?? _emailFromName(item.title, domain: 'aurora.com')}';
+  final phone = '${extras['phone'] ?? '+1 (555) 201-4400'}';
+  final linkedIn = _linkedInFromName(item.title);
+  final roleTitle = node.subtitle;
+  final contract =
+      '${extras['contract'] ?? (node.badges.isEmpty ? 'Active Contract' : node.badges.first)}';
+  final clientCompany = '${extras['clientCompany'] ?? 'Client Portfolio'}';
+
+  return _PersonProfileData(
+    roleTitle: roleTitle,
+    statusLabel: '${extras['statusLabel'] ?? _titleCase(node.status)}',
+    statusColor: node.status == 'active' ? _tealColor : _amberColor,
+    profileFields: [
+      _PersonInfoField(
+        icon: Icons.mail_outline_rounded,
+        label: 'Email',
+        value: email,
+      ),
+      _PersonInfoField(icon: Icons.call_outlined, label: 'Phone', value: phone),
+      _PersonInfoField(
+        icon: Icons.location_on_outlined,
+        label: 'Location',
+        value: location,
+      ),
+      _PersonInfoField(
+        icon: Icons.link_rounded,
+        label: 'LinkedIn',
+        value: linkedIn,
+      ),
+      _PersonInfoField(
+        icon: Icons.badge_outlined,
+        label: 'Employee ID',
+        value: employeeId,
+      ),
+      _PersonInfoField(
+        icon: Icons.cake_outlined,
+        label: 'Date of Birth',
+        value: _birthDateForSeed(item.publicId, usFormat: true),
+      ),
+      const _PersonInfoField(
+        icon: Icons.public_outlined,
+        label: 'Nationality',
+        value: 'American',
+      ),
+      const _PersonInfoField(
+        icon: Icons.verified_user_outlined,
+        label: 'Work Authorization',
+        value: 'Authorized to work in the USA',
+      ),
+    ],
+    managerName: manager,
+    managerRole: _managerRoleForDepartment(department),
+    teamLabel: '$clientCompany Delivery',
+    departmentLabel: department,
+    timelineSummary:
+        'Timeline of ${item.title.split(' ').first} current and past contracts.',
+    employmentLinks: _visualNetworkEmploymentLinks(node, contract, location),
+  );
+}
+
+List<_EmploymentLinkRecord> _visualNetworkEmploymentLinks(
+  _NetworkGraphNode node,
+  String contract,
+  String location,
+) {
+  switch (node.publicId) {
+    case 'employee_jessica_lee':
+      return const [
+        _EmploymentLinkRecord(
+          periodLabel: 'Mar 2021\n- Present',
+          companyName: 'Summit Retail LLC',
+          roleTitle: 'Project Manager',
+          fullDateLabel: 'Mar 04, 2021 - Present',
+          locationLabel: 'Seattle, WA',
+          brandMonogram: 'SR',
+          accent: _tealColor,
+          isCurrent: true,
+        ),
+        _EmploymentLinkRecord(
+          periodLabel: 'Jan 2018\n- Feb 2021',
+          companyName: 'North Harbor Commerce',
+          roleTitle: 'Operations Specialist',
+          fullDateLabel: 'Jan 08, 2018 - Feb 26, 2021',
+          locationLabel: 'Portland, OR',
+          brandMonogram: 'NH',
+          accent: _slateColor,
+        ),
+      ];
+    case 'employee_michael_chen':
+      return const [
+        _EmploymentLinkRecord(
+          periodLabel: 'Jul 2022\n- Present',
+          companyName: 'Summit Solutions Inc.',
+          roleTitle: 'IT Specialist',
+          fullDateLabel: 'Jul 18, 2022 - Present',
+          locationLabel: 'Austin, TX',
+          brandMonogram: 'SS',
+          accent: _tealColor,
+          isCurrent: true,
+        ),
+        _EmploymentLinkRecord(
+          periodLabel: 'May 2019\n- Jun 2022',
+          companyName: 'BlueStack Systems',
+          roleTitle: 'Infrastructure Analyst',
+          fullDateLabel: 'May 06, 2019 - Jun 30, 2022',
+          locationLabel: 'Dallas, TX',
+          brandMonogram: 'BS',
+          accent: _slateColor,
+        ),
+      ];
+    case 'employee_sarah_johnson':
+      return const [
+        _EmploymentLinkRecord(
+          periodLabel: 'Jan 2022\n- Present',
+          companyName: 'Pioneer Services LLC',
+          roleTitle: 'Senior Analyst',
+          fullDateLabel: 'Jan 15, 2022 - Present',
+          locationLabel: 'Chicago, IL',
+          brandMonogram: 'PS',
+          accent: _tealColor,
+          isCurrent: true,
+        ),
+        _EmploymentLinkRecord(
+          periodLabel: 'Jun 2019\n- Jul 2022',
+          companyName: 'Summit Solutions Inc.',
+          roleTitle: 'Consulting Analyst',
+          fullDateLabel: 'Jun 10, 2019 - Jul 31, 2022',
+          locationLabel: 'Austin, TX',
+          brandMonogram: 'SS',
+          accent: _amberColor,
+        ),
+        _EmploymentLinkRecord(
+          periodLabel: 'Jan 2016\n- May 2019',
+          companyName: 'NextWave Digital',
+          roleTitle: 'Associate Analyst',
+          fullDateLabel: 'Jan 04, 2016 - May 31, 2019',
+          locationLabel: 'Austin, TX',
+          brandMonogram: 'ND',
+          accent: _slateColor,
+        ),
+        _EmploymentLinkRecord(
+          periodLabel: 'Jun 2013\n- Dec 2015',
+          companyName: 'BlueStone Apps',
+          roleTitle: 'Product Analyst',
+          fullDateLabel: 'Jun 03, 2013 - Dec 18, 2015',
+          locationLabel: 'Austin, TX',
+          brandMonogram: 'BA',
+          accent: _roseColor,
+        ),
+      ];
+    case 'employee_david_williams':
+      return const [
+        _EmploymentLinkRecord(
+          periodLabel: 'Nov 2020\n- Present',
+          companyName: 'Pioneer Services LLC',
+          roleTitle: 'Account Manager',
+          fullDateLabel: 'Nov 02, 2020 - Present',
+          locationLabel: 'Chicago, IL',
+          brandMonogram: 'PS',
+          accent: _tealColor,
+          isCurrent: true,
+        ),
+        _EmploymentLinkRecord(
+          periodLabel: 'Apr 2017\n- Oct 2020',
+          companyName: 'Redwood Client Services',
+          roleTitle: 'Client Success Lead',
+          fullDateLabel: 'Apr 17, 2017 - Oct 21, 2020',
+          locationLabel: 'Milwaukee, WI',
+          brandMonogram: 'RC',
+          accent: _slateColor,
+        ),
+      ];
+    case 'employee_emily_davis':
+      return const [
+        _EmploymentLinkRecord(
+          periodLabel: 'May 2023\n- Present',
+          companyName: 'Pioneer Tech LLC',
+          roleTitle: 'Operations Lead',
+          fullDateLabel: 'May 10, 2023 - Present',
+          locationLabel: 'Denver, CO',
+          brandMonogram: 'PT',
+          accent: _tealColor,
+          isCurrent: true,
+        ),
+        _EmploymentLinkRecord(
+          periodLabel: 'Aug 2019\n- Apr 2023',
+          companyName: 'FrontRange Logistics',
+          roleTitle: 'Regional Coordinator',
+          fullDateLabel: 'Aug 05, 2019 - Apr 28, 2023',
+          locationLabel: 'Denver, CO',
+          brandMonogram: 'FL',
+          accent: _amberColor,
+        ),
+      ];
+    default:
+      return [
+        _EmploymentLinkRecord(
+          periodLabel: 'Current',
+          companyName: contract,
+          roleTitle: node.subtitle,
+          fullDateLabel:
+              '${node.detailSnapshot.extras['startDate'] ?? 'Current'} - Present',
+          locationLabel: location,
+          brandMonogram: _companyMonogram(contract),
+          accent: _tealColor,
+          isCurrent: true,
+        ),
+      ];
+  }
+}
+
+_PersonProfileData _generatedPersonProfile(_EntityItem item) {
+  final seed = _stableSeed(item.publicId);
+  final currentCompany =
+      _relationValue(item.relations, 'Prestadora atual') ??
+      _relationValue(item.relations, 'Prestadora anterior') ??
+      'PariFlow Servicos Ltda';
+  final previousCompany = _relationValue(item.relations, 'Passagem anterior');
+  final contract =
+      _relationValue(item.relations, 'Contrato atual') ??
+      _relationValue(item.relations, 'Contrato relacionado') ??
+      'Contrato sem rotulo';
+  final client =
+      _relationValue(item.relations, 'Cliente conectado') ??
+      'Cliente nao informado';
+  final location = _locationForClient(client);
+  final roleTitle = _generatedRoleTitle(seed);
+  final managerName = _managerNameForSeed(seed);
+  final department = _departmentForRole(roleTitle);
+  final team = '${client.split(' ').first} Operations';
+  final currentStartYear = 2023 + (seed % 3);
+  final currentMonth = 1 + (seed % 10);
+  final previousEndYear = currentStartYear - 1;
+
+  final links = <_EmploymentLinkRecord>[
+    _EmploymentLinkRecord(
+      periodLabel: item.status == 'desligado recente'
+          ? '${_shortMonth(currentMonth)} $currentStartYear\n- Apr 2026'
+          : '${_shortMonth(currentMonth)} $currentStartYear\n- Present',
+      companyName: currentCompany,
+      roleTitle: roleTitle,
+      fullDateLabel: item.status == 'desligado recente'
+          ? '${_fullMonth(currentMonth)} ${10 + (seed % 18)}, $currentStartYear - Apr 14, 2026'
+          : '${_fullMonth(currentMonth)} ${10 + (seed % 18)}, $currentStartYear - Present',
+      locationLabel: location,
+      brandMonogram: _companyMonogram(currentCompany),
+      accent: item.status == 'desligado recente' ? _roseColor : _tealColor,
+      isCurrent: item.status != 'desligado recente',
+    ),
+  ];
+
+  if (previousCompany != null) {
+    links.add(
+      _EmploymentLinkRecord(
+        periodLabel: 'Jan ${previousEndYear - 2}\n- Dec $previousEndYear',
+        companyName: previousCompany,
+        roleTitle: _previousRoleTitle(seed),
+        fullDateLabel:
+            'Jan 08, ${previousEndYear - 2} - Dec 15, $previousEndYear',
+        locationLabel: location,
+        brandMonogram: _companyMonogram(previousCompany),
+        accent: _amberColor,
+      ),
+    );
+  }
+
+  links.add(
+    _EmploymentLinkRecord(
+      periodLabel: 'Feb ${previousEndYear - 5}\n- Dec ${previousEndYear - 3}',
+      companyName: 'BaseLine Services',
+      roleTitle: _earlyCareerRoleTitle(seed),
+      fullDateLabel:
+          'Feb 05, ${previousEndYear - 5} - Dec 20, ${previousEndYear - 3}',
+      locationLabel: location,
+      brandMonogram: 'BS',
+      accent: _slateColor,
+    ),
+  );
+
+  return _PersonProfileData(
+    roleTitle: roleTitle,
+    statusLabel: switch (item.status) {
+      'ativo' => 'Active',
+      'desligado recente' => 'Dismissed',
+      _ => 'Historical Link',
+    },
+    statusColor: switch (item.status) {
+      'ativo' => _tealColor,
+      'desligado recente' => _roseColor,
+      _ => _amberColor,
+    },
+    profileFields: [
+      _PersonInfoField(
+        icon: Icons.mail_outline_rounded,
+        label: 'Email',
+        value: _emailFromName(item.title, domain: 'pariflow.com.br'),
+      ),
+      _PersonInfoField(
+        icon: Icons.call_outlined,
+        label: 'Phone',
+        value: _phoneForSeed(seed),
+      ),
+      _PersonInfoField(
+        icon: Icons.location_on_outlined,
+        label: 'Location',
+        value: location,
+      ),
+      _PersonInfoField(
+        icon: Icons.link_rounded,
+        label: 'LinkedIn',
+        value: _linkedInFromName(item.title),
+      ),
+      _PersonInfoField(
+        icon: Icons.badge_outlined,
+        label: 'Employee ID',
+        value: 'PFP-${(seed % 90000 + 10000).toString()}',
+      ),
+      _PersonInfoField(
+        icon: Icons.cake_outlined,
+        label: 'Date of Birth',
+        value: _birthDateForSeed(item.publicId),
+      ),
+      const _PersonInfoField(
+        icon: Icons.public_outlined,
+        label: 'Nationality',
+        value: 'Brazilian',
+      ),
+      const _PersonInfoField(
+        icon: Icons.verified_user_outlined,
+        label: 'Work Authorization',
+        value: 'Authorized to work in Brazil',
+      ),
+    ],
+    managerName: managerName,
+    managerRole: _managerRoleForDepartment(department),
+    teamLabel: team,
+    departmentLabel: department,
+    timelineSummary:
+        'Timeline of current and past contracts linked to this employee.',
+    employmentLinks: links,
+  );
+}
+
+String? _relationValue(List<String> relations, String prefix) {
+  for (final relation in relations) {
+    final marker = '$prefix: ';
+    if (relation.startsWith(marker)) {
+      return relation.substring(marker.length).trim();
+    }
+  }
+  return null;
+}
+
+String _linkedInFromName(String name) {
+  final slug = name.toLowerCase().replaceAll(' ', '-');
+  return 'linkedin.com/in/$slug';
+}
+
+String _emailFromName(String name, {required String domain}) {
+  final normalized = name.toLowerCase().replaceAll(' ', '.');
+  return '$normalized@$domain';
+}
+
+String _managerRoleForDepartment(String department) {
+  final lower = department.toLowerCase();
+  if (lower.contains('operation')) {
+    return 'Operations Director';
+  }
+  if (lower.contains('analytic')) {
+    return 'Analytics Manager';
+  }
+  if (lower.contains('account')) {
+    return 'Client Portfolio Director';
+  }
+  if (lower.contains('infrastructure')) {
+    return 'Infrastructure Manager';
+  }
+  return 'Department Lead';
+}
+
+String _generatedRoleTitle(int seed) {
+  const roles = [
+    'Operations Analyst',
+    'Site Supervisor',
+    'People Operations Coordinator',
+    'Field Support Specialist',
+    'Contract Mobility Analyst',
+    'Client Operations Lead',
+  ];
+  return roles[seed % roles.length];
+}
+
+String _previousRoleTitle(int seed) {
+  const roles = [
+    'Operations Coordinator',
+    'Coverage Analyst',
+    'Regional Support Lead',
+    'Shift Supervisor',
+  ];
+  return roles[seed % roles.length];
+}
+
+String _earlyCareerRoleTitle(int seed) {
+  const roles = [
+    'Administrative Assistant',
+    'Junior Analyst',
+    'Operations Assistant',
+    'Support Coordinator',
+  ];
+  return roles[seed % roles.length];
+}
+
+String _departmentForRole(String role) {
+  final lower = role.toLowerCase();
+  if (lower.contains('people')) {
+    return 'People Operations';
+  }
+  if (lower.contains('client')) {
+    return 'Client Services';
+  }
+  if (lower.contains('contract')) {
+    return 'Contract Management';
+  }
+  return 'Field Operations';
+}
+
+String _managerNameForSeed(int seed) {
+  const names = [
+    'Sarah Mitchell',
+    'Camila Prado',
+    'Diego Costa',
+    'Marta Nogueira',
+    'Lucas Lima',
+  ];
+  return names[seed % names.length];
+}
+
+int _stableSeed(String value) {
+  return value.runes.fold<int>(0, (total, rune) => total + rune);
+}
+
+String _phoneForSeed(int seed) {
+  final a = 10 + (seed % 80);
+  final b = 1000 + (seed % 8000);
+  final c = 1000 + ((seed * 3) % 8000);
+  return '+55 ($a) 9$b-$c';
+}
+
+String _birthDateForSeed(String seedValue, {bool usFormat = false}) {
+  final seed = _stableSeed(seedValue);
+  final month = 1 + (seed % 12);
+  final day = 1 + (seed % 27);
+  final year = 1984 + (seed % 13);
+  final age = 2026 - year;
+  if (usFormat) {
+    return '${_fullMonth(month)} $day, $year ($age)';
+  }
+  return '${_fullMonth(month)} $day, $year ($age)';
+}
+
+String _locationForClient(String client) {
+  return switch (client) {
+    'Condominio Bela Vista' => 'Sao Paulo, SP',
+    'Reserva Mirante' => 'Rio de Janeiro, RJ',
+    'Torre Nascente' => 'Campinas, SP',
+    'Parque das Flores' => 'Curitiba, PR',
+    'Jardim Atlantico' => 'Belo Horizonte, MG',
+    'Residencial Aurora' => 'Santos, SP',
+    _ => 'Sao Paulo, SP',
+  };
+}
+
+String _companyMonogram(String company) {
+  final words = company
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList();
+  if (words.length == 1) {
+    return words.first.substring(0, min(2, words.first.length)).toUpperCase();
+  }
+  return '${words.first[0]}${words[1][0]}'.toUpperCase();
+}
+
+String _shortMonth(int month) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return months[month - 1];
+}
+
+String _fullMonth(int month) {
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return months[month - 1];
 }
 
 class _PeopleBatchSpec {

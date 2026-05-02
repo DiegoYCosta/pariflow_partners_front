@@ -41,7 +41,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     _Destination.companies: 0,
     _Destination.clientCompanies: 0,
     _Destination.contracts: 0,
-    _Destination.people: 0,
+    _Destination.people: _defaultPeopleWorkspaceIndex,
   };
 
   @override
@@ -380,6 +380,13 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     }
   }
 }
+
+final int _defaultPeopleWorkspaceIndex = max(
+  0,
+  _peopleWorkspaceData.items.indexWhere(
+    (item) => item.publicId == 'employee_sarah_johnson',
+  ),
+);
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
