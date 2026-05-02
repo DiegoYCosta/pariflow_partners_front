@@ -31,13 +31,15 @@ class _Panel extends StatelessWidget {
 class _Tag extends StatelessWidget {
   const _Tag({
     required this.label,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.color,
     required this.background,
-  });
+  }) : assert(icon != null || leading != null);
 
   final String label;
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final Color color;
   final Color background;
 
@@ -52,7 +54,7 @@ class _Tag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
+          leading ?? Icon(icon, size: 18, color: color),
           const SizedBox(width: 8),
           Flexible(
             child: Text(

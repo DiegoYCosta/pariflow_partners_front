@@ -245,11 +245,11 @@ class _CrmSidebar extends StatelessWidget {
                             ),
                           Row(
                             children: [
-                              Icon(
-                                item.icon,
-                                color: selected
-                                    ? _amberColor
-                                    : const Color(0xFFDCE9E3),
+                              _SpriteMoldIcon(
+                                mold: item.mold,
+                                state: selected
+                                    ? _SpriteMoldState.selected
+                                    : _SpriteMoldState.base,
                                 size: 34,
                               ),
                               const SizedBox(width: 18),
@@ -708,12 +708,6 @@ class _CrmEntryCard extends StatelessWidget {
         subtitle: 'Explore your business\nnetwork visually',
       ),
     };
-    final iconColor = switch (choice.target) {
-      _ChoiceTarget.people => _tealColor,
-      _ChoiceTarget.network => _amberColor,
-      _ => choice.color,
-    };
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(32),
@@ -747,7 +741,13 @@ class _CrmEntryCard extends StatelessWidget {
                 ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(choice.icon, size: 50, color: iconColor),
+              child: Center(
+                child: _SpriteMoldIcon(
+                  mold: choice.mold,
+                  size: 56,
+                  semanticLabel: copy.title,
+                ),
+              ),
             ),
             const SizedBox(height: 22),
             Text(
@@ -873,7 +873,7 @@ class _CrmMetricCard extends StatelessWidget {
         children: [
           _Tag(
             label: card.label,
-            icon: card.icon,
+            leading: _SpriteMoldIcon(mold: card.mold, size: 18),
             color: card.color,
             background: card.color.withValues(alpha: 0.12),
           ),
@@ -924,7 +924,11 @@ class _CrmSectionHeader extends StatelessWidget {
           children: [
             _Tag(
               label: page.shortLabel,
-              icon: page.icon,
+              leading: _SpriteMoldIcon(
+                mold: page.mold,
+                state: _SpriteMoldState.selected,
+                size: 18,
+              ),
               color: page.accent,
               background: page.accent.withValues(alpha: 0.12),
             ),

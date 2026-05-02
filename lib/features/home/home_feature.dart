@@ -334,7 +334,7 @@ class _ChoiceCard extends StatelessWidget {
                 color: choice.color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(choice.icon, color: choice.color),
+              child: _SpriteMoldIcon(mold: choice.mold, size: 30),
             ),
             const SizedBox(height: 18),
             Text(choice.title, style: theme.textTheme.titleMedium),
@@ -371,7 +371,7 @@ class _SummaryCard extends StatelessWidget {
         children: [
           _Tag(
             label: card.label,
-            icon: card.icon,
+            leading: _SpriteMoldIcon(mold: card.mold, size: 18),
             color: card.color,
             background: card.color.withValues(alpha: 0.12),
           ),
@@ -415,7 +415,7 @@ class _ResumeTile extends StatelessWidget {
             color: item.color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Icon(item.icon, color: item.color),
+          child: _SpriteMoldIcon(mold: item.mold, size: 26),
         ),
         title: Text(item.title, style: theme.textTheme.titleMedium),
         subtitle: Padding(
@@ -485,7 +485,7 @@ class _ChoiceCardData {
     required this.title,
     required this.description,
     required this.hint,
-    required this.icon,
+    required this.mold,
     required this.color,
     required this.background,
     required this.borderColor,
@@ -495,7 +495,7 @@ class _ChoiceCardData {
   final String title;
   final String description;
   final String hint;
-  final IconData icon;
+  final _SpriteMold mold;
   final Color color;
   final Color background;
   final Color borderColor;
@@ -508,14 +508,14 @@ class _SummaryCardData {
     required this.label,
     required this.value,
     required this.description,
-    required this.icon,
+    required this.mold,
     required this.color,
   });
 
   final String label;
   final String value;
   final String description;
-  final IconData icon;
+  final _SpriteMold mold;
   final Color color;
 }
 
@@ -524,14 +524,14 @@ class _ResumeItem {
     required this.target,
     required this.title,
     required this.description,
-    required this.icon,
+    required this.mold,
     required this.color,
   });
 
   final _ChoiceTarget target;
   final String title;
   final String description;
-  final IconData icon;
+  final _SpriteMold mold;
   final Color color;
 }
 
@@ -542,7 +542,7 @@ const _choices = [
     description:
         'Abrir um workspace mais calmo para prestadoras, status e relacoes principais.',
     hint: 'lista curta, detalhe ao lado, sem poluicao',
-    icon: Icons.apartment_outlined,
+    mold: _SpriteMold.company,
     color: _tealColor,
     background: Color(0xFFF4FBF8),
     borderColor: Color(0xFFCFE3DB),
@@ -553,7 +553,7 @@ const _choices = [
     description:
         'Abrir a carteira de clientes sem esconder transicoes, multi-prestadora e contexto operacional.',
     hint: 'cliente como modulo proprio, nao como reflexo da prestadora',
-    icon: Icons.business_outlined,
+    mold: _SpriteMold.company,
     color: _slateColor,
     background: Color(0xFFF4F8FA),
     borderColor: Color(0xFFD2DDE4),
@@ -564,7 +564,7 @@ const _choices = [
     description:
         'Entrar direto no contexto contratual, com filtros e conexoes relevantes.',
     hint: 'cliente, prestadora e vigencia no mesmo eixo',
-    icon: Icons.assignment_outlined,
+    mold: _SpriteMold.document,
     color: _amberColor,
     background: Color(0xFFFFF6EF),
     borderColor: Color(0xFFF1D8BF),
@@ -575,7 +575,7 @@ const _choices = [
     description:
         'Abrir a ficha consolidada sem misturar pessoa, empresa, vinculo e historico.',
     hint: 'registro-base, status e historico multiempresa',
-    icon: Icons.groups_outlined,
+    mold: _SpriteMold.people,
     color: _roseColor,
     background: Color(0xFFFFF5F4),
     borderColor: Color(0xFFF0D2D2),
@@ -586,7 +586,7 @@ const _choices = [
     description:
         'Entrar direto no business overview da malha relacional, sem pagina intermediaria de teia.',
     hint: 'visual network canonica com drill-down controlado',
-    icon: Icons.hub_outlined,
+    mold: _SpriteMold.network,
     color: _slateColor,
     background: Color(0xFFF4F8FA),
     borderColor: Color(0xFFD2DDE4),
@@ -598,7 +598,7 @@ const _summaryCards = [
     label: 'Prestadoras monitoradas',
     value: '6',
     description: 'Prestadoras simuladas no recorte atual do workspace.',
-    icon: Icons.business_outlined,
+    mold: _SpriteMold.company,
     color: _tealColor,
   ),
   _SummaryCardData(
@@ -606,14 +606,14 @@ const _summaryCards = [
     value: '6',
     description:
         'Empresas clientes tratadas como modulo proprio no shell novo.',
-    icon: Icons.business_center_outlined,
+    mold: _SpriteMold.company,
     color: _slateColor,
   ),
   _SummaryCardData(
     label: 'Contratos ativos',
     value: '14',
     description: 'Contratos ativos distribuidos entre as empresas do mock.',
-    icon: Icons.assignment_turned_in_outlined,
+    mold: _SpriteMold.document,
     color: _amberColor,
   ),
   _SummaryCardData(
@@ -621,7 +621,7 @@ const _summaryCards = [
     value: '68',
     description:
         'Pessoas simuladas com mistura de ativos, historico e desligamento recente.',
-    icon: Icons.badge_outlined,
+    mold: _SpriteMold.people,
     color: _roseColor,
   ),
 ];
@@ -632,7 +632,7 @@ const _resumeItems = [
     title: 'Prestadoras com atualizacao recente',
     description:
         'Retomar uma lista curta de empresas que impactam contratos e postos.',
-    icon: Icons.domain_verification_outlined,
+    mold: _SpriteMold.company,
     color: _tealColor,
   ),
   _ResumeItem(
@@ -640,7 +640,7 @@ const _resumeItems = [
     title: 'Clientes com transicao de atendimento',
     description:
         'Abrir direto a carteira quando a leitura central for o cliente, e nao a prestadora.',
-    icon: Icons.business_center_outlined,
+    mold: _SpriteMold.company,
     color: _slateColor,
   ),
   _ResumeItem(
@@ -648,7 +648,7 @@ const _resumeItems = [
     title: 'Contratos proximos de vencimento',
     description:
         'Entrar direto no contexto contratual sem atravessar varios cards.',
-    icon: Icons.schedule_outlined,
+    mold: _SpriteMold.document,
     color: _amberColor,
   ),
   _ResumeItem(
@@ -656,7 +656,7 @@ const _resumeItems = [
     title: 'Funcionarios com mudanca recente',
     description:
         'Abrir a ficha de quem teve movimentacao, desligamento ou mudanca de status.',
-    icon: Icons.person_search_outlined,
+    mold: _SpriteMold.people,
     color: _roseColor,
   ),
 ];

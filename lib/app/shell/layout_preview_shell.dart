@@ -81,8 +81,12 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
               destinations: [
                 for (final item in _pageInfo.values)
                   NavigationDestination(
-                    icon: Icon(item.icon),
-                    selectedIcon: Icon(item.icon, color: page.accent),
+                    icon: _SpriteMoldIcon(mold: item.mold, size: 24),
+                    selectedIcon: _SpriteMoldIcon(
+                      mold: item.mold,
+                      state: _SpriteMoldState.selected,
+                      size: 24,
+                    ),
                     label: item.shortLabel,
                   ),
               ],
@@ -164,8 +168,12 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
               destinations: [
                 for (final item in _pageInfo.values)
                   NavigationDestination(
-                    icon: Icon(item.icon),
-                    selectedIcon: Icon(item.icon, color: page.accent),
+                    icon: _SpriteMoldIcon(mold: item.mold, size: 24),
+                    selectedIcon: _SpriteMoldIcon(
+                      mold: item.mold,
+                      state: _SpriteMoldState.selected,
+                      size: 24,
+                    ),
                     label: item.shortLabel,
                   ),
               ],
@@ -712,7 +720,13 @@ class _AppSidebar extends StatelessWidget {
                                 : Colors.white.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Icon(item.icon, color: Colors.white),
+                          child: _SpriteMoldIcon(
+                            mold: item.mold,
+                            state: selected
+                                ? _SpriteMoldState.selected
+                                : _SpriteMoldState.base,
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -784,7 +798,7 @@ class _PageInfo {
     required this.description,
     required this.kicker,
     required this.sidebarHint,
-    required this.icon,
+    required this.mold,
     required this.accent,
   });
 
@@ -794,7 +808,7 @@ class _PageInfo {
   final String description;
   final String kicker;
   final String sidebarHint;
-  final IconData icon;
+  final _SpriteMold mold;
   final Color accent;
 }
 
@@ -807,7 +821,7 @@ const _pageInfo = {
     kicker:
         'Escolha direta para prestadoras, clientes, contratos, pessoas ou visual network',
     sidebarHint: 'escolha o caminho inicial',
-    icon: Icons.home_outlined,
+    mold: _SpriteMold.home,
     accent: _tealColor,
   ),
   _Destination.companies: _PageInfo(
@@ -817,7 +831,7 @@ const _pageInfo = {
     description: 'Workspace focado em consulta e contexto empresarial.',
     kicker: 'Consulta focada em prestadoras',
     sidebarHint: 'contexto empresarial e contratual',
-    icon: Icons.apartment_outlined,
+    mold: _SpriteMold.company,
     accent: _tealColor,
   ),
   _Destination.clientCompanies: _PageInfo(
@@ -828,7 +842,7 @@ const _pageInfo = {
         'Workspace focado em carteira, multi-prestadora e contexto operacional do cliente.',
     kicker: 'Consulta focada em clientes e carteira ativa',
     sidebarHint: 'carteira, transicao e operacao por cliente',
-    icon: Icons.business_outlined,
+    mold: _SpriteMold.company,
     accent: _slateColor,
   ),
   _Destination.contracts: _PageInfo(
@@ -838,7 +852,7 @@ const _pageInfo = {
     description: 'Workspace focado em contexto contratual e relacoes.',
     kicker: 'Consulta focada em contratos',
     sidebarHint: 'filtros e relacoes principais',
-    icon: Icons.description_outlined,
+    mold: _SpriteMold.document,
     accent: _amberColor,
   ),
   _Destination.people: _PageInfo(
@@ -848,7 +862,7 @@ const _pageInfo = {
     description: 'Workspace focado em ficha consolidada e historico.',
     kicker: 'Consulta focada em pessoas e historico',
     sidebarHint: 'registro-base e passagens',
-    icon: Icons.groups_outlined,
+    mold: _SpriteMold.people,
     accent: _roseColor,
   ),
   _Destination.network: _PageInfo(
@@ -859,7 +873,7 @@ const _pageInfo = {
         'Business overview da malha relacional, com foco em empresas, contratos e conexoes.',
     kicker: 'Leitura visual de carteiras, contratos e conexoes operacionais',
     sidebarHint: 'visual network canonica',
-    icon: Icons.hub_outlined,
+    mold: _SpriteMold.network,
     accent: _slateColor,
   ),
 };

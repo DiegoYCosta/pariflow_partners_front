@@ -58,7 +58,12 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/
+    - assets/images/background_abstract_warm.webp
+    - assets/images/banner_mobile_clean.webp
+    - assets/images/banner_web_clean.webp
+    - assets/images/Icones.webp
+    - assets/images/neutral_infinite_background.webp
+    - assets/images/pariflow_logo.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
