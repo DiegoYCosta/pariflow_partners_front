@@ -94,6 +94,8 @@ class _SpriteMoldIcon extends StatelessWidget {
     required this.mold,
     this.state = _SpriteMoldState.base,
     this.size = 28,
+    this.color,
+    this.fit = BoxFit.cover,
     this.semanticLabel,
   });
 
@@ -116,6 +118,8 @@ class _SpriteMoldIcon extends StatelessWidget {
   final _SpriteMold mold;
   final _SpriteMoldState state;
   final double size;
+  final Color? color;
+  final BoxFit fit;
   final String? semanticLabel;
 
   @override
@@ -131,13 +135,21 @@ class _SpriteMoldIcon extends StatelessWidget {
             return SizedBox.square(dimension: size);
           }
 
-          final icon = CustomPaint(
+          Widget icon = CustomPaint(
             size: Size.square(size),
             painter: _SpriteMoldPainter(
               image: snapshot.data!,
               sourceRect: rect,
+              fit: fit,
             ),
           );
+
+          if (color != null) {
+            icon = ColorFiltered(
+              colorFilter: ColorFilter.mode(color!, BlendMode.srcIn),
+              child: icon,
+            );
+          }
 
           if (semanticLabel == null) {
             return icon;
@@ -151,14 +163,19 @@ class _SpriteMoldIcon extends StatelessWidget {
 }
 
 class _SpriteMoldPainter extends CustomPainter {
-  const _SpriteMoldPainter({required this.image, required this.sourceRect});
+  const _SpriteMoldPainter({
+    required this.image,
+    required this.sourceRect,
+    required this.fit,
+  });
 
   final ui.Image image;
   final ui.Rect sourceRect;
+  final BoxFit fit;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final fitted = applyBoxFit(BoxFit.contain, sourceRect.size, size);
+    final fitted = applyBoxFit(fit, sourceRect.size, size);
     final outputRect = Alignment.center.inscribe(
       fitted.destination,
       Offset.zero & size,
@@ -173,7 +190,9 @@ class _SpriteMoldPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SpriteMoldPainter oldDelegate) {
-    return oldDelegate.image != image || oldDelegate.sourceRect != sourceRect;
+    return oldDelegate.image != image ||
+        oldDelegate.sourceRect != sourceRect ||
+        oldDelegate.fit != fit;
   }
 }
 

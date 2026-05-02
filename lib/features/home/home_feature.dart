@@ -334,7 +334,12 @@ class _ChoiceCard extends StatelessWidget {
                 color: choice.color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: _SpriteMoldIcon(mold: choice.mold, size: 30),
+              child: _SpriteMoldIcon(
+                mold: choice.mold,
+                state: _spriteStateForChoiceTarget(choice.target),
+                color: _spriteTintForChoiceTarget(choice.target, choice.color),
+                size: 34,
+              ),
             ),
             const SizedBox(height: 18),
             Text(choice.title, style: theme.textTheme.titleMedium),
@@ -371,7 +376,14 @@ class _SummaryCard extends StatelessWidget {
         children: [
           _Tag(
             label: card.label,
-            leading: _SpriteMoldIcon(mold: card.mold, size: 18),
+            leading: _SpriteMoldIcon(
+              mold: card.mold,
+              state: card.mold == _SpriteMold.document
+                  ? _SpriteMoldState.selected
+                  : _SpriteMoldState.base,
+              color: card.mold == _SpriteMold.document ? null : card.color,
+              size: 18,
+            ),
             color: card.color,
             background: card.color.withValues(alpha: 0.12),
           ),
@@ -415,7 +427,12 @@ class _ResumeTile extends StatelessWidget {
             color: item.color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: _SpriteMoldIcon(mold: item.mold, size: 26),
+          child: _SpriteMoldIcon(
+            mold: item.mold,
+            state: _spriteStateForChoiceTarget(item.target),
+            color: _spriteTintForChoiceTarget(item.target, item.color),
+            size: 28,
+          ),
         ),
         title: Text(item.title, style: theme.textTheme.titleMedium),
         subtitle: Padding(

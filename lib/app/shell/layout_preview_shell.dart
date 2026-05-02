@@ -81,7 +81,11 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
               destinations: [
                 for (final item in _pageInfo.values)
                   NavigationDestination(
-                    icon: _SpriteMoldIcon(mold: item.mold, size: 24),
+                    icon: _SpriteMoldIcon(
+                      mold: item.mold,
+                      size: 24,
+                      color: _mutedColor,
+                    ),
                     selectedIcon: _SpriteMoldIcon(
                       mold: item.mold,
                       state: _SpriteMoldState.selected,
@@ -168,7 +172,11 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
               destinations: [
                 for (final item in _pageInfo.values)
                   NavigationDestination(
-                    icon: _SpriteMoldIcon(mold: item.mold, size: 24),
+                    icon: _SpriteMoldIcon(
+                      mold: item.mold,
+                      size: 24,
+                      color: _mutedColor,
+                    ),
                     selectedIcon: _SpriteMoldIcon(
                       mold: item.mold,
                       state: _SpriteMoldState.selected,
@@ -725,6 +733,9 @@ class _AppSidebar extends StatelessWidget {
                             state: selected
                                 ? _SpriteMoldState.selected
                                 : _SpriteMoldState.base,
+                            color: selected
+                                ? null
+                                : const Color(0xFFDCE9E3),
                             size: 24,
                           ),
                         ),
@@ -877,3 +888,19 @@ const _pageInfo = {
     accent: _slateColor,
   ),
 };
+
+_SpriteMoldState _spriteStateForChoiceTarget(_ChoiceTarget target) {
+  return switch (target) {
+    _ChoiceTarget.contracts || _ChoiceTarget.network =>
+      _SpriteMoldState.selected,
+    _ => _SpriteMoldState.base,
+  };
+}
+
+Color? _spriteTintForChoiceTarget(_ChoiceTarget target, Color fallbackColor) {
+  return switch (target) {
+    _ChoiceTarget.contracts || _ChoiceTarget.network => null,
+    _ChoiceTarget.people => _tealColor,
+    _ => fallbackColor,
+  };
+}

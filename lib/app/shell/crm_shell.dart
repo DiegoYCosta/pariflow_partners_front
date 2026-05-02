@@ -250,6 +250,9 @@ class _CrmSidebar extends StatelessWidget {
                                 state: selected
                                     ? _SpriteMoldState.selected
                                     : _SpriteMoldState.base,
+                                color: selected
+                                    ? null
+                                    : const Color(0xFFDCE9E3),
                                 size: 34,
                               ),
                               const SizedBox(width: 18),
@@ -744,7 +747,9 @@ class _CrmEntryCard extends StatelessWidget {
               child: Center(
                 child: _SpriteMoldIcon(
                   mold: choice.mold,
-                  size: 56,
+                  state: _spriteStateForChoiceTarget(choice.target),
+                  color: _spriteTintForChoiceTarget(choice.target, choice.color),
+                  size: 70,
                   semanticLabel: copy.title,
                 ),
               ),
