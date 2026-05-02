@@ -35,6 +35,102 @@ class _CrmTopBar extends StatelessWidget {
         final subtitle = isHome
             ? _formatDate(today)
             : '${page.shortLabel} | ${page.kicker}';
+        final leadingBlock = Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showMenuButton)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Builder(
+                  builder: (context) => IconButton.filledTonal(
+                    onPressed: Scaffold.of(context).openDrawer,
+                    icon: const Icon(Icons.menu_rounded),
+                  ),
+                ),
+              ),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: compact ? constraints.maxWidth - 88 : 540,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.9,
+                      color: _inkColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _mutedColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+        final homeActions = Wrap(
+          spacing: 22,
+          runSpacing: 14,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: const [
+            _CrmToolbarGlyph(icon: Icons.search_rounded),
+            _CrmToolbarGlyph(
+              icon: Icons.notifications_none_rounded,
+              badge: '3',
+            ),
+            _CrmPrimaryActionButton(),
+          ],
+        );
+        final generalActions = Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const _CrmIconAction(icon: Icons.search_rounded),
+            const _CrmIconAction(
+              icon: Icons.notifications_none_rounded,
+              badge: '3',
+            ),
+            _CrmViewerChip(
+              viewerProfile: viewerProfile,
+              compact: compact,
+              onViewerChanged: onViewerChanged,
+            ),
+            const _CrmPrimaryActionButton(),
+          ],
+        );
+
+        if (isHome && !compact) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                leadingBlock,
+                const SizedBox(width: 72),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: homeActions,
+                ),
+              ],
+            ),
+          );
+        }
 
         return Wrap(
           alignment: WrapAlignment.spaceBetween,
@@ -42,91 +138,8 @@ class _CrmTopBar extends StatelessWidget {
           runSpacing: 18,
           spacing: 18,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (showMenuButton)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Builder(
-                      builder: (context) => IconButton.filledTonal(
-                        onPressed: Scaffold.of(context).openDrawer,
-                        icon: const Icon(Icons.menu_rounded),
-                      ),
-                    ),
-                  ),
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: compact ? constraints.maxWidth - 88 : 540,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.9,
-                          color: _inkColor,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _mutedColor,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (isHome) ...[
-                  const _CrmToolbarGlyph(icon: Icons.search_rounded),
-                  const _CrmToolbarGlyph(
-                    icon: Icons.notifications_none_rounded,
-                    badge: '3',
-                  ),
-                ] else ...[
-                  const _CrmIconAction(icon: Icons.search_rounded),
-                  const _CrmIconAction(
-                    icon: Icons.notifications_none_rounded,
-                    badge: '3',
-                  ),
-                  _CrmViewerChip(
-                    viewerProfile: viewerProfile,
-                    compact: compact,
-                    onViewerChanged: onViewerChanged,
-                  ),
-                ],
-                Container(
-                  width: isHome ? 60 : 58,
-                  height: isHome ? 60 : 58,
-                  decoration: const BoxDecoration(
-                    color: _deepTealColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
-              ],
-            ),
+            leadingBlock,
+            isHome ? homeActions : generalActions,
           ],
         );
       },
@@ -168,6 +181,23 @@ class _CrmTopBar extends StatelessWidget {
       'December',
     ];
     return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+}
+
+class _CrmPrimaryActionButton extends StatelessWidget {
+  const _CrmPrimaryActionButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: const BoxDecoration(
+        color: _deepTealColor,
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.add_rounded, color: Colors.white, size: 30),
+    );
   }
 }
 
