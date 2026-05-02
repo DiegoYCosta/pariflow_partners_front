@@ -175,7 +175,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
           children: [
             if (showSidebar)
               Container(
-                width: 296,
+                width: 332,
                 color: _deepTealColor,
                 child: _CrmSidebar(
                   current: _destination,
@@ -729,8 +729,8 @@ class _PageInfo {
 const _pageInfo = {
   _Destination.home: _PageInfo(
     destination: _Destination.home,
-    shortLabel: 'Inicio',
-    title: 'Inicio',
+    shortLabel: 'Home',
+    title: 'Home',
     description: 'Escolha enxuta entre modulos operacionais e Visual Network.',
     kicker:
         'Escolha direta para prestadoras, clientes, contratos, pessoas ou visual network',
@@ -740,8 +740,8 @@ const _pageInfo = {
   ),
   _Destination.companies: _PageInfo(
     destination: _Destination.companies,
-    shortLabel: 'Empresas',
-    title: 'Empresas prestadoras',
+    shortLabel: 'Companies',
+    title: 'Companies',
     description: 'Workspace focado em consulta e contexto empresarial.',
     kicker: 'Consulta focada em prestadoras',
     sidebarHint: 'contexto empresarial e contratual',
@@ -750,8 +750,8 @@ const _pageInfo = {
   ),
   _Destination.clientCompanies: _PageInfo(
     destination: _Destination.clientCompanies,
-    shortLabel: 'Clientes',
-    title: 'Empresas clientes',
+    shortLabel: 'Clients',
+    title: 'Clients',
     description:
         'Workspace focado em carteira, multi-prestadora e contexto operacional do cliente.',
     kicker: 'Consulta focada em clientes e carteira ativa',
@@ -761,8 +761,8 @@ const _pageInfo = {
   ),
   _Destination.contracts: _PageInfo(
     destination: _Destination.contracts,
-    shortLabel: 'Contratos',
-    title: 'Contratos',
+    shortLabel: 'Contracts',
+    title: 'Contracts',
     description: 'Workspace focado em contexto contratual e relacoes.',
     kicker: 'Consulta focada em contratos',
     sidebarHint: 'filtros e relacoes principais',
@@ -771,12 +771,12 @@ const _pageInfo = {
   ),
   _Destination.people: _PageInfo(
     destination: _Destination.people,
-    shortLabel: 'Funcionarios',
-    title: 'Funcionarios',
+    shortLabel: 'People',
+    title: 'People',
     description: 'Workspace focado em ficha consolidada e historico.',
     kicker: 'Consulta focada em pessoas e historico',
     sidebarHint: 'registro-base e passagens',
-    icon: Icons.badge_outlined,
+    icon: Icons.groups_outlined,
     accent: _roseColor,
   ),
   _Destination.network: _PageInfo(

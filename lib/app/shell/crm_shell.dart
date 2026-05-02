@@ -26,13 +26,14 @@ class _CrmTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isHome = page.destination == _Destination.home;
         final compact = constraints.maxWidth < 920;
         final today = DateTime.now();
-        final title = page.destination == _Destination.home
+        final title = isHome
             ? '${_greeting(today)}, ${viewerProfile.name.split(' ').first}'
             : page.title;
-        final subtitle = page.destination == _Destination.home
-            ? '${_formatDate(today)} | shell CRM com layout institucional'
+        final subtitle = isHome
+            ? _formatDate(today)
             : '${page.shortLabel} | ${page.kicker}';
 
         return Wrap(
@@ -93,19 +94,27 @@ class _CrmTopBar extends StatelessWidget {
               runSpacing: 14,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const _CrmIconAction(icon: Icons.search_rounded),
-                const _CrmIconAction(
-                  icon: Icons.notifications_none_rounded,
-                  badge: '3',
-                ),
-                _CrmViewerChip(
-                  viewerProfile: viewerProfile,
-                  compact: compact,
-                  onViewerChanged: onViewerChanged,
-                ),
+                if (isHome) ...[
+                  const _CrmToolbarGlyph(icon: Icons.search_rounded),
+                  const _CrmToolbarGlyph(
+                    icon: Icons.notifications_none_rounded,
+                    badge: '3',
+                  ),
+                ] else ...[
+                  const _CrmIconAction(icon: Icons.search_rounded),
+                  const _CrmIconAction(
+                    icon: Icons.notifications_none_rounded,
+                    badge: '3',
+                  ),
+                  _CrmViewerChip(
+                    viewerProfile: viewerProfile,
+                    compact: compact,
+                    onViewerChanged: onViewerChanged,
+                  ),
+                ],
                 Container(
-                  width: 58,
-                  height: 58,
+                  width: isHome ? 60 : 58,
+                  height: isHome ? 60 : 58,
                   decoration: const BoxDecoration(
                     color: _deepTealColor,
                     shape: BoxShape.circle,
@@ -126,18 +135,39 @@ class _CrmTopBar extends StatelessWidget {
 
   String _greeting(DateTime now) {
     if (now.hour < 12) {
-      return 'Bom dia';
+      return 'Good morning';
     }
     if (now.hour < 18) {
-      return 'Boa tarde';
+      return 'Good afternoon';
     }
-    return 'Boa noite';
+    return 'Good evening';
   }
 
   String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$day/$month/${date.year}';
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 }
 
@@ -178,70 +208,63 @@ class _CrmSidebar extends StatelessWidget {
             Expanded(
               child: ListView.separated(
                 itemCount: _pageInfo.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
                   final item = _pageInfo.values.elementAt(index);
                   final selected = item.destination == current;
                   return InkWell(
                     onTap: () => onSelect(item.destination),
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(26),
                     child: Ink(
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
                       decoration: BoxDecoration(
                         color: selected
-                            ? Colors.white.withValues(alpha: 0.10)
+                            ? const Color(0xFF1C464B)
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(28),
+                        borderRadius: BorderRadius.circular(26),
                         border: Border.all(
                           color: selected
-                              ? Colors.white.withValues(alpha: 0.14)
+                              ? Colors.white.withValues(alpha: 0.08)
                               : Colors.transparent,
                         ),
                       ),
-                      child: Row(
+                      child: Stack(
                         children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? item.accent.withValues(alpha: 0.18)
-                                  : Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(18),
+                          if (selected)
+                            Positioned(
+                              left: -22,
+                              top: 6,
+                              bottom: 6,
+                              child: Container(
+                                width: 4,
+                                decoration: BoxDecoration(
+                                  color: _amberColor,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
                             ),
-                            child: Icon(
-                              item.icon,
-                              color: selected
-                                  ? const Color(0xFFE2A041)
-                                  : Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
+                          Row(
+                            children: [
+                              Icon(
+                                item.icon,
+                                color: selected
+                                    ? _amberColor
+                                    : const Color(0xFFDCE9E3),
+                                size: 34,
+                              ),
+                              const SizedBox(width: 18),
+                              Expanded(
+                                child: Text(
                                   item.shortLabel,
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                     fontSize: selected ? 18 : 17,
+                                    letterSpacing: -0.2,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  item.sidebarHint,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Color(0xFFC8D8D3),
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -323,380 +346,196 @@ class _CrmDashboardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardsPerRow = pageWidth >= 1500
-        ? 4
-        : pageWidth >= 1100
-        ? 2
-        : 1;
-    final cardWidth = cardsPerRow == 4
-        ? 270.0
-        : cardsPerRow == 2
-        ? (pageWidth - 60) / 2
-        : double.infinity;
+    final dashboardChoices = _choices
+        .where((choice) => choice.target != _ChoiceTarget.clientCompanies)
+        .toList(growable: false);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _CrmDashboardHero(viewerProfile: viewerProfile),
-        const SizedBox(height: 28),
-        Wrap(
-          spacing: 18,
-          runSpacing: 18,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardsPerRow = constraints.maxWidth >= 1380
+            ? 4
+            : constraints.maxWidth >= 800
+            ? 2
+            : 1;
+        const spacing = 22.0;
+        final cardWidth = cardsPerRow == 1
+            ? double.infinity
+            : (constraints.maxWidth - (spacing * (cardsPerRow - 1))) /
+                  cardsPerRow;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final choice in _choices)
-              SizedBox(
-                width: cardWidth,
-                child: _CrmEntryCard(
-                  choice: choice,
-                  onTap: () => onChooseDestination(choice.target),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 28),
-        const Center(
-          child: Text(
-            'Clareza gera decisoes melhores. Contexto gera parcerias mais fortes.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _deepTealColor,
-              fontSize: 22,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-        const SizedBox(height: 28),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: [
-            for (final card in _summaryCards)
-              SizedBox(
-                width: pageWidth >= 1320
-                    ? 290
-                    : pageWidth >= 920
-                    ? 250
-                    : double.infinity,
-                child: _CrmMetricCard(card: card),
-              ),
-          ],
-        ),
-        const SizedBox(height: 28),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final stacked = constraints.maxWidth < 1080;
-
-            final left = _Panel(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ordem sensata de rollout',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Primeiro shell, depois modulos mestre, depois ficha de pessoa e so entao a Visual Network canonica. O contrato relacional continua sendo o bloqueador principal.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
-                  ),
-                  const SizedBox(height: 18),
-                  for (final item in const [
-                    'shell novo com feature flag',
-                    'empresas, clientes e contratos',
-                    'pessoas e vinculos',
-                    'visual network com endpoint canonico',
-                  ])
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: _amberColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(item),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            );
-
-            final right = _Panel(
-              padding: const EdgeInsets.all(24),
-              child: _AccessContextPanel(viewerProfile: viewerProfile),
-            );
-
-            if (stacked) {
-              return Column(
-                children: [left, const SizedBox(height: 18), right],
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const _CrmDashboardHero(),
+            const SizedBox(height: 40),
+            Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
               children: [
-                Expanded(flex: 5, child: left),
-                const SizedBox(width: 18),
-                Expanded(flex: 4, child: right),
+                for (final choice in dashboardChoices)
+                  SizedBox(
+                    width: cardWidth,
+                    child: _CrmEntryCard(
+                      choice: choice,
+                      onTap: () => onChooseDestination(choice.target),
+                    ),
+                  ),
               ],
-            );
-          },
-        ),
-      ],
+            ),
+            const SizedBox(height: 40),
+            const _CrmDashboardQuote(),
+          ],
+        );
+      },
     );
   }
 }
 
 class _CrmDashboardHero extends StatelessWidget {
-  const _CrmDashboardHero({required this.viewerProfile});
-
-  final _ViewerAccessProfile viewerProfile;
+  const _CrmDashboardHero();
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final stacked = constraints.maxWidth < 980;
+        final stacked = constraints.maxWidth < 1120;
         final bannerAsset = stacked
             ? _crmBannerMobileAsset
             : _crmBannerWebAsset;
-        final headlineSize = stacked ? 44.0 : 60.0;
-        final headlineColor = stacked ? _deepTealColor : Colors.white;
-        final headlineAccentColor = stacked
-            ? const Color(0xFFC8891F)
-            : const Color(0xFFE5A64C);
-        final chipColor = stacked ? _deepTealColor : Colors.white;
-        final chipBackground = stacked
-            ? Colors.white.withValues(alpha: 0.78)
-            : Colors.white.withValues(alpha: 0.14);
-        final accentBarColor = stacked
-            ? const Color(0xFFC8891F)
-            : const Color(0xFFE5A64C);
-        final showHeroMetaTags = constraints.maxWidth < 0;
+        final headlineSize = stacked ? 44.0 : 66.0;
+        const accentColor = Color(0xFFE2A041);
 
         return Container(
           width: double.infinity,
-          height: stacked ? 600 : 418,
+          height: stacked ? 520 : 404,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(40),
+            borderRadius: BorderRadius.circular(38),
             boxShadow: [
               BoxShadow(
-                color: _deepTealColor.withValues(alpha: 0.16),
-                blurRadius: 36,
-                offset: const Offset(0, 18),
+                color: _deepTealColor.withValues(alpha: 0.14),
+                blurRadius: 34,
+                offset: const Offset(0, 16),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(40),
+            borderRadius: BorderRadius.circular(38),
             child: Stack(
               children: [
-                if (stacked) ...[
-                  Positioned.fill(
-                    child: Image.asset(
-                      _crmBackgroundAsset,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    width: constraints.maxWidth * 0.90,
-                    height: 352,
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: 0.82,
-                        child: ImageFiltered(
-                          imageFilter: ImageFilter.blur(
-                            sigmaX: 0.9,
-                            sigmaY: 0.9,
-                          ),
-                          child: Image.asset(
-                            bannerAsset,
-                            fit: BoxFit.cover,
-                            alignment: const Alignment(0.42, 1.0),
-                          ),
-                        ),
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color(0xFF072F33),
+                          Color(0xFF0A4047),
+                          Color(0xFF124B52),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
                     ),
                   ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFDFFFDF8),
-                            const Color(0xF6FFF9F0),
-                            const Color(0xD9FFF7EE),
-                            const Color(0xA9FFF7EE),
-                          ],
-                          stops: const [0.0, 0.30, 0.70, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: const Alignment(0.86, -0.18),
-                          radius: 0.86,
-                          colors: [
-                            const Color(0x58F3C97C),
-                            const Color(0x26F3C97C),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.34, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  Positioned.fill(
-                    child: Image.asset(
-                      bannerAsset,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.centerRight,
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xF205262B),
-                            const Color(0xE2124B4E),
-                            const Color(0xB3124B4E),
-                            const Color(0x5C124B4E),
-                          ],
-                          stops: const [0.0, 0.34, 0.70, 1.0],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: -8,
-                    height: 152,
-                    child: Opacity(
-                      opacity: 0.92,
-                      child: HighTechLightWaves(
-                        primaryColor: const Color(0xFF63E6E2),
-                        accentColor: const Color(0xFFE4A23B),
-                        numberOfWaves: 6,
-                        waveAmplitude: 0.108,
-                        waveFrequency: 0.038,
-                        waveSpeed: 0.0054,
-                        pulseSpeedMultiplier: 1.55,
-                        pulseSize: 6.8,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
                 Positioned.fill(
+                  child: Image.asset(
+                    bannerAsset,
+                    fit: BoxFit.cover,
+                    alignment: stacked
+                        ? const Alignment(0.78, 0.82)
+                        : Alignment.centerRight,
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xF6062428),
+                          const Color(0xE1134A50),
+                          const Color(0x8A134A50),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.34, 0.72, 1.0],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: -12,
+                  height: stacked ? 104 : 124,
                   child: IgnorePointer(
-                    child: Padding(
-                      padding: EdgeInsets.all(stacked ? 28 : 42),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: stacked
-                                ? constraints.maxWidth
-                                : min(constraints.maxWidth * 0.58, 760.0),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _Tag(
-                                label: _ShellVariant.crm.label,
-                                icon: Icons.auto_awesome_mosaic_outlined,
-                                color: chipColor,
-                                background: chipBackground,
+                    child: Opacity(
+                      opacity: 0.20,
+                      child: HighTechLightWaves(
+                        primaryColor: accentColor,
+                        accentColor: const Color(0xFF7F6129),
+                        numberOfWaves: 5,
+                        waveAmplitude: 0.076,
+                        waveFrequency: 0.030,
+                        waveSpeed: 0.0021,
+                        pulseSpeedMultiplier: 1.0,
+                        pulseSize: 1.8,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      stacked ? 32 : 72,
+                      stacked ? 48 : 62,
+                      stacked ? 32 : 72,
+                      stacked ? 52 : 62,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: stacked
+                              ? constraints.maxWidth
+                              : min(constraints.maxWidth * 0.56, 760.0),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'What would you like to',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: headlineSize,
+                                fontWeight: FontWeight.w400,
+                                letterSpacing: -2.6,
+                                height: 0.96,
                               ),
-                              const SizedBox(height: 18),
-                              RichText(
-                                text: TextSpan(
-                                  style: TextStyle(
-                                    color: headlineColor,
-                                    fontSize: headlineSize,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: -2.4,
-                                    height: 0.98,
-                                  ),
-                                  children: [
-                                    const TextSpan(
-                                      text: 'O que voce gostaria de\n',
-                                    ),
-                                    TextSpan(
-                                      text: 'consultar hoje?',
-                                      style: TextStyle(
-                                        color: headlineAccentColor,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'consult today?',
+                              style: TextStyle(
+                                color: accentColor,
+                                fontSize: headlineSize,
+                                fontWeight: FontWeight.w400,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: -2.3,
+                                height: 0.96,
                               ),
-                              const SizedBox(height: 18),
-                              Container(
-                                width: 92,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: accentBarColor,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
+                            ),
+                            const SizedBox(height: 28),
+                            Container(
+                              width: 80,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: accentColor,
+                                borderRadius: BorderRadius.circular(999),
                               ),
-                              if (showHeroMetaTags) ...[
-                                const SizedBox(height: 18),
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: [
-                                    _Tag(
-                                      label: viewerProfile.consultationSummary,
-                                      icon: viewerProfile.canViewSensitive
-                                          ? Icons.lock_open_rounded
-                                          : Icons.lock_outline_rounded,
-                                      color: chipColor,
-                                      background: chipBackground,
-                                    ),
-                                    _Tag(
-                                      label: _ShellFeatureFlags
-                                          .activeVariant
-                                          .rolloutSummary,
-                                      icon: Icons.flag_outlined,
-                                      color: chipColor,
-                                      background: chipBackground,
-                                    ),
-                                    _Tag(
-                                      label:
-                                          '${_networkGraphContractPreview.lanes.length} faixas da visual network',
-                                      icon: Icons.view_week_outlined,
-                                      color: chipColor,
-                                      background: chipBackground,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -720,12 +559,27 @@ class _CrmEntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = switch (choice.target) {
-      _ChoiceTarget.companies => 'Empresas',
-      _ChoiceTarget.clientCompanies => 'Clientes',
-      _ChoiceTarget.contracts => 'Contratos',
-      _ChoiceTarget.people => 'Pessoas',
-      _ChoiceTarget.network => 'Visual Network',
+    final copy = switch (choice.target) {
+      _ChoiceTarget.companies => (
+        title: 'Companies',
+        subtitle: 'Explore and manage\nyour companies',
+      ),
+      _ChoiceTarget.clientCompanies => (
+        title: 'Clients',
+        subtitle: 'Open your managed\nclient portfolio',
+      ),
+      _ChoiceTarget.contracts => (
+        title: 'Contracts',
+        subtitle: 'View and manage\nyour contracts',
+      ),
+      _ChoiceTarget.people => (
+        title: 'Employees',
+        subtitle: 'Manage and connect\nwith your team',
+      ),
+      _ChoiceTarget.network => (
+        title: 'Visual Network',
+        subtitle: 'Explore your business\nnetwork visually',
+      ),
     };
     final iconColor = switch (choice.target) {
       _ChoiceTarget.people => _tealColor,
@@ -735,18 +589,18 @@ class _CrmEntryCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(34),
+      borderRadius: BorderRadius.circular(32),
       child: Ink(
-        padding: const EdgeInsets.fromLTRB(30, 34, 30, 28),
+        padding: const EdgeInsets.fromLTRB(28, 34, 28, 28),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(34),
-          border: Border.all(color: _lineColor),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: const Color(0xFFE8ECEB)),
           boxShadow: [
             BoxShadow(
-              color: _deepTealColor.withValues(alpha: 0.06),
-              blurRadius: 28,
-              offset: const Offset(0, 12),
+              color: _deepTealColor.withValues(alpha: 0.07),
+              blurRadius: 34,
+              offset: const Offset(0, 16),
             ),
           ],
         ),
@@ -759,8 +613,8 @@ class _CrmEntryCard extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   colors: [
-                    choice.color.withValues(alpha: 0.16),
-                    choice.color.withValues(alpha: 0.06),
+                    choice.color.withValues(alpha: 0.18),
+                    choice.color.withValues(alpha: 0.07),
                     Colors.white,
                   ],
                 ),
@@ -770,19 +624,23 @@ class _CrmEntryCard extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             Text(
-              title,
+              copy.title,
               textAlign: TextAlign.center,
               style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 28,
+                fontSize: 26,
+                color: _deepTealColor,
                 fontWeight: FontWeight.w500,
                 letterSpacing: -1.1,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              choice.description,
+              copy.subtitle,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(color: _mutedColor),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: _mutedColor,
+                height: 1.45,
+              ),
             ),
             const SizedBox(height: 22),
             Container(
@@ -800,6 +658,76 @@ class _CrmEntryCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CrmDashboardQuote extends StatelessWidget {
+  const _CrmDashboardQuote();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 860) {
+          return Text(
+            '" Clarity drives better decisions. Insight builds stronger partnerships. "',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: _deepTealColor,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w500,
+            ),
+          );
+        }
+
+        return Row(
+          children: [
+            const Expanded(child: Divider(indent: 120)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '"',
+                    style: TextStyle(
+                      color: _amberColor,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: min(constraints.maxWidth * 0.56, 560.0),
+                    ),
+                    child: Text(
+                      'Clarity drives better decisions. Insight builds stronger partnerships.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: _deepTealColor,
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    '"',
+                    style: TextStyle(
+                      color: _amberColor,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Expanded(child: Divider(endIndent: 120)),
+          ],
+        );
+      },
     );
   }
 }
@@ -916,6 +844,49 @@ class _CrmIconAction extends StatelessWidget {
               right: -2,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: const BoxDecoration(
+                  color: _amberColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  badge!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmToolbarGlyph extends StatelessWidget {
+  const _CrmToolbarGlyph({required this.icon, this.badge});
+
+  final IconData icon;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Align(child: Icon(icon, color: _deepTealColor, size: 34)),
+          if (badge != null)
+            Positioned(
+              top: -4,
+              right: -2,
+              child: Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
                 decoration: const BoxDecoration(
                   color: _amberColor,
                   shape: BoxShape.circle,
