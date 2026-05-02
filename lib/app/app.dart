@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../widgets/high_tech_light_waves.dart';
 
 part '../core/widgets/primitives.dart';
+part '../core/widgets/sprite_mold_icon.dart';
 part '../core/widgets/master_detail_workspace.dart';
 part '../shared/models/attachment_record.dart';
 part '../shared/models/network_graph_payload.dart';
@@ -49,6 +53,7 @@ const _crmBannerWebAsset = 'assets/images/banner_web_clean.webp';
 const _crmBannerMobileAsset = 'assets/images/banner_mobile_clean.webp';
 const _crmBackgroundAsset = 'assets/images/background_abstract_warm.webp';
 const _crmLogoAsset = 'assets/images/pariflow_logo.png';
+const _spriteMoldSheetAsset = 'assets/images/Icones.webp';
 
 class PariFlowPartnersApp extends StatelessWidget {
   const PariFlowPartnersApp({super.key});
