@@ -399,9 +399,6 @@ class _CrmDashboardHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final stacked = constraints.maxWidth < 980;
-        final bannerAsset = stacked
-            ? _crmBannerMobileAsset
-            : _crmBannerWebAsset;
         final headlineSize = stacked ? 44.0 : 60.0;
         final headlineColor = stacked ? _deepTealColor : Colors.white;
         final headlineAccentColor = stacked
@@ -414,6 +411,7 @@ class _CrmDashboardHero extends StatelessWidget {
         final accentBarColor = stacked
             ? const Color(0xFFC8891F)
             : const Color(0xFFE5A64C);
+        final mobileFeatureWidth = min(constraints.maxWidth * 0.84, 360.0);
 
         return Container(
           width: double.infinity,
@@ -435,29 +433,23 @@ class _CrmDashboardHero extends StatelessWidget {
                 if (stacked) ...[
                   Positioned.fill(
                     child: Image.asset(
-                      _crmBackgroundAsset,
+                      _crmBannerMobileAsset,
                       fit: BoxFit.cover,
-                      alignment: Alignment.center,
+                      alignment: const Alignment(0.56, 0.58),
                     ),
                   ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    width: constraints.maxWidth * 0.90,
-                    height: 352,
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: 0.82,
-                        child: ImageFiltered(
-                          imageFilter: ImageFilter.blur(
-                            sigmaX: 0.9,
-                            sigmaY: 0.9,
-                          ),
-                          child: Image.asset(
-                            bannerAsset,
-                            fit: BoxFit.cover,
-                            alignment: const Alignment(0.42, 1.0),
-                          ),
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: 0.56,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: 7.0,
+                          sigmaY: 7.0,
+                        ),
+                        child: Image.asset(
+                          _crmBackgroundAsset,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
                         ),
                       ),
                     ),
@@ -469,12 +461,12 @@ class _CrmDashboardHero extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            const Color(0xFDFFFDF8),
-                            const Color(0xF6FFF9F0),
-                            const Color(0xD9FFF7EE),
-                            const Color(0xA9FFF7EE),
+                            const Color(0xF7FFF8F0),
+                            const Color(0xE8F8F0DF),
+                            const Color(0xD8F1E6CF),
+                            const Color(0xA8D0C7A7),
                           ],
-                          stops: const [0.0, 0.30, 0.70, 1.0],
+                          stops: const [0.0, 0.32, 0.72, 1.0],
                         ),
                       ),
                     ),
@@ -483,11 +475,11 @@ class _CrmDashboardHero extends StatelessWidget {
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: RadialGradient(
-                          center: const Alignment(0.86, -0.18),
-                          radius: 0.86,
+                          center: const Alignment(0.80, -0.08),
+                          radius: 0.94,
                           colors: [
-                            const Color(0x58F3C97C),
-                            const Color(0x26F3C97C),
+                            const Color(0x56A7AE74),
+                            const Color(0x18A7AE74),
                             Colors.transparent,
                           ],
                           stops: const [0.0, 0.34, 1.0],
@@ -495,10 +487,84 @@ class _CrmDashboardHero extends StatelessWidget {
                       ),
                     ),
                   ),
+                  Positioned(
+                    right: -6,
+                    bottom: 10,
+                    width: mobileFeatureWidth,
+                    height: 324,
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(34),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _deepTealColor.withValues(alpha: 0.14),
+                              blurRadius: 28,
+                              offset: const Offset(0, 20),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.30),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(34),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              ImageFiltered(
+                                imageFilter: ImageFilter.blur(
+                                  sigmaX: 1.2,
+                                  sigmaY: 1.2,
+                                ),
+                                child: Image.asset(
+                                  _crmBannerWebAsset,
+                                  fit: BoxFit.cover,
+                                  alignment: const Alignment(0.74, 0.50),
+                                ),
+                              ),
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        const Color(0xA8F0DFC0),
+                                        const Color(0x72E2D4B1),
+                                        const Color(0x82C7C08F),
+                                      ],
+                                      stops: const [0.0, 0.54, 1.0],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: RadialGradient(
+                                      center: const Alignment(0.84, 0.18),
+                                      radius: 0.90,
+                                      colors: [
+                                        const Color(0x42A5AE76),
+                                        const Color(0x14A5AE76),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.34, 1.0],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ] else ...[
                   Positioned.fill(
                     child: Image.asset(
-                      bannerAsset,
+                      _crmBannerWebAsset,
                       fit: BoxFit.cover,
                       alignment: Alignment.centerRight,
                     ),

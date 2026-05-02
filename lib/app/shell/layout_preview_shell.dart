@@ -185,54 +185,126 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
               ),
             Expanded(
               child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: _paperColor,
-                  image: DecorationImage(
-                    image: const AssetImage(_crmBackgroundAsset),
-                    fit: BoxFit.cover,
-                    opacity: _destination == _Destination.home ? 0.40 : 0.88,
-                  ),
-                ),
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    showSidebar ? 32 : 18,
-                    18,
-                    showSidebar ? 32 : 18,
-                    showSidebar ? 32 : 104,
-                  ),
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1560),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _CrmTopBar(
-                            page: page,
-                            viewerProfile: _viewerProfile,
-                            showMenuButton: !showSidebar,
-                            onViewerChanged: (value) {
-                              setState(() {
-                                _viewerProfile = value;
-                              });
-                            },
+                decoration: const BoxDecoration(color: _paperColor),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildCrmShellBackground(
+                      isHome: _destination == _Destination.home,
+                      showSidebar: showSidebar,
+                    ),
+                    SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        showSidebar ? 32 : 18,
+                        18,
+                        showSidebar ? 32 : 18,
+                        showSidebar ? 32 : 104,
+                      ),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1560),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _CrmTopBar(
+                                page: page,
+                                viewerProfile: _viewerProfile,
+                                showMenuButton: !showSidebar,
+                                onViewerChanged: (value) {
+                                  setState(() {
+                                    _viewerProfile = value;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 30),
+                              if (_destination != _Destination.home &&
+                                  _destination != _Destination.network) ...[
+                                _CrmSectionHeader(page: page),
+                                const SizedBox(height: 24),
+                              ],
+                              _buildWorkspaceContent(page, width),
+                            ],
                           ),
-                          const SizedBox(height: 30),
-                          if (_destination != _Destination.home &&
-                              _destination != _Destination.network) ...[
-                            _CrmSectionHeader(page: page),
-                            const SizedBox(height: 24),
-                          ],
-                          _buildWorkspaceContent(page, width),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCrmShellBackground({
+    required bool isHome,
+    required bool showSidebar,
+  }) {
+    final blurSigma = isHome ? 2.0 : (showSidebar ? 11.0 : 7.0);
+    final textureOpacity = isHome ? 0.38 : (showSidebar ? 0.50 : 0.44);
+    final veilLeadOpacity = isHome ? 0.24 : (showSidebar ? 0.68 : 0.56);
+    final veilMidOpacity = isHome ? 0.10 : (showSidebar ? 0.42 : 0.30);
+    final veilTailOpacity = isHome ? 0.16 : (showSidebar ? 0.52 : 0.40);
+    final oliveGlowOpacity = isHome ? 0.08 : (showSidebar ? 0.18 : 0.12);
+
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(
+                sigmaX: blurSigma,
+                sigmaY: blurSigma,
+              ),
+              child: Opacity(
+                opacity: textureOpacity,
+                child: Image.asset(
+                  _crmBackgroundAsset,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFFF9F2E5).withValues(alpha: veilLeadOpacity),
+                    const Color(0xFFF7EFD9).withValues(alpha: veilMidOpacity),
+                    const Color(0xFFF5EBD7).withValues(alpha: veilTailOpacity),
+                  ],
+                  stops: const [0.0, 0.48, 1.0],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.82, -0.10),
+                  radius: 0.92,
+                  colors: [
+                    const Color(0xFFA9AE7A).withValues(alpha: oliveGlowOpacity),
+                    const Color(0xFFA9AE7A).withValues(
+                      alpha: oliveGlowOpacity * 0.32,
+                    ),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.30, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
