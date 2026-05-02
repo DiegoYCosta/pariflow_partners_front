@@ -21,6 +21,7 @@ final _peopleWorkspaceData = _EntityWorkspaceData(
 );
 
 List<_EntityItem> _buildPeopleWorkspaceItems() => [
+  ..._buildVisualNetworkEmployeeItems(),
   _EntityItem(
     publicId: 'pes_01hpes0000000000000001',
     title: 'Ana Paula Rocha',
@@ -184,6 +185,45 @@ List<_EntityItem> _buildPeopleWorkspaceItems() => [
   ),
   ..._buildGeneratedPeopleItems(),
 ];
+
+List<_EntityItem> _buildVisualNetworkEmployeeItems() {
+  return _networkGraphContractPreview.nodes
+      .where((node) => node.lane == _NetworkGraphLane.employee)
+      .map(_buildVisualNetworkEmployeeItem)
+      .toList();
+}
+
+_EntityItem _buildVisualNetworkEmployeeItem(_NetworkGraphNode node) {
+  final extras = node.detailSnapshot.extras;
+  final contract = '${extras['contract'] ?? '-'}';
+  final clientCompany = '${extras['clientCompany'] ?? '-'}';
+  final manager = '${extras['manager'] ?? '-'}';
+  final department = '${extras['department'] ?? '-'}';
+  final employeeId = '${extras['employeeId'] ?? node.publicId}';
+  final primaryBadge = node.badges.isEmpty
+      ? 'visual network'
+      : node.badges.first;
+
+  return _EntityItem(
+    publicId: node.publicId,
+    title: node.displayName,
+    subtitle: '${node.subtitle} com ficha aberta a partir da Visual Network.',
+    meta: '${_titleCase(node.status)} | $contract | $clientCompany',
+    status: node.status == 'active' ? 'ativo' : _titleCase(node.status),
+    icon: Icons.badge_outlined,
+    color: _roseColor,
+    detailSummary:
+        'A ficha individual do colaborador sai da leitura de malha e abre aqui, preservando separacao entre contexto relacional, identificacao humana e historico operacional.',
+    relations: [
+      'Employee ID: $employeeId',
+      'Contrato atual: $contract',
+      'Empresa cliente: $clientCompany',
+      'Gestor imediato: $manager',
+      'Departamento: $department',
+      'Marcador visual: $primaryBadge',
+    ],
+  );
+}
 
 class _PeopleBatchSpec {
   const _PeopleBatchSpec({
@@ -431,15 +471,16 @@ Color _generatedColor(_PeopleBatchSpec batch, _MockPersonMode mode) =>
       _MockPersonMode.dismissed => _roseColor,
     };
 
-String _generatedSubtitle(_PeopleBatchSpec batch, _MockPersonMode mode) =>
-    switch (mode) {
-      _MockPersonMode.active =>
-        'Pessoa em operacao ativa de ${batch.operation}.',
-      _MockPersonMode.history =>
-        'Pessoa com passagens entre postos e leitura historica mais rica.',
-      _MockPersonMode.dismissed =>
-        'Pessoa desligada recentemente e ainda relevante para o contexto da equipe.',
-    };
+String _generatedSubtitle(
+  _PeopleBatchSpec batch,
+  _MockPersonMode mode,
+) => switch (mode) {
+  _MockPersonMode.active => 'Pessoa em operacao ativa de ${batch.operation}.',
+  _MockPersonMode.history =>
+    'Pessoa com passagens entre postos e leitura historica mais rica.',
+  _MockPersonMode.dismissed =>
+    'Pessoa desligada recentemente e ainda relevante para o contexto da equipe.',
+};
 
 String _generatedMeta(
   _PeopleBatchSpec batch,

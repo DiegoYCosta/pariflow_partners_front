@@ -9,8 +9,6 @@ enum _Destination {
   network,
 }
 
-enum _HomeMode { overview, network }
-
 class LayoutPreviewPage extends StatelessWidget {
   const LayoutPreviewPage({super.key});
 
@@ -34,11 +32,10 @@ class _ShellPreviewPage extends StatefulWidget {
 
 class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   _Destination _destination = _Destination.home;
-  _HomeMode _homeMode = _HomeMode.overview;
   _ViewerAccessProfile _viewerProfile = _diegoViewerProfile;
   _NetworkFilterState _networkFilters = const _NetworkFilterState();
   bool _showAdvancedNetworkFilters = false;
-  String _selectedNetworkNodeId = 'person_ana';
+  String _selectedNetworkNodeId = 'contract_maintenance';
   String? _hoveredNetworkNodeId;
   final Map<_Destination, int> _selectedItemIndex = {
     _Destination.companies: 0,
@@ -221,7 +218,8 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                             },
                           ),
                           const SizedBox(height: 30),
-                          if (_destination != _Destination.home) ...[
+                          if (_destination != _Destination.home &&
+                              _destination != _Destination.network) ...[
                             _CrmSectionHeader(page: page),
                             const SizedBox(height: 24),
                           ],
@@ -249,35 +247,8 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                 pageWidth: width,
               )
             : _HomeContent(
-                mode: _homeMode,
                 viewerProfile: _viewerProfile,
-                filters: _networkFilters,
-                showAdvancedFilters: _showAdvancedNetworkFilters,
-                selectedNodeId: _selectedNetworkNodeId,
-                hoveredNodeId: _hoveredNetworkNodeId,
-                onChangeMode: (mode) {
-                  setState(() {
-                    _homeMode = mode;
-                  });
-                },
-                onFiltersChanged: (filters) {
-                  setState(() {
-                    _networkFilters = filters;
-                  });
-                },
-                onToggleAdvancedFilters: () {
-                  setState(() {
-                    _showAdvancedNetworkFilters = !_showAdvancedNetworkFilters;
-                  });
-                },
-                onSelectNode: _handleNetworkNodeSelection,
-                onHoverNode: _handleNetworkNodeHover,
                 onChooseDestination: _handleChoice,
-                onOpenFullNetwork: () {
-                  setState(() {
-                    _destination = _Destination.network;
-                  });
-                },
                 pageWidth: width,
               );
       case _Destination.network:
@@ -301,11 +272,11 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
           },
           onSelectNode: _handleNetworkNodeSelection,
           onHoverNode: _handleNetworkNodeHover,
-          actionLabel: 'Levar esta leitura para a home',
+          onOpenEmployeeProfile: _openEmployeeProfile,
+          actionLabel: 'Voltar ao inicio',
           onAction: () {
             setState(() {
               _destination = _Destination.home;
-              _homeMode = _HomeMode.network;
             });
           },
         );
@@ -355,9 +326,6 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   void _handleDestination(_Destination destination) {
     setState(() {
       _destination = destination;
-      if (destination == _Destination.network) {
-        _homeMode = _HomeMode.network;
-      }
     });
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
@@ -379,10 +347,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         _handleDestination(_Destination.people);
         return;
       case _ChoiceTarget.network:
-        setState(() {
-          _destination = _Destination.home;
-          _homeMode = _HomeMode.network;
-        });
+        _handleDestination(_Destination.network);
         return;
     }
   }
@@ -398,6 +363,21 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     setState(() {
       _hoveredNetworkNodeId = nodeId;
     });
+  }
+
+  void _openEmployeeProfile(String publicId) {
+    final peopleIndex = _peopleWorkspaceData.items.indexWhere(
+      (item) => item.publicId == publicId,
+    );
+    setState(() {
+      _destination = _Destination.people;
+      if (peopleIndex >= 0) {
+        _selectedItemIndex[_Destination.people] = peopleIndex;
+      }
+    });
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 }
 
@@ -604,7 +584,7 @@ class _AppSidebar extends StatelessWidget {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'Home mais limpa, escolha objetiva e espaco reservado para a teia relacional.',
+                  'Home mais limpa, escolha objetiva e acesso direto a Visual Network e modulos operacionais.',
                   style: TextStyle(color: Color(0xFFD1E0DB), height: 1.5),
                 ),
               ],
@@ -744,9 +724,9 @@ const _pageInfo = {
     destination: _Destination.home,
     shortLabel: 'Inicio',
     title: 'Inicio',
-    description: 'Escolha enxuta entre consulta direta e teia relacional.',
+    description: 'Escolha enxuta entre modulos operacionais e Visual Network.',
     kicker:
-        'Escolha direta para prestadoras, clientes, contratos, pessoas ou teia',
+        'Escolha direta para prestadoras, clientes, contratos, pessoas ou visual network',
     sidebarHint: 'escolha o caminho inicial',
     icon: Icons.home_outlined,
     accent: _tealColor,
@@ -794,12 +774,12 @@ const _pageInfo = {
   ),
   _Destination.network: _PageInfo(
     destination: _Destination.network,
-    shortLabel: 'Teia',
-    title: 'Workspace da teia relacional',
+    shortLabel: 'Network',
+    title: 'Visual Network',
     description:
-        'Leitura focada da malha com mais espaco para navegacao, contexto e historico.',
-    kicker: 'Workspace visual de carteiras, origens e historico',
-    sidebarHint: 'workspace focado da malha relacional',
+        'Business overview da malha relacional, com foco em empresas, contratos e conexoes.',
+    kicker: 'Leitura visual de carteiras, contratos e conexoes operacionais',
+    sidebarHint: 'visual network canonica',
     icon: Icons.hub_outlined,
     accent: _slateColor,
   ),

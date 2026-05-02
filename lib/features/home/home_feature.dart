@@ -2,84 +2,34 @@ part of '../../app/app.dart';
 
 class _HomeContent extends StatelessWidget {
   const _HomeContent({
-    required this.mode,
     required this.viewerProfile,
-    required this.filters,
-    required this.showAdvancedFilters,
-    required this.selectedNodeId,
-    required this.hoveredNodeId,
-    required this.onChangeMode,
-    required this.onFiltersChanged,
-    required this.onToggleAdvancedFilters,
-    required this.onSelectNode,
-    required this.onHoverNode,
     required this.onChooseDestination,
-    required this.onOpenFullNetwork,
     required this.pageWidth,
   });
 
-  final _HomeMode mode;
   final _ViewerAccessProfile viewerProfile;
-  final _NetworkFilterState filters;
-  final bool showAdvancedFilters;
-  final String selectedNodeId;
-  final String? hoveredNodeId;
-  final ValueChanged<_HomeMode> onChangeMode;
-  final ValueChanged<_NetworkFilterState> onFiltersChanged;
-  final VoidCallback onToggleAdvancedFilters;
-  final ValueChanged<String> onSelectNode;
-  final ValueChanged<String?> onHoverNode;
   final ValueChanged<_ChoiceTarget> onChooseDestination;
-  final VoidCallback onOpenFullNetwork;
   final double pageWidth;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _ChoiceHero(
-          mode: mode,
-          onChangeMode: onChangeMode,
-          onChooseDestination: onChooseDestination,
-        ),
+        _ChoiceHero(onChooseDestination: onChooseDestination),
         const SizedBox(height: 24),
-        if (mode == _HomeMode.overview)
-          _HomeOverview(
-            viewerProfile: viewerProfile,
-            onChooseDestination: onChooseDestination,
-            pageWidth: pageWidth,
-          )
-        else
-          _NetworkWorkspace(
-            title: 'Previa da teia na home',
-            subtitle:
-                'Leitura curta da malha sem sair do inicio. O contexto atual continua ao abrir o workspace completo da teia.',
-            filters: filters,
-            showAdvancedFilters: showAdvancedFilters,
-            selectedNodeId: selectedNodeId,
-            hoveredNodeId: hoveredNodeId,
-            compact: true,
-            onFiltersChanged: onFiltersChanged,
-            onToggleAdvancedFilters: onToggleAdvancedFilters,
-            onSelectNode: onSelectNode,
-            onHoverNode: onHoverNode,
-            actionLabel: 'Abrir workspace completo',
-            onAction: onOpenFullNetwork,
-          ),
+        _HomeOverview(
+          viewerProfile: viewerProfile,
+          onChooseDestination: onChooseDestination,
+          pageWidth: pageWidth,
+        ),
       ],
     );
   }
 }
 
 class _ChoiceHero extends StatelessWidget {
-  const _ChoiceHero({
-    required this.mode,
-    required this.onChangeMode,
-    required this.onChooseDestination,
-  });
+  const _ChoiceHero({required this.onChooseDestination});
 
-  final _HomeMode mode;
-  final ValueChanged<_HomeMode> onChangeMode;
   final ValueChanged<_ChoiceTarget> onChooseDestination;
 
   @override
@@ -119,27 +69,8 @@ class _ChoiceHero extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'A primeira pagina deixa o usuario escolher entre consulta direta e uma previa da teia. Quando a leitura pedir mais espaco, o workspace completo continua disponivel sem perder o contexto atual.',
+                'A home agora funciona como roteador limpo entre os modulos operacionais e a Visual Network. A leitura visual abre direto na pagina canonica, sem etapa intermediaria nem preview legado.',
                 style: theme.textTheme.bodyLarge?.copyWith(color: _mutedColor),
-              ),
-              const SizedBox(height: 22),
-              SegmentedButton<_HomeMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: _HomeMode.overview,
-                    icon: Icon(Icons.space_dashboard_outlined),
-                    label: Text('Resumo'),
-                  ),
-                  ButtonSegment(
-                    value: _HomeMode.network,
-                    icon: Icon(Icons.hub_outlined),
-                    label: Text('Teia'),
-                  ),
-                ],
-                selected: {mode},
-                onSelectionChanged: (selection) {
-                  onChangeMode(selection.first);
-                },
               ),
             ],
           );
@@ -331,10 +262,9 @@ class _AccessContextPanel extends StatelessWidget {
                   ? Icons.lock_open_rounded
                   : Icons.lock_outline_rounded,
               color: viewerProfile.canViewSensitive ? _tealColor : _roseColor,
-              background: (viewerProfile.canViewSensitive
-                      ? _tealColor
-                      : _roseColor)
-                  .withValues(alpha: 0.12),
+              background:
+                  (viewerProfile.canViewSensitive ? _tealColor : _roseColor)
+                      .withValues(alpha: 0.12),
             ),
             if (viewerProfile.isAuthenticated)
               _Tag(
@@ -652,10 +582,10 @@ const _choices = [
   ),
   _ChoiceCardData(
     target: _ChoiceTarget.network,
-    title: 'Ver previa da teia',
+    title: 'Abrir Visual Network',
     description:
-        'Abrir uma previa da malha ainda na home para decidir se vale entrar no workspace completo.',
-    hint: 'pre-visualizacao rapida com contexto persistente',
+        'Entrar direto no business overview da malha relacional, sem pagina intermediaria de teia.',
+    hint: 'visual network canonica com drill-down controlado',
     icon: Icons.hub_outlined,
     color: _slateColor,
     background: Color(0xFFF4F8FA),
@@ -689,7 +619,8 @@ const _summaryCards = [
   _SummaryCardData(
     label: 'Funcionarios em foco',
     value: '68',
-    description: 'Pessoas simuladas com mistura de ativos, historico e desligamento recente.',
+    description:
+        'Pessoas simuladas com mistura de ativos, historico e desligamento recente.',
     icon: Icons.badge_outlined,
     color: _roseColor,
   ),

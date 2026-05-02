@@ -397,7 +397,7 @@ class _CrmDashboardContent extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Primeiro shell, depois modulos mestre, depois ficha de pessoa e so entao a teia nova em faixas. O contrato relacional continua sendo o bloqueador principal.',
+                    'Primeiro shell, depois modulos mestre, depois ficha de pessoa e so entao a Visual Network canonica. O contrato relacional continua sendo o bloqueador principal.',
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
@@ -407,7 +407,7 @@ class _CrmDashboardContent extends StatelessWidget {
                     'shell novo com feature flag',
                     'empresas, clientes e contratos',
                     'pessoas e vinculos',
-                    'teia nova com endpoint canonico',
+                    'visual network com endpoint canonico',
                   ])
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -687,7 +687,7 @@ class _CrmDashboardHero extends StatelessWidget {
                                     ),
                                     _Tag(
                                       label:
-                                          '${_networkGraphContractPreview.lanes.length} faixas da teia',
+                                          '${_networkGraphContractPreview.lanes.length} faixas da visual network',
                                       icon: Icons.view_week_outlined,
                                       color: chipColor,
                                       background: chipBackground,
@@ -725,7 +725,7 @@ class _CrmEntryCard extends StatelessWidget {
       _ChoiceTarget.clientCompanies => 'Clientes',
       _ChoiceTarget.contracts => 'Contratos',
       _ChoiceTarget.people => 'Pessoas',
-      _ChoiceTarget.network => 'Teia Visual',
+      _ChoiceTarget.network => 'Visual Network',
     };
     final iconColor = switch (choice.target) {
       _ChoiceTarget.people => _tealColor,
