@@ -241,67 +241,10 @@ class _CrmSidebar extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
                   final item = _pageInfo.values.elementAt(index);
-                  final selected = item.destination == current;
-                  return InkWell(
+                  return _CrmSidebarNavItem(
+                    item: item,
+                    selected: item.destination == current,
                     onTap: () => onSelect(item.destination),
-                    borderRadius: BorderRadius.circular(26),
-                    child: Ink(
-                      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFF1C464B)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(
-                          color: selected
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.transparent,
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          if (selected)
-                            Positioned(
-                              left: -22,
-                              top: 6,
-                              bottom: 6,
-                              child: Container(
-                                width: 4,
-                                decoration: BoxDecoration(
-                                  color: _amberColor,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                            ),
-                          Row(
-                            children: [
-                              _SpriteMoldIcon(
-                                mold: item.mold,
-                                state: selected
-                                    ? _SpriteMoldState.selected
-                                    : _SpriteMoldState.base,
-                                color: selected
-                                    ? null
-                                    : const Color(0xFFDCE9E3),
-                                size: 34,
-                              ),
-                              const SizedBox(width: 18),
-                              Expanded(
-                                child: Text(
-                                  item.shortLabel,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: selected ? 18 : 17,
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
                   );
                 },
               ),
@@ -890,6 +833,166 @@ class _CrmDashboardQuote extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _CrmSidebarNavItem extends StatefulWidget {
+  const _CrmSidebarNavItem({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _PageInfo item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_CrmSidebarNavItem> createState() => _CrmSidebarNavItemState();
+}
+
+class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.selected;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedScale(
+        scale: _hovered && !selected ? 1.025 : 1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      blurRadius: 24,
+                      spreadRadius: 0.5,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFFC7D7D4).withValues(alpha: 0.06),
+                      blurRadius: 16,
+                      spreadRadius: 0,
+                    ),
+                  ]
+                : _hovered
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(26),
+            child: Ink(
+              padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+              decoration: BoxDecoration(
+                gradient: selected
+                    ? const LinearGradient(
+                        colors: [Color(0xFF1F4A50), Color(0xFF173F46)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: selected
+                    ? null
+                    : _hovered
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFFE0A64C).withValues(alpha: 0.18)
+                      : _hovered
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.transparent,
+                  width: selected ? 1.0 : 1,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  if (selected)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(26),
+                            gradient: RadialGradient(
+                              center: const Alignment(-0.92, -0.05),
+                              radius: 1.15,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.09),
+                                const Color(0xFFF7F3EA).withValues(alpha: 0.05),
+                                Colors.transparent,
+                              ],
+                              stops: const [0, 0.18, 0.68],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (selected)
+                    Positioned(
+                      left: -22,
+                      top: 6,
+                      bottom: 6,
+                      child: Container(
+                        width: 4,
+                        decoration: BoxDecoration(
+                          color: _amberColor,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      _SpriteMoldIcon(
+                        mold: widget.item.mold,
+                        state: selected
+                            ? _SpriteMoldState.selected
+                            : _SpriteMoldState.base,
+                        color: selected ? null : const Color(0xFFDCE9E3),
+                        size: 34,
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: selected
+                                ? 18
+                                : _hovered
+                                ? 17.5
+                                : 17,
+                            letterSpacing: -0.2,
+                          ),
+                          child: Text(widget.item.shortLabel),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
