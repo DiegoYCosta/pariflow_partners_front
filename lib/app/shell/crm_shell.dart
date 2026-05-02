@@ -398,144 +398,205 @@ class _CrmDashboardHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final stacked = constraints.maxWidth < 1120;
+        final stacked = constraints.maxWidth < 980;
         final bannerAsset = stacked
             ? _crmBannerMobileAsset
             : _crmBannerWebAsset;
-        final headlineSize = stacked ? 44.0 : 66.0;
-        const accentColor = Color(0xFFE2A041);
+        final headlineSize = stacked ? 44.0 : 60.0;
+        final headlineColor = stacked ? _deepTealColor : Colors.white;
+        final headlineAccentColor = stacked
+            ? const Color(0xFFC8891F)
+            : const Color(0xFFE5A64C);
+        final chipColor = stacked ? _deepTealColor : Colors.white;
+        final chipBackground = stacked
+            ? Colors.white.withValues(alpha: 0.78)
+            : Colors.white.withValues(alpha: 0.14);
+        final accentBarColor = stacked
+            ? const Color(0xFFC8891F)
+            : const Color(0xFFE5A64C);
 
         return Container(
           width: double.infinity,
-          height: stacked ? 520 : 404,
+          height: stacked ? 600 : 418,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(38),
+            borderRadius: BorderRadius.circular(40),
             boxShadow: [
               BoxShadow(
-                color: _deepTealColor.withValues(alpha: 0.14),
-                blurRadius: 34,
-                offset: const Offset(0, 16),
+                color: _deepTealColor.withValues(alpha: 0.16),
+                blurRadius: 36,
+                offset: const Offset(0, 18),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(38),
+            borderRadius: BorderRadius.circular(40),
             child: Stack(
               children: [
-                const Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0xFF072F33),
-                          Color(0xFF0A4047),
-                          Color(0xFF124B52),
-                        ],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
+                if (stacked) ...[
+                  Positioned.fill(
+                    child: Image.asset(
+                      _crmBackgroundAsset,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
                     ),
                   ),
-                ),
-                Positioned.fill(
-                  child: Image.asset(
-                    bannerAsset,
-                    fit: BoxFit.cover,
-                    alignment: stacked
-                        ? const Alignment(0.78, 0.82)
-                        : Alignment.centerRight,
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xF6062428),
-                          const Color(0xE1134A50),
-                          const Color(0x8A134A50),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.34, 0.72, 1.0],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: -12,
-                  height: stacked ? 104 : 124,
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.20,
-                      child: HighTechLightWaves(
-                        primaryColor: accentColor,
-                        accentColor: const Color(0xFF7F6129),
-                        numberOfWaves: 5,
-                        waveAmplitude: 0.076,
-                        waveFrequency: 0.030,
-                        waveSpeed: 0.0021,
-                        pulseSpeedMultiplier: 1.0,
-                        pulseSize: 1.8,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      stacked ? 32 : 72,
-                      stacked ? 48 : 62,
-                      stacked ? 32 : 72,
-                      stacked ? 52 : 62,
-                    ),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: stacked
-                              ? constraints.maxWidth
-                              : min(constraints.maxWidth * 0.56, 760.0),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    width: constraints.maxWidth * 0.90,
+                    height: 352,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.82,
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: 0.9,
+                            sigmaY: 0.9,
+                          ),
+                          child: Image.asset(
+                            bannerAsset,
+                            fit: BoxFit.cover,
+                            alignment: const Alignment(0.42, 1.0),
+                          ),
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'What would you like to',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: headlineSize,
-                                fontWeight: FontWeight.w400,
-                                letterSpacing: -2.6,
-                                height: 0.96,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'consult today?',
-                              style: TextStyle(
-                                color: accentColor,
-                                fontSize: headlineSize,
-                                fontWeight: FontWeight.w400,
-                                fontStyle: FontStyle.italic,
-                                letterSpacing: -2.3,
-                                height: 0.96,
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-                            Container(
-                              width: 80,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: accentColor,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFDFFFDF8),
+                            const Color(0xF6FFF9F0),
+                            const Color(0xD9FFF7EE),
+                            const Color(0xA9FFF7EE),
                           ],
+                          stops: const [0.0, 0.30, 0.70, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: const Alignment(0.86, -0.18),
+                          radius: 0.86,
+                          colors: [
+                            const Color(0x58F3C97C),
+                            const Color(0x26F3C97C),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.34, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Positioned.fill(
+                    child: Image.asset(
+                      bannerAsset,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.centerRight,
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xF205262B),
+                            const Color(0xE2124B4E),
+                            const Color(0xB3124B4E),
+                            const Color(0x5C124B4E),
+                          ],
+                          stops: const [0.0, 0.34, 0.70, 1.0],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: -8,
+                    height: 152,
+                    child: Opacity(
+                      opacity: 0.92,
+                      child: HighTechLightWaves(
+                        primaryColor: const Color(0xFF63E6E2),
+                        accentColor: const Color(0xFFE4A23B),
+                        numberOfWaves: 6,
+                        waveAmplitude: 0.108,
+                        waveFrequency: 0.038,
+                        waveSpeed: 0.0054,
+                        pulseSpeedMultiplier: 1.55,
+                        pulseSize: 6.8,
+                      ),
+                    ),
+                  ),
+                ],
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Padding(
+                      padding: EdgeInsets.all(stacked ? 28 : 42),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: stacked
+                                ? constraints.maxWidth
+                                : min(constraints.maxWidth * 0.58, 760.0),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _Tag(
+                                label: _ShellVariant.crm.label,
+                                icon: Icons.auto_awesome_mosaic_outlined,
+                                color: chipColor,
+                                background: chipBackground,
+                              ),
+                              const SizedBox(height: 18),
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    color: headlineColor,
+                                    fontSize: headlineSize,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: -2.4,
+                                    height: 0.98,
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                      text: 'O que voce gostaria de\n',
+                                    ),
+                                    TextSpan(
+                                      text: 'consultar hoje?',
+                                      style: TextStyle(
+                                        color: headlineAccentColor,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Container(
+                                width: 92,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: accentBarColor,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
