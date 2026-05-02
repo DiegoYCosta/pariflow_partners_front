@@ -34,9 +34,11 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
     with TickerProviderStateMixin {
   late final AnimationController _controller;
   late final AnimationController _hoverController;
+  late final AnimationController _interactionController;
   late final List<_WaveBundleData> _waves;
   final Random _random = Random(18);
   Offset _hoverPosition = const Offset(0.72, 0.70);
+  Offset _interactionPosition = const Offset(0.72, 0.70);
 
   @override
   void initState() {
@@ -45,6 +47,11 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
       vsync: this,
       duration: const Duration(seconds: 22),
     )..repeat();
+    _interactionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      reverseDuration: const Duration(milliseconds: 360),
+    );
     _hoverController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -87,6 +94,7 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
   @override
   void dispose() {
     _hoverController.dispose();
+    _interactionController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -101,16 +109,25 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
         );
 
         final painterChild = AnimatedBuilder(
-          animation: Listenable.merge([_controller, _hoverController]),
+          animation: Listenable.merge([
+            _controller,
+            _hoverController,
+            _interactionController,
+          ]),
           builder: (context, _) {
             return CustomPaint(
               painter: _HighTechLightWavesPainter(
                 animationValue: _controller.value,
                 waves: _waves,
                 pulseSize: widget.pulseSize,
-                interactionPosition: _hoverPosition,
-                interactionStrength: Curves.easeOutCubic.transform(
+                hoverPosition: _hoverPosition,
+                hoverStrength: Curves.easeOutCubic.transform(
                   _hoverController.value,
+                ),
+                tapPosition: _interactionPosition,
+                tapProgress: _interactionController.value,
+                tapStrength: Curves.easeOutCubic.transform(
+                  _interactionController.value,
                 ),
               ),
               child: const SizedBox.expand(),
@@ -130,15 +147,17 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
           },
           onHover: (event) {
             _updateHoverPosition(event.localPosition, availableSize);
-            if (_hoverController.status != AnimationStatus.forward &&
-                _hoverController.value < 1) {
-              _hoverController.forward();
-            }
           },
           onExit: (_) {
             _hoverController.reverse();
           },
-          child: painterChild,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTapDown: (details) {
+              _triggerInteraction(details.localPosition, availableSize);
+            },
+            child: painterChild,
+          ),
         );
       },
     );
@@ -160,6 +179,25 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
     }
 
     _hoverPosition = next;
+  }
+
+  void _triggerInteraction(Offset localPosition, Size availableSize) {
+    if (availableSize.width <= 0 || availableSize.height <= 0) {
+      return;
+    }
+
+    _interactionPosition = Offset(
+      (localPosition.dx / availableSize.width).clamp(0.0, 1.0),
+      (localPosition.dy / availableSize.height).clamp(0.0, 1.0),
+    );
+    _interactionController
+      ..stop()
+      ..reset()
+      ..forward().whenComplete(() {
+        if (mounted) {
+          _interactionController.reverse();
+        }
+      });
   }
 }
 
@@ -202,15 +240,21 @@ class _HighTechLightWavesPainter extends CustomPainter {
     required this.animationValue,
     required this.waves,
     required this.pulseSize,
-    required this.interactionPosition,
-    required this.interactionStrength,
+    required this.hoverPosition,
+    required this.hoverStrength,
+    required this.tapPosition,
+    required this.tapProgress,
+    required this.tapStrength,
   });
 
   final double animationValue;
   final List<_WaveBundleData> waves;
   final double pulseSize;
-  final Offset interactionPosition;
-  final double interactionStrength;
+  final Offset hoverPosition;
+  final double hoverStrength;
+  final Offset tapPosition;
+  final double tapProgress;
+  final double tapStrength;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -274,7 +318,7 @@ class _HighTechLightWavesPainter extends CustomPainter {
       );
       final intensity = 1.0 - (normalizedDistance * 0.34);
       final interactionBoost =
-          1 + (interactionStrength * (1.0 - normalizedDistance) * 0.20);
+          1 + (hoverStrength * (1.0 - normalizedDistance) * 0.20);
       final lineAlpha =
           (0.08 + wave.depth * 0.20) * intensity * interactionBoost;
       final glowAlpha =
@@ -284,10 +328,10 @@ class _HighTechLightWavesPainter extends CustomPainter {
 
       glowPaint
         ..color = wave.color.withValues(alpha: glowAlpha.clamp(0.0, 0.42))
-        ..strokeWidth = strokeWidth + 0.90 + (interactionStrength * 0.35)
+        ..strokeWidth = strokeWidth + 0.90 + (hoverStrength * 0.35)
         ..maskFilter = MaskFilter.blur(
           BlurStyle.normal,
-          2.8 + (wave.depth * 3.8) + (interactionStrength * 1.8),
+          2.8 + (wave.depth * 3.8) + (hoverStrength * 1.8),
         );
       canvas.drawPath(strandPath, glowPaint);
 
@@ -299,8 +343,10 @@ class _HighTechLightWavesPainter extends CustomPainter {
       if (normalizedDistance < 0.25) {
         linePaint
           ..color = Color.lerp(wave.color, Colors.white, 0.22)!.withValues(
-            alpha: (0.14 + wave.depth * 0.18 + interactionStrength * 0.06)
-                .clamp(0.0, 0.42),
+            alpha: (0.14 + wave.depth * 0.18 + hoverStrength * 0.06).clamp(
+              0.0,
+              0.42,
+            ),
           )
           ..strokeWidth = max(0.95, strokeWidth * 0.68);
         canvas.drawPath(strandPath, linePaint);
@@ -376,33 +422,59 @@ class _HighTechLightWavesPainter extends CustomPainter {
           wave.amplitude *
           0.08;
       final hoverReach = 0.10 + (wave.depth * 0.09);
-      final hoverEnvelope = interactionStrength <= 0
+      final hoverEnvelope = hoverStrength <= 0
           ? 0.0
           : exp(
-              -pow(
-                (progress - interactionPosition.dx) / hoverReach,
-                2,
-              ).toDouble(),
+              -pow((progress - hoverPosition.dx) / hoverReach, 2).toDouble(),
             ).toDouble();
       final hoverLift =
           hoverEnvelope *
-          interactionStrength *
+          hoverStrength *
           size.height *
           (0.018 + wave.depth * 0.014) *
-          (1.08 - interactionPosition.dy * 0.55);
+          (1.08 - hoverPosition.dy * 0.55);
       final hoverShear =
           hoverEnvelope *
-          interactionStrength *
-          (progress - interactionPosition.dx) *
+          hoverStrength *
+          (progress - hoverPosition.dx) *
           size.height *
           0.06 *
           (0.72 + wave.depth * 0.28);
       final hoverBreath =
           sin((animationValue * 2 * pi) + wave.phase) *
           hoverEnvelope *
-          interactionStrength *
+          hoverStrength *
           size.height *
           0.006;
+      final strandY = wave.baseYOffset + (strandOffset / size.height);
+      final tapDx = progress - tapPosition.dx;
+      final tapDy = (strandY - tapPosition.dy) * 1.25;
+      final tapDistance = sqrt((tapDx * tapDx) + (tapDy * tapDy));
+      final rippleRadius = 0.015 + (tapProgress * 0.20);
+      final rippleWidth = 0.018 + (tapStrength * 0.008);
+      final rippleEnvelope = tapStrength <= 0
+          ? 0.0
+          : exp(
+              -pow((tapDistance - rippleRadius) / rippleWidth, 2).toDouble(),
+            ).toDouble();
+      final rippleCore = tapStrength <= 0
+          ? 0.0
+          : exp(
+              -pow(tapDistance / (0.020 + (tapProgress * 0.030)), 2).toDouble(),
+            ).toDouble();
+      final tapRippleLift =
+          rippleEnvelope *
+          tapStrength *
+          size.height *
+          (0.014 + wave.depth * 0.010);
+      final tapRippleBreathe =
+          sin((1 - tapProgress) * pi * 1.8) *
+          rippleEnvelope *
+          tapStrength *
+          size.height *
+          0.006;
+      final tapCoreDip =
+          rippleCore * tapStrength * size.height * (0.004 + wave.depth * 0.003);
       final lean = (progress - 0.5) * wave.slope * size.height * 0.14;
       final y =
           (size.height * wave.baseYOffset) -
@@ -412,8 +484,11 @@ class _HighTechLightWavesPainter extends CustomPainter {
           tail +
           lean -
           hoverLift +
+          tapRippleLift +
           hoverShear +
           hoverBreath +
+          tapRippleBreathe +
+          tapCoreDip +
           strandOffset;
 
       if (sample == 0) {
@@ -439,16 +514,16 @@ class _HighTechLightWavesPainter extends CustomPainter {
       return;
     }
     final metric = metricIterator.current;
-    final pulseRuns = wave.depth > 0.55 ? 2 : 1;
+    final pulseRuns = wave.depth > 0.82 ? 2 : 1;
 
     for (var pulseIndex = 0; pulseIndex < pulseRuns; pulseIndex++) {
       final cadence =
-          (0.42 + wave.depth * 0.36 + wave.pulseSpeed * 0.14) +
-          (pulseIndex * 0.18);
+          (0.28 + wave.depth * 0.20 + wave.pulseSpeed * 0.08) +
+          (pulseIndex * 0.12);
       final cycle =
-          (animationValue * cadence + wave.pulseOffset + pulseIndex * 0.36) %
+          (animationValue * cadence + wave.pulseOffset + pulseIndex * 0.42) %
           1.0;
-      final activeWindow = 0.16 + ((1.0 - wave.depth) * 0.05);
+      final activeWindow = 0.11 + ((1.0 - wave.depth) * 0.03);
       if (cycle > activeWindow) {
         continue;
       }
@@ -461,13 +536,14 @@ class _HighTechLightWavesPainter extends CustomPainter {
         continue;
       }
 
-      final interactionBoost = interactionStrength <= 0
+      final interactionFocusX = tapStrength > 0.02
+          ? tapPosition.dx
+          : hoverPosition.dx;
+      final interactionBlend = (hoverStrength * 0.45) + (tapStrength * 0.30);
+      final interactionBoost = interactionBlend <= 0
           ? 0.0
-          : (1 - ((travel - interactionPosition.dx).abs() / 0.24)).clamp(
-                  0.0,
-                  1.0,
-                ) *
-                interactionStrength;
+          : (1 - ((travel - interactionFocusX).abs() / 0.24)).clamp(0.0, 1.0) *
+                interactionBlend;
       final segmentLength =
           size.width *
           (0.028 + wave.depth * 0.016) *
@@ -528,7 +604,10 @@ class _HighTechLightWavesPainter extends CustomPainter {
     return oldDelegate.animationValue != animationValue ||
         oldDelegate.waves != waves ||
         oldDelegate.pulseSize != pulseSize ||
-        oldDelegate.interactionPosition != interactionPosition ||
-        oldDelegate.interactionStrength != interactionStrength;
+        oldDelegate.hoverPosition != hoverPosition ||
+        oldDelegate.hoverStrength != hoverStrength ||
+        oldDelegate.tapPosition != tapPosition ||
+        oldDelegate.tapProgress != tapProgress ||
+        oldDelegate.tapStrength != tapStrength;
   }
 }

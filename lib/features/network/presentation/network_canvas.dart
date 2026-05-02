@@ -24,7 +24,7 @@ class _NetworkCanvasCard extends StatefulWidget {
 }
 
 class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final TransformationController _transformController =
       TransformationController();
   _NetworkZoomPreset _zoomPreset = _NetworkZoomPreset.overview;
@@ -34,7 +34,11 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
   double _canvasWidth = 1500.0;
   double _canvasHeight = 820.0;
   late final AnimationController _cameraController;
+  late final AnimationController _edgePulseController;
   Animation<Matrix4>? _cameraAnimation;
+  String? _edgePulseNodeId;
+  String? _edgePulseEdgeKey;
+  double _edgePulseEdgeOrigin = 0.5;
 
   @override
   void initState() {
@@ -49,6 +53,10 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
             _transformController.value = animation.value;
           }
         });
+    _edgePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1280),
+    );
   }
 
   @override
@@ -77,6 +85,7 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
 
   @override
   void dispose() {
+    _edgePulseController.dispose();
     _cameraController.dispose();
     _transformController.dispose();
     super.dispose();
@@ -124,7 +133,7 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
         Text('Teia relacional', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
         Text(
-          'Clique ou toque fixa a leitura. Hover apenas antecipa relacoes e o painel volta para o no selecionado ao sair.',
+          'Clique ou toque fixa a leitura. Se tocar numa conexao, a onda nasce ali e se espalha pela linha; se tocar num no, o pulso percorre os vinculos dele.',
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
@@ -219,7 +228,7 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
                         PopupMenuButton<String>(
                           tooltip: 'Abrir menu de salto',
                           onSelected: (nodeId) {
-                            widget.onSelectNode(nodeId);
+                            _selectNode(nodeId);
                             _centerOnNode(nodeId);
                           },
                           itemBuilder: (context) => _buildJumpMenuItems(
@@ -327,7 +336,7 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
                         PopupMenuButton<String>(
                           tooltip: 'Abrir menu de salto',
                           onSelected: (nodeId) {
-                            widget.onSelectNode(nodeId);
+                            _selectNode(nodeId);
                             _centerOnNode(nodeId);
                           },
                           itemBuilder: (context) => _buildJumpMenuItems(
@@ -469,6 +478,22 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
                               nodes: widget.visibleNodes,
                               edges: visibleEdges,
                               focusNodeId: widget.focusNodeId,
+                              pulseNodeId: _edgePulseNodeId,
+                              pulseAnimation: _edgePulseController,
+                              pulseEdgeKey: _edgePulseEdgeKey,
+                              pulseEdgeOrigin: _edgePulseEdgeOrigin,
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: Listener(
+                              behavior: HitTestBehavior.translucent,
+                              onPointerDown: (event) {
+                                _handleCanvasTap(
+                                  event.localPosition,
+                                  visibleEdges,
+                                  Size(canvasWidth, canvasHeight),
+                                );
+                              },
                             ),
                           ),
                           Positioned(
@@ -494,7 +519,7 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
                                   node.id != widget.focusNodeId &&
                                   !relatedIds.contains(node.id),
                               parentSize: Size(canvasWidth, canvasHeight),
-                              onTap: () => widget.onSelectNode(node.id),
+                              onTap: () => _selectNode(node.id),
                               onHoverChanged: widget.onHoverNode,
                             ),
                         ],
@@ -726,6 +751,54 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
   Matrix4 _buildTransform(double translateX, double translateY, double scale) {
     return Matrix4.diagonal3Values(scale, scale, 1)
       ..setTranslationRaw(translateX, translateY, 0);
+  }
+
+  void _selectNode(String nodeId) {
+    _startEdgePulse(nodeId);
+    widget.onSelectNode(nodeId);
+  }
+
+  void _startEdgePulse(String nodeId) {
+    setState(() {
+      _edgePulseNodeId = nodeId;
+      _edgePulseEdgeKey = null;
+      _edgePulseEdgeOrigin = 0.5;
+    });
+    _edgePulseController
+      ..stop()
+      ..reset()
+      ..forward();
+  }
+
+  void _startEdgeRipple(_GraphEdge edge, double origin) {
+    setState(() {
+      _edgePulseNodeId = null;
+      _edgePulseEdgeKey = _graphEdgeKey(edge);
+      _edgePulseEdgeOrigin = origin.clamp(0.0, 1.0);
+    });
+    _edgePulseController
+      ..stop()
+      ..reset()
+      ..forward();
+  }
+
+  void _handleCanvasTap(
+    Offset localPosition,
+    List<_GraphEdge> visibleEdges,
+    Size canvasSize,
+  ) {
+    final hit = _nearestGraphEdgeHit(
+      point: localPosition,
+      nodes: widget.visibleNodes,
+      edges: visibleEdges,
+      canvasSize: canvasSize,
+    );
+
+    if (hit == null) {
+      return;
+    }
+
+    _startEdgeRipple(hit.edge, hit.progress);
   }
 
   void _setTransform(

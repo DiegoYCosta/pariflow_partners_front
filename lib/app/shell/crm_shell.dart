@@ -469,14 +469,11 @@ class _CrmDashboardHero extends StatelessWidget {
         final bannerAsset = stacked
             ? _crmBannerMobileAsset
             : _crmBannerWebAsset;
-        final headlineSize = stacked ? 44.0 : 72.0;
+        final headlineSize = stacked ? 44.0 : 60.0;
         final headlineColor = stacked ? _deepTealColor : Colors.white;
         final headlineAccentColor = stacked
             ? const Color(0xFFC8891F)
             : const Color(0xFFE5A64C);
-        final summaryColor = stacked
-            ? _mutedColor.withValues(alpha: 0.92)
-            : const Color(0xFFF0F5F3);
         final chipColor = stacked ? _deepTealColor : Colors.white;
         final chipBackground = stacked
             ? Colors.white.withValues(alpha: 0.78)
@@ -484,10 +481,11 @@ class _CrmDashboardHero extends StatelessWidget {
         final accentBarColor = stacked
             ? const Color(0xFFC8891F)
             : const Color(0xFFE5A64C);
+        final showHeroMetaTags = constraints.maxWidth < 0;
 
         return Container(
           width: double.infinity,
-          height: stacked ? 600 : 370,
+          height: stacked ? 600 : 418,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(40),
             boxShadow: [
@@ -604,7 +602,7 @@ class _CrmDashboardHero extends StatelessWidget {
                         waveAmplitude: 0.108,
                         waveFrequency: 0.038,
                         waveSpeed: 0.0054,
-                        pulseSpeedMultiplier: 2.35,
+                        pulseSpeedMultiplier: 1.55,
                         pulseSize: 6.8,
                       ),
                     ),
@@ -617,7 +615,9 @@ class _CrmDashboardHero extends StatelessWidget {
                       alignment: Alignment.centerLeft,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: stacked ? constraints.maxWidth : 640,
+                          maxWidth: stacked
+                              ? constraints.maxWidth
+                              : min(constraints.maxWidth * 0.58, 760.0),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -629,7 +629,7 @@ class _CrmDashboardHero extends StatelessWidget {
                               color: chipColor,
                               background: chipBackground,
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 18),
                             RichText(
                               text: TextSpan(
                                 style: TextStyle(
@@ -653,7 +653,7 @@ class _CrmDashboardHero extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 18),
                             Container(
                               width: 92,
                               height: 4,
@@ -662,45 +662,38 @@ class _CrmDashboardHero extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                             ),
-                            const SizedBox(height: 22),
-                            Text(
-                              'A home agora herda a cidade do layout aprovado, com entrada direta para prestadoras, clientes, contratos, pessoas e rede visual.',
-                              style: TextStyle(
-                                color: summaryColor,
-                                fontSize: 16,
-                                height: 1.6,
+                            if (showHeroMetaTags) ...[
+                              const SizedBox(height: 18),
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: [
+                                  _Tag(
+                                    label: viewerProfile.consultationSummary,
+                                    icon: viewerProfile.canViewSensitive
+                                        ? Icons.lock_open_rounded
+                                        : Icons.lock_outline_rounded,
+                                    color: chipColor,
+                                    background: chipBackground,
+                                  ),
+                                  _Tag(
+                                    label: _ShellFeatureFlags
+                                        .activeVariant
+                                        .rolloutSummary,
+                                    icon: Icons.flag_outlined,
+                                    color: chipColor,
+                                    background: chipBackground,
+                                  ),
+                                  _Tag(
+                                    label:
+                                        '${_networkGraphContractPreview.lanes.length} faixas da teia',
+                                    icon: Icons.view_week_outlined,
+                                    color: chipColor,
+                                    background: chipBackground,
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                _Tag(
-                                  label: viewerProfile.consultationSummary,
-                                  icon: viewerProfile.canViewSensitive
-                                      ? Icons.lock_open_rounded
-                                      : Icons.lock_outline_rounded,
-                                  color: chipColor,
-                                  background: chipBackground,
-                                ),
-                                _Tag(
-                                  label: _ShellFeatureFlags
-                                      .activeVariant
-                                      .rolloutSummary,
-                                  icon: Icons.flag_outlined,
-                                  color: chipColor,
-                                  background: chipBackground,
-                                ),
-                                _Tag(
-                                  label:
-                                      '${_networkGraphContractPreview.lanes.length} faixas da teia',
-                                  icon: Icons.view_week_outlined,
-                                  color: chipColor,
-                                  background: chipBackground,
-                                ),
-                              ],
-                            ),
+                            ],
                           ],
                         ),
                       ),
