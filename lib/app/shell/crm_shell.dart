@@ -609,92 +609,94 @@ class _CrmDashboardHero extends StatelessWidget {
                   ),
                 ],
                 Positioned.fill(
-                  child: Padding(
-                    padding: EdgeInsets.all(stacked ? 28 : 42),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: stacked
-                              ? constraints.maxWidth
-                              : min(constraints.maxWidth * 0.58, 760.0),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _Tag(
-                              label: _ShellVariant.crm.label,
-                              icon: Icons.auto_awesome_mosaic_outlined,
-                              color: chipColor,
-                              background: chipBackground,
-                            ),
-                            const SizedBox(height: 18),
-                            RichText(
-                              text: TextSpan(
-                                style: TextStyle(
-                                  color: headlineColor,
-                                  fontSize: headlineSize,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: -2.4,
-                                  height: 0.98,
-                                ),
-                                children: [
-                                  const TextSpan(
-                                    text: 'O que voce gostaria de\n',
-                                  ),
-                                  TextSpan(
-                                    text: 'consultar hoje?',
-                                    style: TextStyle(
-                                      color: headlineAccentColor,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ],
+                  child: IgnorePointer(
+                    child: Padding(
+                      padding: EdgeInsets.all(stacked ? 28 : 42),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: stacked
+                                ? constraints.maxWidth
+                                : min(constraints.maxWidth * 0.58, 760.0),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _Tag(
+                                label: _ShellVariant.crm.label,
+                                icon: Icons.auto_awesome_mosaic_outlined,
+                                color: chipColor,
+                                background: chipBackground,
                               ),
-                            ),
-                            const SizedBox(height: 18),
-                            Container(
-                              width: 92,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: accentBarColor,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                            if (showHeroMetaTags) ...[
                               const SizedBox(height: 18),
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: [
-                                  _Tag(
-                                    label: viewerProfile.consultationSummary,
-                                    icon: viewerProfile.canViewSensitive
-                                        ? Icons.lock_open_rounded
-                                        : Icons.lock_outline_rounded,
-                                    color: chipColor,
-                                    background: chipBackground,
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    color: headlineColor,
+                                    fontSize: headlineSize,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: -2.4,
+                                    height: 0.98,
                                   ),
-                                  _Tag(
-                                    label: _ShellFeatureFlags
-                                        .activeVariant
-                                        .rolloutSummary,
-                                    icon: Icons.flag_outlined,
-                                    color: chipColor,
-                                    background: chipBackground,
-                                  ),
-                                  _Tag(
-                                    label:
-                                        '${_networkGraphContractPreview.lanes.length} faixas da teia',
-                                    icon: Icons.view_week_outlined,
-                                    color: chipColor,
-                                    background: chipBackground,
-                                  ),
-                                ],
+                                  children: [
+                                    const TextSpan(
+                                      text: 'O que voce gostaria de\n',
+                                    ),
+                                    TextSpan(
+                                      text: 'consultar hoje?',
+                                      style: TextStyle(
+                                        color: headlineAccentColor,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(height: 18),
+                              Container(
+                                width: 92,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: accentBarColor,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                              if (showHeroMetaTags) ...[
+                                const SizedBox(height: 18),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    _Tag(
+                                      label: viewerProfile.consultationSummary,
+                                      icon: viewerProfile.canViewSensitive
+                                          ? Icons.lock_open_rounded
+                                          : Icons.lock_outline_rounded,
+                                      color: chipColor,
+                                      background: chipBackground,
+                                    ),
+                                    _Tag(
+                                      label: _ShellFeatureFlags
+                                          .activeVariant
+                                          .rolloutSummary,
+                                      icon: Icons.flag_outlined,
+                                      color: chipColor,
+                                      background: chipBackground,
+                                    ),
+                                    _Tag(
+                                      label:
+                                          '${_networkGraphContractPreview.lanes.length} faixas da teia',
+                                      icon: Icons.view_week_outlined,
+                                      color: chipColor,
+                                      background: chipBackground,
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
