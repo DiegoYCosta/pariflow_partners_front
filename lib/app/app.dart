@@ -45,9 +45,9 @@ const _deepTealColor = Color(0xFF143C38);
 const _amberColor = Color(0xFFBF6B2D);
 const _roseColor = Color(0xFFA35252);
 const _slateColor = Color(0xFF536A75);
-const _crmBannerWebAsset = 'assets/images/banner_web_clean.png';
-const _crmBannerMobileAsset = 'assets/images/banner_mobile_clean.png';
-const _crmBackgroundAsset = 'assets/images/background_abstract_warm.png';
+const _crmBannerWebAsset = 'assets/images/banner_web_clean.webp';
+const _crmBannerMobileAsset = 'assets/images/banner_mobile_clean.webp';
+const _crmBackgroundAsset = 'assets/images/background_abstract_warm.webp';
 const _crmLogoAsset = 'assets/images/pariflow_logo.png';
 
 class PariFlowPartnersApp extends StatelessWidget {
