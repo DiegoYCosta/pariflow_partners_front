@@ -49,8 +49,7 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
     )..repeat();
     _interactionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
-      reverseDuration: const Duration(milliseconds: 360),
+      duration: const Duration(milliseconds: 520),
     );
     _hoverController = AnimationController(
       vsync: this,
@@ -126,9 +125,9 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
                 ),
                 tapPosition: _interactionPosition,
                 tapProgress: _interactionController.value,
-                tapStrength: Curves.easeOutCubic.transform(
-                  _interactionController.value,
-                ),
+                tapStrength: sin(
+                  _interactionController.value * pi,
+                ).clamp(0.0, 1.0),
               ),
               child: const SizedBox.expand(),
             );
@@ -195,7 +194,7 @@ class _HighTechLightWavesState extends State<HighTechLightWaves>
       ..reset()
       ..forward().whenComplete(() {
         if (mounted) {
-          _interactionController.reverse();
+          _interactionController.reset();
         }
       });
   }
@@ -448,33 +447,53 @@ class _HighTechLightWavesPainter extends CustomPainter {
           0.006;
       final strandY = wave.baseYOffset + (strandOffset / size.height);
       final tapDx = progress - tapPosition.dx;
-      final tapDy = (strandY - tapPosition.dy) * 1.25;
+      final tapDy = (strandY - tapPosition.dy) * 1.18;
       final tapDistance = sqrt((tapDx * tapDx) + (tapDy * tapDy));
-      final rippleRadius = 0.015 + (tapProgress * 0.20);
-      final rippleWidth = 0.018 + (tapStrength * 0.008);
-      final rippleEnvelope = tapStrength <= 0
+      final splashRadius = 0.010 + (tapProgress * 0.28);
+      final splashWidth = 0.018 + (tapProgress * 0.018) + (wave.depth * 0.004);
+      final splashEnvelope = tapStrength <= 0
           ? 0.0
           : exp(
-              -pow((tapDistance - rippleRadius) / rippleWidth, 2).toDouble(),
+              -pow((tapDistance - splashRadius) / splashWidth, 2).toDouble(),
             ).toDouble();
-      final rippleCore = tapStrength <= 0
+      final splashWake = tapStrength <= 0
           ? 0.0
           : exp(
-              -pow(tapDistance / (0.020 + (tapProgress * 0.030)), 2).toDouble(),
+              -pow(
+                (tapDistance - (splashRadius * 0.48)) / (splashWidth * 1.15),
+                2,
+              ).toDouble(),
             ).toDouble();
-      final tapRippleLift =
-          rippleEnvelope *
+      final splashTail = tapStrength <= 0
+          ? 0.0
+          : exp(
+              -pow(
+                (tapDistance - (splashRadius * 1.26)) / (splashWidth * 1.70),
+                2,
+              ).toDouble(),
+            ).toDouble();
+      final splashCore = tapStrength <= 0
+          ? 0.0
+          : exp(
+              -pow(tapDistance / (0.014 + (tapProgress * 0.020)), 2).toDouble(),
+            ).toDouble();
+      final tapSplashLift =
+          splashEnvelope *
           tapStrength *
           size.height *
-          (0.014 + wave.depth * 0.010);
-      final tapRippleBreathe =
-          sin((1 - tapProgress) * pi * 1.8) *
-          rippleEnvelope *
+          (0.014 + wave.depth * 0.008);
+      final tapSplashWake =
+          splashWake * tapStrength * size.height * (0.007 + wave.depth * 0.003);
+      final tapSplashTail =
+          splashTail * tapStrength * size.height * (0.003 + wave.depth * 0.002);
+      final tapCoreSink =
+          splashCore * tapStrength * size.height * (0.010 + wave.depth * 0.004);
+      final tapMicroTremor =
+          sin((1 - tapProgress) * pi * 1.35) *
+          splashEnvelope *
           tapStrength *
           size.height *
-          0.006;
-      final tapCoreDip =
-          rippleCore * tapStrength * size.height * (0.004 + wave.depth * 0.003);
+          0.003;
       final lean = (progress - 0.5) * wave.slope * size.height * 0.14;
       final y =
           (size.height * wave.baseYOffset) -
@@ -484,11 +503,13 @@ class _HighTechLightWavesPainter extends CustomPainter {
           tail +
           lean -
           hoverLift +
-          tapRippleLift +
+          tapSplashLift +
           hoverShear +
           hoverBreath +
-          tapRippleBreathe +
-          tapCoreDip +
+          tapMicroTremor -
+          tapSplashWake +
+          tapSplashTail +
+          tapCoreSink +
           strandOffset;
 
       if (sample == 0) {
