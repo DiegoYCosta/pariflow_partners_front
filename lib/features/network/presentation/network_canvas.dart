@@ -42,7 +42,7 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
     _cameraController =
         AnimationController(
           vsync: this,
-          duration: const Duration(milliseconds: 260),
+          duration: const Duration(milliseconds: 360),
         )..addListener(() {
           final animation = _cameraAnimation;
           if (animation != null) {
@@ -750,7 +750,7 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
         ).animate(
           CurvedAnimation(
             parent: _cameraController,
-            curve: Curves.easeOutCubic,
+            curve: Curves.easeInOutCubicEmphasized,
           ),
         );
     _cameraController
@@ -758,7 +758,6 @@ class _NetworkCanvasCardState extends State<_NetworkCanvasCard>
       ..forward();
   }
 }
-
 
 class _NodeKindBadge extends StatelessWidget {
   const _NodeKindBadge({required this.node});
@@ -826,85 +825,120 @@ class _NetworkNodeWidget extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 160),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
               opacity: muted ? 0.34 : 1,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 180),
-                scale: focused ? 1.03 : 1,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: size.width,
-                  height: size.height,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: focused ? node.color : _lineColor,
-                      width: selected
-                          ? 2.4
-                          : focused
-                          ? 2
-                          : 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: node.color.withValues(
-                          alpha: focused ? 0.2 : 0.06,
-                        ),
-                        blurRadius: focused ? 22 : 14,
-                        offset: const Offset(0, 8),
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                offset: focused
+                    ? const Offset(0, -0.018)
+                    : selected
+                    ? const Offset(0, -0.008)
+                    : Offset.zero,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  scale: focused
+                      ? 1.035
+                      : selected
+                      ? 1.012
+                      : 1,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    width: size.width,
+                    height: size.height,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: focused ? node.color : _lineColor,
+                        width: selected
+                            ? 2.4
+                            : focused
+                            ? 2
+                            : 1.2,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              color: node.color.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(9),
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(node.icon, size: 15, color: node.color),
+                      boxShadow: [
+                        BoxShadow(
+                          color: node.color.withValues(
+                            alpha: focused
+                                ? 0.22
+                                : selected
+                                ? 0.12
+                                : 0.06,
                           ),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              node.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: _inkColor,
-                                fontSize: 13,
-                                height: 1.15,
+                          blurRadius: focused
+                              ? 26
+                              : selected
+                              ? 18
+                              : 14,
+                          offset: Offset(
+                            0,
+                            focused
+                                ? 12
+                                : selected
+                                ? 10
+                                : 8,
+                          ),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: node.color.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                              alignment: Alignment.center,
+                              child: Icon(
+                                node.icon,
+                                size: 15,
+                                color: node.color,
                               ),
                             ),
-                          ),
-                          if (selected || focused) ...[
-                            const SizedBox(width: 6),
-                            Icon(
-                              selected
-                                  ? Icons.check_circle_rounded
-                                  : Icons.visibility_rounded,
-                              size: 15,
-                              color: selected ? _tealColor : _slateColor,
+                            const SizedBox(width: 7),
+                            Expanded(
+                              child: Text(
+                                node.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: _inkColor,
+                                  fontSize: 13,
+                                  height: 1.15,
+                                ),
+                              ),
                             ),
+                            if (selected || focused) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                selected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.visibility_rounded,
+                                size: 15,
+                                color: selected ? _tealColor : _slateColor,
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                      const Spacer(),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _NodeKindBadge(node: node),
-                      ),
-                    ],
+                        ),
+                        const Spacer(),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _NodeKindBadge(node: node),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -924,4 +958,3 @@ Size _graphNodeCardSize(_GraphNode node) {
     _GraphNodeKind.person => const Size(158, 84),
   };
 }
-

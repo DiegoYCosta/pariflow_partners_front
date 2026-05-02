@@ -595,19 +595,17 @@ class _CrmDashboardHero extends StatelessWidget {
                     right: 0,
                     bottom: -8,
                     height: 152,
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: 0.92,
-                        child: HighTechLightWaves(
-                          primaryColor: const Color(0xFF63E6E2),
-                          accentColor: const Color(0xFFE4A23B),
-                          numberOfWaves: 6,
-                          waveAmplitude: 0.12,
-                          waveFrequency: 0.040,
-                          waveSpeed: 0.0062,
-                          pulseSpeedMultiplier: 2.8,
-                          pulseSize: 7.4,
-                        ),
+                    child: Opacity(
+                      opacity: 0.92,
+                      child: HighTechLightWaves(
+                        primaryColor: const Color(0xFF63E6E2),
+                        accentColor: const Color(0xFFE4A23B),
+                        numberOfWaves: 6,
+                        waveAmplitude: 0.108,
+                        waveFrequency: 0.038,
+                        waveSpeed: 0.0054,
+                        pulseSpeedMultiplier: 2.35,
+                        pulseSize: 6.8,
                       ),
                     ),
                   ),
