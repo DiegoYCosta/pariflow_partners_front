@@ -141,7 +141,11 @@ class _RelationalNetworkWorkspaceBody extends StatefulWidget {
 
 class _RelationalNetworkWorkspaceBodyState
     extends State<_RelationalNetworkWorkspaceBody> {
+  static const double _minCanvasZoom = 0.65;
+  static const double _maxCanvasZoom = 1.85;
+
   late final TextEditingController _searchController;
+  final TransformationController _canvasController = TransformationController();
   late String _periodPreset;
   late Set<String> _selectedRootIds;
   late Set<String> _selectedClientIds;
@@ -152,6 +156,7 @@ class _RelationalNetworkWorkspaceBodyState
   bool _showFilters = false;
   bool _showDetailPanel = true;
   double _zoom = 1.0;
+  Size _canvasViewportSize = Size.zero;
 
   _NetworkGraphPayload get _payload => _networkGraphContractPreview;
 
@@ -171,6 +176,7 @@ class _RelationalNetworkWorkspaceBodyState
   @override
   void dispose() {
     _searchController.dispose();
+    _canvasController.dispose();
     super.dispose();
   }
 
@@ -186,14 +192,73 @@ class _RelationalNetworkWorkspaceBodyState
   }
 
   void _adjustZoom(double delta) {
-    setState(() {
-      _zoom = (_zoom + delta).clamp(0.85, 1.25);
-    });
+    _setCanvasScale(
+      _zoom + delta,
+      focalPoint: _canvasViewportSize == Size.zero
+          ? null
+          : Offset(
+              _canvasViewportSize.width / 2,
+              _canvasViewportSize.height / 2,
+            ),
+    );
   }
 
   void _resetViewport() {
     setState(() {
+      _canvasController.value = Matrix4.identity();
       _zoom = 1.0;
+    });
+  }
+
+  void _setCanvasScale(double scale, {Offset? focalPoint}) {
+    final nextScale = scale.clamp(_minCanvasZoom, _maxCanvasZoom).toDouble();
+    final viewportFocalPoint =
+        focalPoint ??
+        Offset(_canvasViewportSize.width / 2, _canvasViewportSize.height / 2);
+    final sceneFocalPoint = _canvasController.toScene(viewportFocalPoint);
+    final matrix = Matrix4.identity()
+      ..translateByDouble(
+        viewportFocalPoint.dx - (sceneFocalPoint.dx * nextScale),
+        viewportFocalPoint.dy - (sceneFocalPoint.dy * nextScale),
+        0,
+        1,
+      )
+      ..scaleByDouble(nextScale, nextScale, 1, 1);
+
+    setState(() {
+      _canvasController.value = matrix;
+      _zoom = nextScale;
+    });
+  }
+
+  void _syncZoomFromCanvas() {
+    final nextZoom = _canvasController.value
+        .getMaxScaleOnAxis()
+        .clamp(_minCanvasZoom, _maxCanvasZoom)
+        .toDouble();
+    if ((nextZoom - _zoom).abs() < 0.005) {
+      return;
+    }
+    setState(() {
+      _zoom = nextZoom;
+    });
+  }
+
+  void _centerCanvasOn(Rect rect, Size viewportSize) {
+    final nextScale = max(_zoom, 1.0);
+    final matrix = Matrix4.identity()
+      ..translateByDouble(
+        (viewportSize.width / 2) - (rect.center.dx * nextScale),
+        (viewportSize.height / 2) - (rect.center.dy * nextScale),
+        0,
+        1,
+      )
+      ..scaleByDouble(nextScale, nextScale, 1, 1);
+
+    setState(() {
+      _canvasViewportSize = viewportSize;
+      _canvasController.value = matrix;
+      _zoom = nextScale;
     });
   }
 
@@ -225,6 +290,12 @@ class _RelationalNetworkWorkspaceBodyState
           compact: !wide,
           view: view,
           selectedNode: selectedNode,
+          detailPanelCollapsed: !_showDetailPanel,
+          onReopenDetailPanel: () {
+            setState(() {
+              _showDetailPanel = true;
+            });
+          },
         );
         final detailPanel = _buildDetailPanel(
           context,
@@ -314,14 +385,15 @@ class _RelationalNetworkWorkspaceBodyState
                       ? Row(
                           children: [
                             Expanded(child: graphSection),
-                            SizedBox(width: 424, child: detailPanel),
+                            if (_showDetailPanel)
+                              SizedBox(width: 424, child: detailPanel),
                           ],
                         )
                       : SingleChildScrollView(
                           child: Column(
                             children: [
                               SizedBox(height: 720, child: graphSection),
-                              detailPanel,
+                              if (_showDetailPanel) detailPanel,
                             ],
                           ),
                         ),
@@ -339,6 +411,8 @@ class _RelationalNetworkWorkspaceBodyState
     required bool compact,
     required _RelationalNetworkView view,
     required _NetworkGraphNode? selectedNode,
+    required bool detailPanelCollapsed,
+    required VoidCallback onReopenDetailPanel,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -401,6 +475,13 @@ class _RelationalNetworkWorkspaceBodyState
           payload: _payload,
           nodes: view.nodes,
         );
+        final scaledHeight = canvasAreaHeight;
+        final graphViewportWidth = max(
+          1.0,
+          constraints.maxWidth - layout.laneRailWidth,
+        );
+        final graphViewportSize = Size(graphViewportWidth, scaledHeight);
+        _canvasViewportSize = graphViewportSize;
 
         final connectedIds = selectedNode == null
             ? <String>{}
@@ -413,7 +494,6 @@ class _RelationalNetworkWorkspaceBodyState
                     edge.toPublicId,
                   },
               };
-        final scaledHeight = canvasAreaHeight;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,14 +547,29 @@ class _RelationalNetworkWorkspaceBodyState
                                   child: ColoredBox(color: Colors.white),
                                 ),
                                 Positioned.fill(
-                                  child: ClipRect(
-                                    child: Transform.scale(
-                                      scale: _zoom,
-                                      alignment: Alignment.topCenter,
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.grab,
+                                    child: InteractiveViewer(
+                                      transformationController:
+                                          _canvasController,
+                                      constrained: false,
+                                      boundaryMargin: const EdgeInsets.all(720),
+                                      minScale: _minCanvasZoom,
+                                      maxScale: _maxCanvasZoom,
+                                      scaleFactor: 180,
+                                      trackpadScrollCausesScale: true,
+                                      panEnabled: true,
+                                      scaleEnabled: true,
+                                      clipBehavior: Clip.none,
+                                      onInteractionUpdate: (_) =>
+                                          _syncZoomFromCanvas(),
+                                      onInteractionEnd: (_) =>
+                                          _syncZoomFromCanvas(),
                                       child: SizedBox(
                                         width: layout.contentWidth,
                                         height: layout.canvasHeight,
                                         child: Stack(
+                                          clipBehavior: Clip.none,
                                           children: [
                                             Positioned.fill(
                                               child: CustomPaint(
@@ -537,13 +632,25 @@ class _RelationalNetworkWorkspaceBodyState
                     bottom: 18,
                     child: _RelationalViewportDock(
                       onCenterTap: () {
-                        if (selectedNode != null) {
-                          widget.onSelectNode(selectedNode.publicId);
+                        final selectedRect = selectedNode == null
+                            ? null
+                            : layout.positions[selectedNode.publicId];
+                        if (selectedRect != null) {
+                          _centerCanvasOn(selectedRect, graphViewportSize);
                         }
                       },
                       onResetTap: _resetViewport,
                     ),
                   ),
+                  if (detailPanelCollapsed)
+                    Positioned(
+                      right: 24,
+                      bottom: 24,
+                      child: _RelationalCollapsedDetailDock(
+                        selectedNode: selectedNode,
+                        onTap: onReopenDetailPanel,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -558,46 +665,7 @@ class _RelationalNetworkWorkspaceBodyState
     required _NetworkGraphNode? selectedNode,
   }) {
     if (!_showDetailPanel) {
-      return _Panel(
-        padding: const EdgeInsets.all(24),
-        child: SizedBox(
-          height: 280,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.chevron_left_rounded,
-                  size: 42,
-                  color: _slateColor,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Painel lateral recolhido.',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Clique em um no para reabrir o detalhe.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
-                ),
-                const SizedBox(height: 18),
-                FilledButton.tonalIcon(
-                  onPressed: () {
-                    setState(() {
-                      _showDetailPanel = true;
-                    });
-                  },
-                  icon: const Icon(Icons.open_in_new_outlined),
-                  label: const Text('Reabrir detalhe'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     if (selectedNode == null) {
@@ -786,7 +854,17 @@ class _RelationalCanvasLayout {
     required _NetworkGraphPayload payload,
     required List<_NetworkGraphNode> nodes,
   }) {
-    final contentWidth = canvasWidth - laneRailWidth;
+    final availableWidth = max(1.0, canvasWidth - laneRailWidth);
+    final maxLaneCount = payload.lanes.fold<int>(0, (count, lane) {
+      final laneCount = nodes.where((node) => node.lane == lane).length;
+      return max(count, laneCount);
+    });
+    final preferredGap = cardWidth <= 180 ? 44.0 : 72.0;
+    final preferredRowWidth =
+        (maxLaneCount.toDouble() * cardWidth) +
+        (max(0, maxLaneCount - 1).toDouble() * preferredGap) +
+        (horizontalPadding * 2);
+    final contentWidth = max(availableWidth, preferredRowWidth);
     final positions = <String, Rect>{};
     final laneTops = <_NetworkGraphLane, double>{};
     var laneIndex = 0;
@@ -808,9 +886,7 @@ class _RelationalCanvasLayout {
         final occupiedWidth =
             totalCardWidth + (gap * max(0, laneNodes.length - 1));
         final startX =
-            laneRailWidth +
-            horizontalPadding +
-            max(0.0, (usableWidth - occupiedWidth) / 2);
+            horizontalPadding + max(0.0, (usableWidth - occupiedWidth) / 2);
 
         for (var index = 0; index < laneNodes.length; index++) {
           final node = laneNodes[index];
@@ -1440,7 +1516,7 @@ class _RelationalLaneRail extends StatelessWidget {
               left: 0,
               right: 18,
               child: SizedBox(
-                height: cardHeight,
+                height: max(118.0, cardHeight),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1465,9 +1541,11 @@ class _RelationalLaneRail extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(
                       _laneLabel(lane),
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleLarge?.copyWith(color: _laneColor(lane)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: _laneColor(lane),
+                      ),
                     ),
                   ],
                 ),
@@ -1575,7 +1653,7 @@ class _RelationalNetworkNodeCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     node.subtitle,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(
                       context,
@@ -1628,6 +1706,88 @@ class _RelationalNodeAvatar extends StatelessWidget {
         border: Border.all(color: laneColor.withValues(alpha: 0.24)),
       ),
       child: Icon(_iconForLane(node.lane), color: laneColor, size: 29),
+    );
+  }
+}
+
+class _RelationalCollapsedDetailDock extends StatelessWidget {
+  const _RelationalCollapsedDetailDock({
+    required this.selectedNode,
+    required this.onTap,
+  });
+
+  final _NetworkGraphNode? selectedNode;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = selectedNode?.displayName ?? 'Detalhe recolhido';
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      elevation: 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          width: 260,
+          padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _lineColor),
+            boxShadow: [
+              BoxShadow(
+                color: _deepTealColor.withValues(alpha: 0.08),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _tealColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  color: _tealColor,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Detalhe recolhido',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: _mutedColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1980,7 +2140,11 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
                     ),
                     IconButton(
                       onPressed: onClose,
-                      icon: const Icon(Icons.close_rounded, size: 28),
+                      tooltip: 'Recolher painel',
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 32,
+                      ),
                     ),
                   ],
                 ),
