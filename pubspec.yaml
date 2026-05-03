@@ -62,6 +62,9 @@ flutter:
     - assets/images/banner_mobile_clean.webp
     - assets/images/banner_web_clean.webp
     - assets/images/Icones.webp
+    - assets/images/PFP.webp
+    - assets/images/background-logo.webp
+    - assets/images/logo_transparent.webp
     - assets/images/neutral_infinite_background.webp
     - assets/images/pariflow_logo.png
 

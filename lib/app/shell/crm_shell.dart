@@ -362,7 +362,7 @@ class _CrmSidebar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.asset(_crmLogoAsset, width: 198, fit: BoxFit.contain),
+            const _CrmInteractiveBrand(),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,
@@ -972,6 +972,237 @@ class _CrmDashboardQuote extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CrmInteractiveBrand extends StatefulWidget {
+  const _CrmInteractiveBrand();
+
+  @override
+  State<_CrmInteractiveBrand> createState() => _CrmInteractiveBrandState();
+}
+
+class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shineController;
+  bool _hovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _shineController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1250),
+    );
+  }
+
+  @override
+  void dispose() {
+    _shineController.dispose();
+    super.dispose();
+  }
+
+  void _runShine() {
+    _shineController.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _runShine,
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          scale: _hovered ? 1.035 : 1.0,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            width: double.infinity,
+            height: 174,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: _hovered ? 0.14 : 0.08),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(
+                    0xFFE6B65A,
+                  ).withValues(alpha: _hovered ? 0.24 : 0.11),
+                  blurRadius: _hovered ? 30 : 18,
+                  spreadRadius: _hovered ? 1.5 : 0,
+                  offset: Offset(0, _hovered ? 14 : 9),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: _hovered ? 0.42 : 0.28),
+                  blurRadius: _hovered ? 34 : 22,
+                  offset: Offset(0, _hovered ? 18 : 12),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(26),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    _crmLogoBackdropAsset,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment(_hovered ? -0.34 : -0.52, -0.20),
+                        radius: _hovered ? 0.88 : 0.72,
+                        colors: [
+                          const Color(
+                            0xFFE6B65A,
+                          ).withValues(alpha: _hovered ? 0.16 : 0.08),
+                          const Color(0xFF0A3135).withValues(alpha: 0.16),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.38, 1.0],
+                      ),
+                    ),
+                  ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    transform: Matrix4.identity()
+                      ..translateByDouble(
+                        _hovered ? 1.8 : 0.0,
+                        _hovered ? -1.4 : 0.0,
+                        0,
+                        1,
+                      ),
+                    child: _CrmBrandArtwork(
+                      shadowOpacity: _hovered ? 0.56 : 0.38,
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: _shineController,
+                    builder: (context, child) {
+                      final value = Curves.easeInOutCubic.transform(
+                        _shineController.value,
+                      );
+                      final visible = _shineController.isAnimating
+                          ? sin(value * pi)
+                          : 0.0;
+                      return IgnorePointer(
+                        child: Opacity(
+                          opacity: visible.clamp(0.0, 1.0).toDouble(),
+                          child: ShaderMask(
+                            blendMode: BlendMode.srcATop,
+                            shaderCallback: (rect) {
+                              final x = -1.35 + (value * 2.70);
+                              return LinearGradient(
+                                begin: Alignment(x - 0.42, -1),
+                                end: Alignment(x + 0.42, 1),
+                                colors: [
+                                  Colors.transparent,
+                                  const Color(
+                                    0xFFFFF2B8,
+                                  ).withValues(alpha: 0.05),
+                                  Colors.white.withValues(alpha: 0.92),
+                                  const Color(
+                                    0xFFE6B65A,
+                                  ).withValues(alpha: 0.62),
+                                  Colors.transparent,
+                                ],
+                                stops: const [0.0, 0.38, 0.50, 0.62, 1.0],
+                              ).createShader(rect);
+                            },
+                            child: const _CrmBrandArtwork(
+                              shadowOpacity: 0,
+                              shinePass: true,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmBrandArtwork extends StatelessWidget {
+  const _CrmBrandArtwork({required this.shadowOpacity, this.shinePass = false});
+
+  final double shadowOpacity;
+  final bool shinePass;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          left: 19,
+          top: 15,
+          width: 82,
+          height: 94,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              boxShadow: shinePass
+                  ? const []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: shadowOpacity),
+                        blurRadius: 24,
+                        offset: const Offset(0, 13),
+                      ),
+                      BoxShadow(
+                        color: const Color(
+                          0xFFE6B65A,
+                        ).withValues(alpha: shadowOpacity * 0.34),
+                        blurRadius: 18,
+                        offset: const Offset(-5, -2),
+                      ),
+                    ],
+            ),
+            child: Image.asset(_crmLogoSymbolAsset, fit: BoxFit.contain),
+          ),
+        ),
+        Positioned(
+          left: 18,
+          right: 18,
+          bottom: 20,
+          height: 52,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              boxShadow: shinePass
+                  ? const []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: shadowOpacity),
+                        blurRadius: 19,
+                        offset: const Offset(0, 10),
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withValues(
+                          alpha: shadowOpacity * 0.08,
+                        ),
+                        blurRadius: 12,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+            ),
+            child: Image.asset(_crmLogoWordmarkAsset, fit: BoxFit.contain),
+          ),
+        ),
+      ],
     );
   }
 }

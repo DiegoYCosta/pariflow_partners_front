@@ -52,7 +52,9 @@ const _slateColor = Color(0xFF536A75);
 const _crmBannerWebAsset = 'assets/images/banner_web_clean.webp';
 const _crmBannerMobileAsset = 'assets/images/banner_mobile_clean.webp';
 const _crmBackgroundAsset = 'assets/images/background_abstract_warm.webp';
-const _crmLogoAsset = 'assets/images/pariflow_logo.png';
+const _crmLogoSymbolAsset = 'assets/images/logo_transparent.webp';
+const _crmLogoWordmarkAsset = 'assets/images/PFP.webp';
+const _crmLogoBackdropAsset = 'assets/images/background-logo.webp';
 const _spriteMoldSheetAsset = 'assets/images/Icones.webp';
 
 class PariFlowPartnersApp extends StatelessWidget {
