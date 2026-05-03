@@ -1027,17 +1027,20 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
 
   @override
   Widget build(BuildContext context) {
-    // 1. Definição de Escalas e Posições para o modo EXPANDIDO (Clique)
-    // Estes valores só mudam quando _isExpanded é true
-    double logoScale = _isExpanded ? 0.80 : 1.0;
-    double textScale = _isExpanded ? 1.30 : 1.0;
-    double logoTop = _isExpanded ? 24.0 : 42.0;
-    double logoLeft = _isExpanded ? 14.0 : 22.0;
-    double logoOpacity = _isExpanded ? 0.55 : 1.0;
-    double textTop = _isExpanded ? 74.0 : 66.0;
-    double textLeft = _isExpanded ? 45.0 : 104.0;
+    // --- AJUSTES FINOS DE COREOGRAFIA ---
 
-    const animationDuration = Duration(milliseconds: 550);
+    // 1. Configurações para o modo EXPANDIDO (Clique)
+    double logoScale = _isExpanded ? 0.72 : 1.0;      // Menor e mais discreto
+    double textScale = _isExpanded ? 1.38 : 1.0;      // Maior e mais imponente
+
+    double logoTop = _isExpanded ? 18.0 : 42.0;       // Mais para cima
+    double logoLeft = _isExpanded ? 10.0 : 22.0;      // Mais para a esquerda
+    double logoOpacity = _isExpanded ? 0.40 : 1.0;    // Mais translúcido
+
+    double textTop = _isExpanded ? 76.0 : 66.0;       // Centralização vertical refinada
+    double textLeft = _isExpanded ? 32.0 : 104.0;     // Ocupa o centro do palco
+
+    const animationDuration = Duration(milliseconds: 600);
     const animationCurve = Curves.easeInOutCubic;
 
     return MouseRegion(
@@ -1057,7 +1060,6 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
             fit: StackFit.expand,
             clipBehavior: Clip.none,
             children: [
-              // Background Backdrop
               Image.asset(
                 _crmLogoBackdropAsset,
                 fit: BoxFit.cover,
@@ -1065,7 +1067,7 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                 color: const Color(0xFF6DA59A).withValues(alpha: 0.12),
                 colorBlendMode: BlendMode.screen,
               ),
-              // Aura de fundo sutil (Hover)
+              // Aura de fundo (Hover)
               AnimatedContainer(
                 duration: animationDuration,
                 curve: animationCurve,
@@ -1081,8 +1083,7 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                   ),
                 ),
               ),
-              // --- TÉCNICA DE ESCALA GLOBAL PARA HOVER ---
-              // Isso faz o conjunto subir e crescer sincronizado no mouse over
+              // --- ESCALA GLOBAL PARA HOVER ---
               AnimatedScale(
                 scale: _hovered ? 1.04 : 1.0,
                 duration: const Duration(milliseconds: 250),
@@ -1220,7 +1221,7 @@ class _CrmBrandArtwork extends StatelessWidget {
             ),
           ),
         ),
-        // NOME DA EMPRESA (php.webp)
+        // NOME DA EMPRESA (PariFlow Partners)
         AnimatedPositioned(
           duration: duration,
           curve: curve,
@@ -1246,7 +1247,7 @@ class _CrmBrandArtwork extends StatelessWidget {
   }
 }
 
-// RESTAURAÇÃO DA SIDEBAR NAV ITEM (Para evitar erro de compilação)
+// RESTAURAÇÃO DA SIDEBAR NAV ITEM
 class _CrmSidebarNavItem extends StatefulWidget {
   const _CrmSidebarNavItem({
     required this.item,
@@ -1388,6 +1389,8 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
     );
   }
 }
+
+
 
 class _CrmMetricCard extends StatelessWidget {
   const _CrmMetricCard({required this.card});
