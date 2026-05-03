@@ -157,6 +157,9 @@ class _RelationalNetworkWorkspaceBodyState
   bool _showDetailPanel = true;
   double _zoom = 1.0;
   Size _canvasViewportSize = Size.zero;
+  _NetworkGraphLane? _selectedLaneForDetails;
+  final Set<_NetworkGraphLane> _hiddenLanes = {};
+  final Set<_NetworkGraphLane> _activeOnlyLanes = {};
 
   _NetworkGraphPayload get _payload => _networkGraphContractPreview;
 
@@ -272,6 +275,9 @@ class _RelationalNetworkWorkspaceBodyState
       _employeeStatuses = {..._payload.filters.applied.employeeStatuses};
       _includeHistorical = _payload.filters.applied.includeHistorical;
       _includeIndirect = _payload.filters.applied.includeIndirect;
+      _selectedLaneForDetails = null;
+      _hiddenLanes.clear();
+      _activeOnlyLanes.clear();
     });
   }
 
@@ -289,10 +295,19 @@ class _RelationalNetworkWorkspaceBodyState
           context,
           compact: !wide,
           view: view,
-          selectedNode: selectedNode,
+          selectedNode: _selectedLaneForDetails == null ? selectedNode : null,
           detailPanelCollapsed: !_showDetailPanel,
           onReopenDetailPanel: () {
             setState(() {
+              _showDetailPanel = true;
+            });
+          },
+          selectedLaneForDetails: _selectedLaneForDetails,
+          hiddenLanes: _hiddenLanes,
+          activeOnlyLanes: _activeOnlyLanes,
+          onSelectLane: (lane) {
+            setState(() {
+              _selectedLaneForDetails = lane;
               _showDetailPanel = true;
             });
           },
@@ -413,6 +428,10 @@ class _RelationalNetworkWorkspaceBodyState
     required _NetworkGraphNode? selectedNode,
     required bool detailPanelCollapsed,
     required VoidCallback onReopenDetailPanel,
+    required _NetworkGraphLane? selectedLaneForDetails,
+    required Set<_NetworkGraphLane> hiddenLanes,
+    required Set<_NetworkGraphLane> activeOnlyLanes,
+    required ValueChanged<_NetworkGraphLane> onSelectLane,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -460,9 +479,10 @@ class _RelationalNetworkWorkspaceBodyState
         );
         final cardWidth = compactCanvas ? 176.0 : 216.0;
         final cardHeight = compactCanvas ? 86.0 : 92.0;
+        final laneIntervals = max(1, _payload.lanes.length - 1).toDouble();
         final laneSpacing = max(
-          136.0,
-          min(184.0, (canvasAreaHeight - 44 - cardHeight - 42) / 3),
+          104.0,
+          min(156.0, (canvasAreaHeight - 44 - cardHeight - 42) / laneIntervals),
         );
         final layout = _RelationalCanvasLayout.compute(
           canvasWidth: max(constraints.maxWidth, 760),
@@ -474,6 +494,7 @@ class _RelationalNetworkWorkspaceBodyState
           cardHeight: cardHeight,
           payload: _payload,
           nodes: view.nodes,
+          collapsedLanes: hiddenLanes,
         );
         final scaledHeight = canvasAreaHeight;
         final graphViewportWidth = max(
@@ -534,8 +555,13 @@ class _RelationalNetworkWorkspaceBodyState
                         SizedBox(
                           width: layout.laneRailWidth,
                           child: _RelationalLaneRail(
+                            lanes: _payload.lanes,
                             laneTops: layout.laneTops,
                             cardHeight: layout.cardHeight,
+                            selectedLane: selectedLaneForDetails,
+                            hiddenLanes: hiddenLanes,
+                            activeOnlyLanes: activeOnlyLanes,
+                            onSelectLane: onSelectLane,
                           ),
                         ),
                         Expanded(
@@ -592,27 +618,27 @@ class _RelationalNetworkWorkspaceBodyState
                                                   case final rect?)
                                                 Positioned.fromRect(
                                                   rect: rect,
-                                                  child:
-                                                      _RelationalNetworkNodeCard(
-                                                        node: node,
-                                                        selected:
-                                                            selectedNode
-                                                                ?.publicId ==
-                                                            node.publicId,
-                                                        connected: connectedIds
-                                                            .contains(
-                                                              node.publicId,
-                                                            ),
-                                                        onTap: () {
-                                                          setState(() {
-                                                            _showDetailPanel =
-                                                                true;
-                                                          });
-                                                          widget.onSelectNode(
-                                                            node.publicId,
-                                                          );
-                                                        },
-                                                      ),
+                                                  child: _RelationalNetworkNodeCard(
+                                                    node: node,
+                                                    selected:
+                                                        selectedNode
+                                                            ?.publicId ==
+                                                        node.publicId,
+                                                    connected: connectedIds
+                                                        .contains(
+                                                          node.publicId,
+                                                        ),
+                                                    onTap: () {
+                                                      setState(() {
+                                                        _selectedLaneForDetails =
+                                                            null;
+                                                        _showDetailPanel = true;
+                                                      });
+                                                      widget.onSelectNode(
+                                                        node.publicId,
+                                                      );
+                                                    },
+                                                  ),
                                                 ),
                                           ],
                                         ),
@@ -647,7 +673,9 @@ class _RelationalNetworkWorkspaceBodyState
                       right: 24,
                       bottom: 24,
                       child: _RelationalCollapsedDetailDock(
-                        selectedNode: selectedNode,
+                        label: selectedLaneForDetails == null
+                            ? selectedNode?.displayName
+                            : _laneLabel(selectedLaneForDetails),
                         onTap: onReopenDetailPanel,
                       ),
                     ),
@@ -666,6 +694,41 @@ class _RelationalNetworkWorkspaceBodyState
   }) {
     if (!_showDetailPanel) {
       return const SizedBox.shrink();
+    }
+
+    if (_selectedLaneForDetails case final lane?) {
+      return _RelationalLaneDetailPanel(
+        lane: lane,
+        nodes: _payload.nodes.where((node) => node.lane == lane).toList(),
+        filterTargetNodes: _payload.nodes
+            .where((node) => node.lane == _filterTargetLaneFor(lane))
+            .toList(),
+        hideInactive: _activeOnlyLanes.contains(lane),
+        hideLayer: _hiddenLanes.contains(lane),
+        onClose: () {
+          setState(() {
+            _showDetailPanel = false;
+          });
+        },
+        onToggleHideInactive: (value) {
+          setState(() {
+            if (value) {
+              _activeOnlyLanes.add(lane);
+            } else {
+              _activeOnlyLanes.remove(lane);
+            }
+          });
+        },
+        onToggleHideLayer: (value) {
+          setState(() {
+            if (value) {
+              _hiddenLanes.add(lane);
+            } else {
+              _hiddenLanes.remove(lane);
+            }
+          });
+        },
+      );
     }
 
     if (selectedNode == null) {
@@ -724,10 +787,25 @@ class _RelationalNetworkWorkspaceBodyState
         continue;
       }
 
+      if (_activeOnlyLanes.any(
+            (lane) => _filterTargetLaneFor(lane) == node.lane,
+          ) &&
+          !_isActiveStatus(node.status)) {
+        continue;
+      }
+
       allowedNodes.add(node);
     }
 
     final allowedIds = allowedNodes.map((node) => node.publicId).toSet();
+    final hiddenNodeIds = {
+      for (final node in allowedNodes)
+        if (_hiddenLanes.contains(node.lane)) node.publicId,
+    };
+    final visibleNodes = allowedNodes
+        .where((node) => !_hiddenLanes.contains(node.lane))
+        .toList();
+    final visibleAllowedIds = visibleNodes.map((node) => node.publicId).toSet();
     final filteredEdges = _payload.edges.where((edge) {
       if (!allowedIds.contains(edge.fromPublicId) ||
           !allowedIds.contains(edge.toPublicId)) {
@@ -746,17 +824,26 @@ class _RelationalNetworkWorkspaceBodyState
 
       return true;
     }).toList();
+    final bridgedEdges =
+        _bridgeHiddenNodeEdges(
+          edges: filteredEdges,
+          hiddenNodeIds: hiddenNodeIds,
+          allowedIds: allowedIds,
+        ).where((edge) {
+          return visibleAllowedIds.contains(edge.fromPublicId) &&
+              visibleAllowedIds.contains(edge.toPublicId);
+        }).toList();
 
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) {
       return _RelationalNetworkView(
-        nodes: allowedNodes,
-        edges: filteredEdges,
+        nodes: visibleNodes,
+        edges: bridgedEdges,
         payload: _payload,
       );
     }
 
-    final matchedIds = allowedNodes
+    final matchedIds = visibleNodes
         .where(
           (node) =>
               node.displayName.toLowerCase().contains(query) ||
@@ -767,7 +854,7 @@ class _RelationalNetworkWorkspaceBodyState
         .toSet();
 
     final visibleIds = {...matchedIds};
-    for (final edge in filteredEdges) {
+    for (final edge in bridgedEdges) {
       if (matchedIds.contains(edge.fromPublicId) ||
           matchedIds.contains(edge.toPublicId)) {
         visibleIds.add(edge.fromPublicId);
@@ -775,10 +862,10 @@ class _RelationalNetworkWorkspaceBodyState
       }
     }
 
-    final nodes = allowedNodes
+    final nodes = visibleNodes
         .where((node) => visibleIds.contains(node.publicId))
         .toList();
-    final edges = filteredEdges
+    final edges = bridgedEdges
         .where(
           (edge) =>
               visibleIds.contains(edge.fromPublicId) &&
@@ -792,6 +879,142 @@ class _RelationalNetworkWorkspaceBodyState
       payload: _payload,
     );
   }
+}
+
+List<_NetworkGraphEdge> _bridgeHiddenNodeEdges({
+  required List<_NetworkGraphEdge> edges,
+  required Set<String> hiddenNodeIds,
+  required Set<String> allowedIds,
+}) {
+  final hiddenIds = hiddenNodeIds.intersection(allowedIds);
+  if (hiddenIds.isEmpty) {
+    return edges;
+  }
+
+  final outgoing = <String, List<_NetworkGraphEdge>>{};
+  for (final edge in edges) {
+    outgoing.putIfAbsent(edge.fromPublicId, () => []).add(edge);
+  }
+
+  final result = <_NetworkGraphEdge>[];
+  final emitted = <String>{};
+
+  void emit(_NetworkGraphEdge edge) {
+    final key =
+        '${edge.fromPublicId}|${edge.toPublicId}|${edge.relationshipState.name}';
+    if (emitted.add(key)) {
+      result.add(edge);
+    }
+  }
+
+  void walk({
+    required String sourceId,
+    required String currentId,
+    required _NetworkGraphRelationshipState state,
+    required String seedPublicId,
+    Set<String> visited = const {},
+  }) {
+    if (!allowedIds.contains(currentId) || sourceId == currentId) {
+      return;
+    }
+
+    if (!hiddenIds.contains(currentId)) {
+      emit(
+        _NetworkGraphEdge(
+          publicId: 'bridge_${seedPublicId}_${sourceId}_$currentId',
+          fromPublicId: sourceId,
+          toPublicId: currentId,
+          relationshipKind: 'hidden_node_bridge',
+          relationshipState: state,
+          periodStart: null,
+          periodEnd: null,
+          metadataLabel: 'hidden node bridge',
+        ),
+      );
+      return;
+    }
+
+    if (visited.contains(currentId)) {
+      return;
+    }
+    final nextVisited = {...visited, currentId};
+    for (final nextEdge in outgoing[currentId] ?? const <_NetworkGraphEdge>[]) {
+      walk(
+        sourceId: sourceId,
+        currentId: nextEdge.toPublicId,
+        state: _mergeRelationshipState(state, nextEdge.relationshipState),
+        seedPublicId: seedPublicId,
+        visited: nextVisited,
+      );
+    }
+  }
+
+  for (final edge in edges) {
+    if (hiddenIds.contains(edge.fromPublicId)) {
+      continue;
+    }
+    if (!hiddenIds.contains(edge.toPublicId)) {
+      emit(edge);
+      continue;
+    }
+    walk(
+      sourceId: edge.fromPublicId,
+      currentId: edge.toPublicId,
+      state: edge.relationshipState,
+      seedPublicId: edge.publicId,
+    );
+  }
+
+  return result;
+}
+
+_NetworkGraphRelationshipState _mergeRelationshipState(
+  _NetworkGraphRelationshipState first,
+  _NetworkGraphRelationshipState second,
+) {
+  if (first == _NetworkGraphRelationshipState.indirect ||
+      second == _NetworkGraphRelationshipState.indirect) {
+    return _NetworkGraphRelationshipState.indirect;
+  }
+  if (first == _NetworkGraphRelationshipState.historical ||
+      second == _NetworkGraphRelationshipState.historical) {
+    return _NetworkGraphRelationshipState.historical;
+  }
+  return _NetworkGraphRelationshipState.active;
+}
+
+bool _isActiveStatus(String status) {
+  return status == 'active';
+}
+
+String _inactiveFilterLabelFor(_NetworkGraphLane lane) {
+  return switch (lane) {
+    _NetworkGraphLane.rootCompany => 'Ocultar clientes inativos',
+    _NetworkGraphLane.clientCompany => 'Ocultar contratos encerrados',
+    _NetworkGraphLane.contract => 'Ocultar posicoes encerradas',
+    _NetworkGraphLane.position => 'Ocultar colaboradores desligados',
+    _NetworkGraphLane.employee => 'Ocultar vinculos encerrados',
+  };
+}
+
+_NetworkGraphLane _filterTargetLaneFor(_NetworkGraphLane lane) {
+  return switch (lane) {
+    _NetworkGraphLane.rootCompany => _NetworkGraphLane.clientCompany,
+    _NetworkGraphLane.clientCompany => _NetworkGraphLane.contract,
+    _NetworkGraphLane.contract => _NetworkGraphLane.position,
+    _NetworkGraphLane.position => _NetworkGraphLane.employee,
+    _NetworkGraphLane.employee => _NetworkGraphLane.employee,
+  };
+}
+
+String _inactiveCountLabelFor(_NetworkGraphLane lane) {
+  return switch (lane) {
+    _NetworkGraphLane.rootCompany => 'Inactive groups',
+    _NetworkGraphLane.clientCompany => 'Inactive clients',
+    _NetworkGraphLane.contract => 'Ended contracts',
+    _NetworkGraphLane.position => 'Ended positions',
+    _NetworkGraphLane.employee => 'Dismissed employees',
+  };
 }
 
 class _RelationalNetworkView {
@@ -853,6 +1076,7 @@ class _RelationalCanvasLayout {
     required double cardHeight,
     required _NetworkGraphPayload payload,
     required List<_NetworkGraphNode> nodes,
+    required Set<_NetworkGraphLane> collapsedLanes,
   }) {
     final availableWidth = max(1.0, canvasWidth - laneRailWidth);
     final maxLaneCount = payload.lanes.fold<int>(0, (count, lane) {
@@ -867,11 +1091,15 @@ class _RelationalCanvasLayout {
     final contentWidth = max(availableWidth, preferredRowWidth);
     final positions = <String, Rect>{};
     final laneTops = <_NetworkGraphLane, double>{};
-    var laneIndex = 0;
+    var top = topPadding;
+    _NetworkGraphLane? previousLane;
 
     for (final lane in payload.lanes) {
       final laneNodes = nodes.where((node) => node.lane == lane).toList();
-      final top = topPadding + (laneIndex * laneSpacing);
+      if (previousLane != null) {
+        final previousCollapsed = collapsedLanes.contains(previousLane);
+        top += laneSpacing * (previousCollapsed ? 0.78 : 1.0);
+      }
       laneTops[lane] = top;
 
       if (laneNodes.isNotEmpty) {
@@ -900,12 +1128,11 @@ class _RelationalCanvasLayout {
         }
       }
 
-      laneIndex += 1;
+      previousLane = lane;
     }
 
     final canvasHeight =
-        topPadding +
-        ((payload.lanes.length - 1) * laneSpacing) +
+        (laneTops.values.isEmpty ? topPadding : laneTops.values.reduce(max)) +
         cardHeight +
         72;
 
@@ -1500,60 +1727,50 @@ class _RelationalFilterChip extends StatelessWidget {
 }
 
 class _RelationalLaneRail extends StatelessWidget {
-  const _RelationalLaneRail({required this.laneTops, required this.cardHeight});
+  const _RelationalLaneRail({
+    required this.lanes,
+    required this.laneTops,
+    required this.cardHeight,
+    required this.selectedLane,
+    required this.hiddenLanes,
+    required this.activeOnlyLanes,
+    required this.onSelectLane,
+  });
 
+  final List<_NetworkGraphLane> lanes;
   final Map<_NetworkGraphLane, double> laneTops;
   final double cardHeight;
+  final _NetworkGraphLane? selectedLane;
+  final Set<_NetworkGraphLane> hiddenLanes;
+  final Set<_NetworkGraphLane> activeOnlyLanes;
+  final ValueChanged<_NetworkGraphLane> onSelectLane;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        for (final lane in _NetworkGraphLane.values)
+        for (final lane in lanes)
           if (laneTops[lane] case final top?)
             Positioned(
               top: top,
               left: 0,
-              right: 18,
+              right: 10,
               child: SizedBox(
-                height: max(118.0, cardHeight),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _laneColor(lane).withValues(alpha: 0.36),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _laneNumber(lane),
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(color: _laneColor(lane)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _laneLabel(lane),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: _laneColor(lane),
-                      ),
-                    ),
-                  ],
+                height: hiddenLanes.contains(lane)
+                    ? 82
+                    : max(118.0, cardHeight),
+                child: _RelationalLaneButton(
+                  lane: lane,
+                  selected: selectedLane == lane,
+                  hidden: hiddenLanes.contains(lane),
+                  filterActive: activeOnlyLanes.contains(lane),
+                  onTap: () => onSelectLane(lane),
                 ),
               ),
             ),
         if (laneTops.length > 1)
           Positioned(
-            top: (laneTops[_NetworkGraphLane.rootCompany] ?? 0) + 62,
+            top: (laneTops[lanes.first] ?? 0) + 62,
             left: 25,
             bottom: 60,
             child: CustomPaint(
@@ -1562,6 +1779,128 @@ class _RelationalLaneRail extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _RelationalLaneButton extends StatelessWidget {
+  const _RelationalLaneButton({
+    required this.lane,
+    required this.selected,
+    required this.hidden,
+    required this.filterActive,
+    required this.onTap,
+  });
+
+  final _NetworkGraphLane lane;
+  final bool selected;
+  final bool hidden;
+  final bool filterActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _laneColor(lane);
+    final iconHeight = hidden ? 34.0 : 52.0;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
+          decoration: BoxDecoration(
+            color: selected
+                ? color.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+            border: selected
+                ? Border.all(color: color.withValues(alpha: 0.18))
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 52,
+                    height: iconHeight,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(hidden ? 13 : 16),
+                      border: Border.all(color: color.withValues(alpha: 0.36)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _laneNumber(lane),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: color),
+                      ),
+                    ),
+                  ),
+                  if (hidden)
+                    Positioned(
+                      right: -8,
+                      bottom: -8,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: color.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.visibility_off_outlined,
+                          color: color,
+                          size: 15,
+                        ),
+                      ),
+                    ),
+                  if (filterActive)
+                    Positioned(
+                      top: -3,
+                      right: -4,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _roseColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              SizedBox(height: hidden ? 6 : 8),
+              Text(
+                _laneLabel(lane),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    (hidden
+                            ? Theme.of(context).textTheme.bodyMedium
+                            : Theme.of(context).textTheme.titleMedium)
+                        ?.copyWith(
+                          color: hidden ? color.withValues(alpha: 0.62) : color,
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          height: 1.05,
+                        ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1712,16 +2051,16 @@ class _RelationalNodeAvatar extends StatelessWidget {
 
 class _RelationalCollapsedDetailDock extends StatelessWidget {
   const _RelationalCollapsedDetailDock({
-    required this.selectedNode,
+    required this.label,
     required this.onTap,
   });
 
-  final _NetworkGraphNode? selectedNode;
+  final String? label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final label = selectedNode?.displayName ?? 'Detalhe recolhido';
+    final displayLabel = label ?? 'Detalhe recolhido';
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -1776,7 +2115,7 @@ class _RelationalCollapsedDetailDock extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      label,
+                      displayLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium,
@@ -2068,6 +2407,135 @@ class _RelationalNetworkEdgePainter extends CustomPainter {
   }
 }
 
+class _RelationalLaneDetailPanel extends StatelessWidget {
+  const _RelationalLaneDetailPanel({
+    required this.lane,
+    required this.nodes,
+    required this.filterTargetNodes,
+    required this.hideInactive,
+    required this.hideLayer,
+    required this.onClose,
+    required this.onToggleHideInactive,
+    required this.onToggleHideLayer,
+  });
+
+  final _NetworkGraphLane lane;
+  final List<_NetworkGraphNode> nodes;
+  final List<_NetworkGraphNode> filterTargetNodes;
+  final bool hideInactive;
+  final bool hideLayer;
+  final VoidCallback onClose;
+  final ValueChanged<bool> onToggleHideInactive;
+  final ValueChanged<bool> onToggleHideLayer;
+
+  @override
+  Widget build(BuildContext context) {
+    final laneColor = _laneColor(lane);
+    final activeCount = filterTargetNodes
+        .where((node) => _isActiveStatus(node.status))
+        .length;
+    final inactiveCount = max(0, filterTargetNodes.length - activeCount);
+    final fields = [
+      _RelationalDetailField(
+        icon: Icons.layers_outlined,
+        label: 'Items in layer',
+        value: '${nodes.length}',
+      ),
+      _RelationalDetailField(
+        icon: Icons.check_circle_outline_rounded,
+        label: 'Active in filter scope',
+        value: '$activeCount',
+        accent: _tealColor,
+      ),
+      _RelationalDetailField(
+        icon: Icons.history_toggle_off_outlined,
+        label: _inactiveCountLabelFor(lane),
+        value: '$inactiveCount',
+        accent: inactiveCount == 0 ? null : _amberColor,
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 10, 22, 22),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: _lineColor),
+          boxShadow: [
+            BoxShadow(
+              color: _deepTealColor.withValues(alpha: 0.06),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _laneLabel(lane),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontSize: 24,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onClose,
+                  tooltip: 'Recolher painel',
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: laneColor.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: laneColor, width: 2),
+                  ),
+                  child: Icon(_iconForLane(lane), color: laneColor, size: 42),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Text(
+                    'Layer controls',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: laneColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _RelationalContextFilterSection(
+              inactiveLabel: _inactiveFilterLabelFor(lane),
+              hiddenLabel: 'Ocultar esta camada',
+              hideInactiveLocal: hideInactive,
+              hideLayer: hideLayer,
+              onToggleHideInactiveLocal: onToggleHideInactive,
+              onToggleHideLayer: onToggleHideLayer,
+            ),
+            const SizedBox(height: 20),
+            for (var index = 0; index < fields.length; index++)
+              _RelationalDetailRow(field: fields[index]),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _RelationalNetworkDetailPanel extends StatelessWidget {
   const _RelationalNetworkDetailPanel({
     required this.node,
@@ -2291,15 +2759,61 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
             value: '${extras['contract'] ?? '-'}',
           ),
           _RelationalDetailField(
+            icon: Icons.work_outline_rounded,
+            label: 'Position',
+            value: '${extras['position'] ?? node.subtitle}',
+          ),
+          _RelationalDetailField(
             icon: Icons.timelapse_outlined,
             label: 'Status',
             value: '${extras['statusLabel'] ?? _titleCase(node.status)}',
-            accent: node.status == 'active' ? _tealColor : _amberColor,
+            accent: _isActiveStatus(node.status) ? _tealColor : _amberColor,
           ),
           _RelationalDetailField(
             icon: Icons.calendar_today_outlined,
             label: 'Start Date',
             value: '${extras['startDate'] ?? '-'}',
+          ),
+          _RelationalDetailField(
+            icon: Icons.location_on_outlined,
+            label: 'Location',
+            value: '${extras['location'] ?? '-'}',
+          ),
+        ]);
+        break;
+      case _NetworkGraphLane.position:
+        fields.addAll([
+          _RelationalDetailField(
+            icon: Icons.description_outlined,
+            label: 'Contract',
+            value: '${extras['contract'] ?? '-'}',
+          ),
+          _RelationalDetailField(
+            icon: Icons.schedule_outlined,
+            label: 'Scale',
+            value: '${extras['scale'] ?? '-'}',
+          ),
+          _RelationalDetailField(
+            icon: Icons.wb_sunny_outlined,
+            label: 'Shift',
+            value: '${extras['shift'] ?? '-'}',
+          ),
+          _RelationalDetailField(
+            icon: Icons.group_outlined,
+            label: 'Active employees',
+            value: '${snapshot.activeEmployees ?? 0}',
+          ),
+          if (snapshot.historicalEmployees != null)
+            _RelationalDetailField(
+              icon: Icons.history_toggle_off_outlined,
+              label: 'Historical employees',
+              value: '${snapshot.historicalEmployees}',
+            ),
+          _RelationalDetailField(
+            icon: Icons.timelapse_outlined,
+            label: 'Status',
+            value: '${extras['statusLabel'] ?? _titleCase(node.status)}',
+            accent: _isActiveStatus(node.status) ? _tealColor : _amberColor,
           ),
           _RelationalDetailField(
             icon: Icons.location_on_outlined,
@@ -2398,6 +2912,118 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
   }
 }
 
+class _RelationalContextFilterSection extends StatelessWidget {
+  const _RelationalContextFilterSection({
+    required this.inactiveLabel,
+    required this.hiddenLabel,
+    required this.hideInactiveLocal,
+    required this.hideLayer,
+    required this.onToggleHideInactiveLocal,
+    required this.onToggleHideLayer,
+  });
+
+  final String inactiveLabel;
+  final String hiddenLabel;
+  final bool hideInactiveLocal;
+  final bool hideLayer;
+  final ValueChanged<bool> onToggleHideInactiveLocal;
+  final ValueChanged<bool> onToggleHideLayer;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasActiveFilter = hideInactiveLocal || hideLayer;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBF8F2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasActiveFilter
+              ? _roseColor.withValues(alpha: 0.34)
+              : _lineColor,
+        ),
+      ),
+      child: Column(
+        children: [
+          _RelationalContextFilterRow(
+            icon: Icons.filter_alt_outlined,
+            label: inactiveLabel,
+            value: hideInactiveLocal,
+            onChanged: onToggleHideInactiveLocal,
+            highlight: hideInactiveLocal,
+          ),
+          const Divider(height: 16, color: _lineColor),
+          _RelationalContextFilterRow(
+            icon: hideLayer
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            label: hiddenLabel,
+            value: hideLayer,
+            onChanged: onToggleHideLayer,
+            highlight: hideLayer,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RelationalContextFilterRow extends StatelessWidget {
+  const _RelationalContextFilterRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.highlight,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(icon, color: highlight ? _roseColor : _slateColor, size: 23),
+            if (highlight)
+              Positioned(
+                top: -3,
+                right: -4,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: _roseColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: _inkColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Switch.adaptive(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+}
+
 class _RelationalDetailField {
   const _RelationalDetailField({
     required this.icon,
@@ -2491,6 +3117,7 @@ IconData _iconForLane(_NetworkGraphLane lane) {
     _NetworkGraphLane.rootCompany => Icons.apartment_outlined,
     _NetworkGraphLane.clientCompany => Icons.business_outlined,
     _NetworkGraphLane.contract => Icons.description_outlined,
+    _NetworkGraphLane.position => Icons.work_outline_rounded,
     _NetworkGraphLane.employee => Icons.person_outline_rounded,
   };
 }
@@ -2500,6 +3127,7 @@ String _laneLabel(_NetworkGraphLane lane) {
     _NetworkGraphLane.rootCompany => 'Root Companies',
     _NetworkGraphLane.clientCompany => 'Client Companies',
     _NetworkGraphLane.contract => 'Contracts',
+    _NetworkGraphLane.position => 'Positions',
     _NetworkGraphLane.employee => 'Employees',
   };
 }
@@ -2509,7 +3137,8 @@ String _laneNumber(_NetworkGraphLane lane) {
     _NetworkGraphLane.rootCompany => '01',
     _NetworkGraphLane.clientCompany => '02',
     _NetworkGraphLane.contract => '03',
-    _NetworkGraphLane.employee => '04',
+    _NetworkGraphLane.position => '04',
+    _NetworkGraphLane.employee => '05',
   };
 }
 
@@ -2518,6 +3147,7 @@ Color _laneColor(_NetworkGraphLane lane) {
     _NetworkGraphLane.rootCompany => const Color(0xFF2A5F86),
     _NetworkGraphLane.clientCompany => const Color(0xFF4A7F58),
     _NetworkGraphLane.contract => const Color(0xFF7B57D1),
+    _NetworkGraphLane.position => const Color(0xFFC07A15),
     _NetworkGraphLane.employee => const Color(0xFFD18A17),
   };
 }
@@ -2535,6 +3165,7 @@ String _detailTitleFor(_NetworkGraphNode node) {
     _NetworkGraphLane.rootCompany => 'Root Company Details',
     _NetworkGraphLane.clientCompany => 'Client Company Details',
     _NetworkGraphLane.contract => 'Contract Details',
+    _NetworkGraphLane.position => 'Position Details',
     _NetworkGraphLane.employee => 'Employee Details',
   };
 }
