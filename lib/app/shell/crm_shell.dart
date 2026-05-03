@@ -360,19 +360,27 @@ class _CrmSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CrmInteractiveBrand(),
+          Stack(
+            clipBehavior: Clip.none, // Permite que itens saiam da borda se necessário
+            children: [
+              const _CrmInteractiveBrand(), // O logo fica na camada de baixo
+              Positioned(
+                left: 22,
+                right: 22,
+                bottom: 1, // Coloca a barra exatamente na linha final do logo
+                child: Container(
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.15),
+                ),
+              ),
+            ],
+          ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 18),
-                  Container(
-                    width: double.infinity,
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.10),
-                  ),
                   const SizedBox(height: 22),
                   Expanded(
                     child: ListView.separated(
@@ -1043,11 +1051,11 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     center: Alignment(_hovered ? -0.64 : -0.76, -0.08),
-                    radius: _hovered ? 0.92 : 0.78,
+                    radius: _hovered ? 1.4 : 0.78,
                     colors: [
                       const Color(
                         0xFFE7C67A,
-                      ).withValues(alpha: _hovered ? 0.11 : 0.055),
+                      ).withValues(alpha: _hovered ? 0.06 : 0.077),
                       const Color(0xFF2D7872).withValues(alpha: 0.09),
                       Colors.transparent,
                     ],
