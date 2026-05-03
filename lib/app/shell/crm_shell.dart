@@ -464,7 +464,7 @@ class _CrmDashboardContent extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardsPerRow = constraints.maxWidth >= 1000
+        final cardsPerRow = constraints.maxWidth >= 900
             ? 4
             : constraints.maxWidth >= 620
             ? 2
@@ -525,7 +525,7 @@ class _CrmDashboardHero extends StatelessWidget {
           label: _ShellVariant.crm.label,
           child: Container(
             width: double.infinity,
-            height: stacked ? 520 : 320,
+            height: stacked ? 520 : 290,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
