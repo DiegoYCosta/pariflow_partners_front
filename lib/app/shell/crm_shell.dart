@@ -1024,6 +1024,12 @@
 
     @override
     Widget build(BuildContext context) {
+      // Definimos os valores de escala e translação
+      // O padrão agora é 1.025 (antigo hover), e o novo hover é 1.05
+      final currentScale = _hovered ? 1.05 : 1.025;
+      final currentTranslateX = _hovered ? 2.4 : 1.2;
+      final currentTranslateY = _hovered ? -1.6 : -0.8;
+
       return MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -1051,11 +1057,11 @@
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       center: Alignment(_hovered ? -0.64 : -0.76, -0.08),
-                      radius: _hovered ? 1.6 : 0.78,
+                      radius: _hovered ? 1.6 : 0.85, // Mais expandido
                       colors: [
-                        const Color(
-                          0xFFE7C67A,
-                        ).withValues(alpha: _hovered ? 0.05 : 0.077),
+                        const Color(0xFFE7C67A).withValues(
+                          alpha: _hovered ? 0.05 : 0.03, // Bem sutil
+                        ),
                         const Color(0xFF2D7872).withValues(alpha: 0.09),
                         Colors.transparent,
                       ],
@@ -1077,17 +1083,18 @@
                     ),
                   ),
                 ),
+                // Camada Base do Logo e Texto
                 AnimatedScale(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
-                  scale: _hovered ? 1.025 : 1.0,
+                  scale: currentScale,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
                     transform: Matrix4.identity()
                       ..translateByDouble(
-                        _hovered ? 1.2 : 0.0,
-                        _hovered ? -0.8 : 0.0,
+                        currentTranslateX,
+                        currentTranslateY,
                         0,
                         1,
                       ),
@@ -1096,6 +1103,7 @@
                     ),
                   ),
                 ),
+                // Camada de Brilho do Clique (Sincronizada)
                 AnimatedBuilder(
                   animation: _shineController,
                   builder: (context, child) {
@@ -1108,31 +1116,30 @@
                         child: ShaderMask(
                           blendMode: BlendMode.srcATop,
                           shaderCallback: (rect) {
-                            // Brilho horizontal e largo para não distorcer a leitura
                             final x = -1.5 + (value * 3.0);
                             return LinearGradient(
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                               colors: [
                                 Colors.transparent,
-                                Colors.white.withValues(alpha: 0.40),
+                                Colors.white.withValues(alpha: 0.45),
                                 Colors.transparent,
                               ],
                               stops: const [0.0, 0.5, 1.0],
                             ).createShader(rect);
                           },
-                          // IMPORTANTE: O brilho agora envolve o componente JÁ ANIMADO (escala/movimento)
+                          // A máscara de brilho segue EXATAMENTE a mesma escala e posição da base
                           child: AnimatedScale(
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeOutCubic,
-                            scale: _hovered ? 1.025 : 1.0,
+                            scale: currentScale,
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 220),
                               curve: Curves.easeOutCubic,
                               transform: Matrix4.identity()
                                 ..translateByDouble(
-                                  _hovered ? 1.2 : 0.0,
-                                  _hovered ? -0.8 : 0.0,
+                                  currentTranslateX,
+                                  currentTranslateY,
                                   0,
                                   1,
                                 ),
