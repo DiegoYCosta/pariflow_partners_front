@@ -1027,18 +1027,17 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
 
   @override
   Widget build(BuildContext context) {
-    // --- AJUSTES FINOS DE COREOGRAFIA ---
-
     // 1. Configurações para o modo EXPANDIDO (Clique)
-    double logoScale = _isExpanded ? 0.72 : 1.0;      // Menor e mais discreto
-    double textScale = _isExpanded ? 1.38 : 1.0;      // Maior e mais imponente
+    // Logo menor e mais discreto
+    double logoScale = _isExpanded ? 0.65 : 1.04;
+    double logoTop = _isExpanded ? 14.0 : 42.0;
+    double logoLeft = _isExpanded ? 8.0 : 16.0; // Puxado levemente para a esquerda
+    double logoOpacity = _isExpanded ? 0.30 : 1.0;
 
-    double logoTop = _isExpanded ? 18.0 : 42.0;       // Mais para cima
-    double logoLeft = _isExpanded ? 10.0 : 22.0;      // Mais para a esquerda
-    double logoOpacity = _isExpanded ? 0.40 : 1.0;    // Mais translúcido
-
-    double textTop = _isExpanded ? 76.0 : 66.0;       // Centralização vertical refinada
-    double textLeft = _isExpanded ? 32.0 : 104.0;     // Ocupa o centro do palco
+    // Texto (PFP.WEBP) com mais destaque e melhor centralizado
+    double textScale = _isExpanded ? 1.42 : 1.12; // Aumentado para mais destaque
+    double textTop = _isExpanded ? 72.0 : 66.0;
+    double textLeft = _isExpanded ? 32.0 : 96.0; // Ajustado para centralizar o bloco
 
     const animationDuration = Duration(milliseconds: 600);
     const animationCurve = Curves.easeInOutCubic;
@@ -1067,25 +1066,25 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                 color: const Color(0xFF6DA59A).withValues(alpha: 0.12),
                 colorBlendMode: BlendMode.screen,
               ),
-              // Aura de fundo (Hover)
+              // FUNDO COM BRILHO DOURADO SUTIL
               AnimatedContainer(
                 duration: animationDuration,
                 curve: animationCurve,
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     center: const Alignment(-0.5, -0.1),
-                    radius: _hovered ? 1.8 : 0.8,
+                    radius: _hovered ? 2.0 : 1.0,
                     colors: [
-                      const Color(0xFFE7C67A).withValues(alpha: _hovered ? 0.02 : 0.01),
+                      const Color(0xFFFFD700).withValues(alpha: (_hovered || _isExpanded) ? 0.03 : 0.01),
                       const Color(0xFF2D7872).withValues(alpha: 0.06),
                       Colors.transparent,
                     ],
                   ),
                 ),
               ),
-              // --- ESCALA GLOBAL PARA HOVER ---
+              // ESCALA GLOBAL PARA HOVER (Acompanha os novos tamanhos)
               AnimatedScale(
-                scale: _hovered ? 1.04 : 1.0,
+                scale: _hovered ? 1.18 : 1.0,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
                 child: AnimatedContainer(
@@ -1095,7 +1094,6 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                     ..translateByDouble(0, _hovered ? -2.0 : 0.0, 0, 1),
                   child: Stack(
                     children: [
-                      // CAMADA VISUAL BASE
                       _CrmBrandArtwork(
                         shadowOpacity: _hovered ? 0.40 : 0.35,
                         logoScale: logoScale,
@@ -1108,13 +1106,11 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                         duration: animationDuration,
                         curve: animationCurve,
                       ),
-                      // CAMADA DE BRILHO (ShaderMask)
                       AnimatedBuilder(
                         animation: _shineController,
                         builder: (context, child) {
                           final value = Curves.easeInOutSine.transform(_shineController.value);
                           final visible = _shineController.isAnimating ? sin(value * pi) : 0.0;
-
                           return IgnorePointer(
                             child: Opacity(
                               opacity: (visible * 0.35).clamp(0.0, 1.0).toDouble(),
@@ -1195,7 +1191,6 @@ class _CrmBrandArtwork extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // SÍMBOLO (LOGO)
         AnimatedPositioned(
           duration: duration,
           curve: curve,
@@ -1221,7 +1216,6 @@ class _CrmBrandArtwork extends StatelessWidget {
             ),
           ),
         ),
-        // NOME DA EMPRESA (PariFlow Partners)
         AnimatedPositioned(
           duration: duration,
           curve: curve,
@@ -1247,7 +1241,6 @@ class _CrmBrandArtwork extends StatelessWidget {
   }
 }
 
-// RESTAURAÇÃO DA SIDEBAR NAV ITEM
 class _CrmSidebarNavItem extends StatefulWidget {
   const _CrmSidebarNavItem({
     required this.item,
@@ -1329,7 +1322,27 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
                 ),
               ),
               child: Stack(
+                clipBehavior: Clip.none,
                 children: [
+                  if (selected)
+                    Positioned(
+                      left: -8,
+                      top: 14,
+                      bottom: 14,
+                      child: Container(
+                        width: 2.5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0A64C).withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE0A64C).withValues(alpha: 0.3),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   if (selected)
                     Positioned.fill(
                       child: IgnorePointer(
@@ -1389,8 +1402,6 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
     );
   }
 }
-
-
 
 class _CrmMetricCard extends StatelessWidget {
   const _CrmMetricCard({required this.card});
