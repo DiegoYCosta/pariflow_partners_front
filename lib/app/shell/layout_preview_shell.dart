@@ -209,41 +209,48 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                       isHome: _destination == _Destination.home,
                       showSidebar: showSidebar,
                     ),
-                    SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        showSidebar ? 32 : 18,
-                        18,
-                        showSidebar ? 32 : 18,
-                        showSidebar ? 32 : 104,
-                      ),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1560),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _CrmTopBar(
-                                page: page,
-                                viewerProfile: _viewerProfile,
-                                showMenuButton: !showSidebar,
-                                onViewerChanged: (value) {
-                                  setState(() {
-                                    _viewerProfile = value;
-                                  });
-                                },
+                    Column(
+                      children: [
+                        _CrmTopBar(
+                          viewerProfile: _viewerProfile,
+                          showMenuButton: !showSidebar,
+                          onViewerChanged: (value) {
+                            setState(() {
+                              _viewerProfile = value;
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.fromLTRB(
+                              showSidebar ? 32 : 18,
+                              28,
+                              showSidebar ? 32 : 18,
+                              showSidebar ? 32 : 104,
+                            ),
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 1560,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (_destination != _Destination.home &&
+                                        _destination !=
+                                            _Destination.network) ...[
+                                      _CrmSectionHeader(page: page),
+                                      const SizedBox(height: 24),
+                                    ],
+                                    _buildWorkspaceContent(page, width),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 30),
-                              if (_destination != _Destination.home &&
-                                  _destination != _Destination.network) ...[
-                                _CrmSectionHeader(page: page),
-                                const SizedBox(height: 24),
-                              ],
-                              _buildWorkspaceContent(page, width),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -310,9 +317,9 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                   radius: 0.92,
                   colors: [
                     const Color(0xFFA9AE7A).withValues(alpha: oliveGlowOpacity),
-                    const Color(0xFFA9AE7A).withValues(
-                      alpha: oliveGlowOpacity * 0.32,
-                    ),
+                    const Color(
+                      0xFFA9AE7A,
+                    ).withValues(alpha: oliveGlowOpacity * 0.32),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.30, 1.0],
@@ -733,9 +740,7 @@ class _AppSidebar extends StatelessWidget {
                             state: selected
                                 ? _SpriteMoldState.selected
                                 : _SpriteMoldState.base,
-                            color: selected
-                                ? null
-                                : const Color(0xFFDCE9E3),
+                            color: selected ? null : const Color(0xFFDCE9E3),
                             size: 24,
                           ),
                         ),
@@ -891,8 +896,8 @@ const _pageInfo = {
 
 _SpriteMoldState _spriteStateForChoiceTarget(_ChoiceTarget target) {
   return switch (target) {
-    _ChoiceTarget.contracts || _ChoiceTarget.network =>
-      _SpriteMoldState.selected,
+    _ChoiceTarget.contracts ||
+    _ChoiceTarget.network => _SpriteMoldState.selected,
     _ => _SpriteMoldState.base,
   };
 }

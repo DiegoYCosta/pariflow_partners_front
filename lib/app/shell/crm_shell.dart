@@ -11,13 +11,11 @@ class _CrmShellPage extends StatelessWidget {
 
 class _CrmTopBar extends StatelessWidget {
   const _CrmTopBar({
-    required this.page,
     required this.viewerProfile,
     required this.showMenuButton,
     required this.onViewerChanged,
   });
 
-  final _PageInfo page;
   final _ViewerAccessProfile viewerProfile;
   final bool showMenuButton;
   final ValueChanged<_ViewerAccessProfile> onViewerChanged;
@@ -26,179 +24,316 @@ class _CrmTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isHome = page.destination == _Destination.home;
-        final compact = constraints.maxWidth < 920;
-        final today = DateTime.now();
-        final title = isHome
-            ? '${_greeting(today)}, ${viewerProfile.name.split(' ').first}'
-            : page.title;
-        final subtitle = isHome
-            ? _formatDate(today)
-            : '${page.shortLabel} | ${page.kicker}';
-        final leadingBlock = Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showMenuButton)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Builder(
-                  builder: (context) => IconButton.filledTonal(
-                    onPressed: Scaffold.of(context).openDrawer,
-                    icon: const Icon(Icons.menu_rounded),
-                  ),
-                ),
-              ),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: compact ? constraints.maxWidth - 88 : 540,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.9,
-                      color: _inkColor,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _mutedColor,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-        final homeActions = Wrap(
-          spacing: 22,
-          runSpacing: 14,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: const [
-            _CrmToolbarGlyph(icon: Icons.search_rounded),
-            _CrmToolbarGlyph(
-              icon: Icons.notifications_none_rounded,
-              badge: '3',
-            ),
-            _CrmPrimaryActionButton(),
-          ],
-        );
-        final generalActions = Wrap(
-          spacing: 14,
-          runSpacing: 14,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const _CrmIconAction(icon: Icons.search_rounded),
-            const _CrmIconAction(
-              icon: Icons.notifications_none_rounded,
-              badge: '3',
-            ),
-            _CrmViewerChip(
-              viewerProfile: viewerProfile,
-              compact: compact,
-              onViewerChanged: onViewerChanged,
-            ),
-            const _CrmPrimaryActionButton(),
-          ],
-        );
+        final tight = constraints.maxWidth < 540;
+        final compactProfile = constraints.maxWidth < 760;
+        final searchWidth = constraints.maxWidth >= 980
+            ? 280.0
+            : constraints.maxWidth >= 720
+            ? 236.0
+            : min(220.0, constraints.maxWidth * 0.38);
 
-        if (isHome && !compact) {
-          return Align(
-            alignment: Alignment.centerLeft,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                leadingBlock,
-                const SizedBox(width: 72),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: homeActions,
+        return Container(
+          height: 58,
+          padding: EdgeInsets.symmetric(
+            horizontal: constraints.maxWidth >= 980 ? 24 : 14,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: const Border(bottom: BorderSide(color: Color(0xFFE7ECEA))),
+            boxShadow: [
+              BoxShadow(
+                color: _inkColor.withValues(alpha: 0.04),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              if (showMenuButton) ...[
+                _CrmHeaderIconButton(
+                  icon: Icons.menu_rounded,
+                  tooltip: 'Abrir menu',
+                  onPressed: Scaffold.of(context).openDrawer,
                 ),
+                const SizedBox(width: 8),
               ],
-            ),
-          );
-        }
-
-        return Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          runSpacing: 18,
-          spacing: 18,
-          children: [
-            leadingBlock,
-            isHome ? homeActions : generalActions,
-          ],
+              if (tight)
+                const _CrmHeaderIconButton(
+                  icon: Icons.search_rounded,
+                  tooltip: 'Buscar',
+                )
+              else
+                SizedBox(
+                  width: searchWidth,
+                  child: const _CrmHeaderSearchBox(),
+                ),
+              const Spacer(),
+              const _CrmHeaderIconButton(
+                icon: Icons.notifications_none_rounded,
+                tooltip: 'Notificacoes',
+                badge: '3',
+              ),
+              const SizedBox(width: 6),
+              const _CrmHeaderIconButton(
+                icon: Icons.help_outline_rounded,
+                tooltip: 'Ajuda',
+              ),
+              SizedBox(width: compactProfile ? 8 : 14),
+              _CrmHeaderViewerMenu(
+                viewerProfile: viewerProfile,
+                compact: compactProfile,
+                onViewerChanged: onViewerChanged,
+              ),
+            ],
+          ),
         );
       },
     );
   }
-
-  String _greeting(DateTime now) {
-    if (now.hour < 12) {
-      return 'Good morning';
-    }
-    if (now.hour < 18) {
-      return 'Good afternoon';
-    }
-    return 'Good evening';
-  }
-
-  String _formatDate(DateTime date) {
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
-  }
 }
 
-class _CrmPrimaryActionButton extends StatelessWidget {
-  const _CrmPrimaryActionButton();
+class _CrmHeaderSearchBox extends StatelessWidget {
+  const _CrmHeaderSearchBox();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 60,
-      height: 60,
-      decoration: const BoxDecoration(
-        color: _deepTealColor,
-        shape: BoxShape.circle,
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: const Color(0xFFE5EAE8)),
       ),
-      child: const Icon(Icons.add_rounded, color: Colors.white, size: 30),
+      child: const Row(
+        children: [
+          Icon(Icons.search_rounded, color: Color(0xFF98A39E), size: 15),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Search people, companies...',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Color(0xFF98A39E), fontSize: 11),
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
+
+class _CrmHeaderIconButton extends StatelessWidget {
+  const _CrmHeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    this.badge,
+    this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final String? badge;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(
+            child: IconButton(
+              onPressed: onPressed ?? () {},
+              tooltip: tooltip,
+              icon: Icon(icon, color: const Color(0xFF1F302C), size: 21),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              style: IconButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+          if (badge != null)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Container(
+                width: 14,
+                height: 14,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _tealColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text(
+                  badge!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmHeaderViewerMenu extends StatelessWidget {
+  const _CrmHeaderViewerMenu({
+    required this.viewerProfile,
+    required this.compact,
+    required this.onViewerChanged,
+  });
+
+  final _ViewerAccessProfile viewerProfile;
+  final bool compact;
+  final ValueChanged<_ViewerAccessProfile> onViewerChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<_ViewerAccessProfile>(
+        value: viewerProfile,
+        isDense: true,
+        borderRadius: BorderRadius.circular(12),
+        dropdownColor: Colors.white,
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Color(0xFF1F302C),
+          size: 19,
+        ),
+        onChanged: (value) {
+          if (value != null) {
+            onViewerChanged(value);
+          }
+        },
+        selectedItemBuilder: (context) {
+          return _viewerProfiles.map((value) {
+            return _CrmHeaderViewerIdentity(
+              viewerProfile: value,
+              compact: compact,
+            );
+          }).toList();
+        },
+        items: [
+          for (final value in _viewerProfiles)
+            DropdownMenuItem(
+              value: value,
+              child: _CrmHeaderViewerIdentity(
+                viewerProfile: value,
+                compact: false,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmHeaderViewerIdentity extends StatelessWidget {
+  const _CrmHeaderViewerIdentity({
+    required this.viewerProfile,
+    required this.compact,
+  });
+
+  final _ViewerAccessProfile viewerProfile;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return SizedBox(
+        width: 34,
+        height: 34,
+        child: _CrmHeaderAvatar(viewerProfile: viewerProfile),
+      );
+    }
+
+    return SizedBox(
+      width: 150,
+      height: 38,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _CrmHeaderAvatar(viewerProfile: viewerProfile),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  viewerProfile.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF1F302C),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _viewerRoleLabel(viewerProfile),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF6F7D78),
+                    fontSize: 9.5,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmHeaderAvatar extends StatelessWidget {
+  const _CrmHeaderAvatar({required this.viewerProfile});
+
+  final _ViewerAccessProfile viewerProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: 17,
+      backgroundColor: viewerProfile.color.withValues(alpha: 0.16),
+      child: CircleAvatar(
+        radius: 14,
+        backgroundColor: viewerProfile.color,
+        child: Text(
+          viewerProfile.badge,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _viewerRoleLabel(_ViewerAccessProfile profile) {
+  if (profile.groups.isEmpty) {
+    return 'Public Access';
+  }
+
+  return profile.groups.map((group) => group.label).join(' / ');
 }
 
 class _CrmSidebar extends StatelessWidget {
@@ -418,10 +553,7 @@ class _CrmDashboardHero extends StatelessWidget {
                     child: Opacity(
                       opacity: 0.56,
                       child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: 7.0,
-                          sigmaY: 7.0,
-                        ),
+                        imageFilter: ImageFilter.blur(sigmaX: 7.0, sigmaY: 7.0),
                         child: Image.asset(
                           _crmBackgroundAsset,
                           fit: BoxFit.cover,
@@ -721,7 +853,10 @@ class _CrmEntryCard extends StatelessWidget {
                 child: _SpriteMoldIcon(
                   mold: choice.mold,
                   state: _spriteStateForChoiceTarget(choice.target),
-                  color: _spriteTintForChoiceTarget(choice.target, choice.color),
+                  color: _spriteTintForChoiceTarget(
+                    choice.target,
+                    choice.color,
+                  ),
                   size: 70,
                   semanticLabel: copy.title,
                 ),
@@ -1079,204 +1214,6 @@ class _CrmSectionHeader extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _CrmIconAction extends StatelessWidget {
-  const _CrmIconAction({required this.icon, this.badge});
-
-  final IconData icon;
-  final String? badge;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 52,
-      height: 52,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.70),
-              shape: BoxShape.circle,
-              border: Border.all(color: _lineColor),
-            ),
-            child: Icon(icon, color: _deepTealColor, size: 28),
-          ),
-          if (badge != null)
-            Positioned(
-              top: -4,
-              right: -2,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: const BoxDecoration(
-                  color: _amberColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CrmToolbarGlyph extends StatelessWidget {
-  const _CrmToolbarGlyph({required this.icon, this.badge});
-
-  final IconData icon;
-  final String? badge;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 44,
-      height: 44,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Align(child: Icon(icon, color: _deepTealColor, size: 34)),
-          if (badge != null)
-            Positioned(
-              top: -4,
-              right: -2,
-              child: Container(
-                width: 28,
-                height: 28,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: _amberColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CrmViewerChip extends StatelessWidget {
-  const _CrmViewerChip({
-    required this.viewerProfile,
-    required this.compact,
-    required this.onViewerChanged,
-  });
-
-  final _ViewerAccessProfile viewerProfile;
-  final bool compact;
-  final ValueChanged<_ViewerAccessProfile> onViewerChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _lineColor),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<_ViewerAccessProfile>(
-          value: viewerProfile,
-          borderRadius: BorderRadius.circular(20),
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: viewerProfile.color,
-          ),
-          onChanged: (value) {
-            if (value != null) {
-              onViewerChanged(value);
-            }
-          },
-          selectedItemBuilder: (context) {
-            return _viewerProfiles.map((value) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: value.color,
-                    child: Text(
-                      value.badge,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    compact ? value.name.split(' ').first : value.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ],
-              );
-            }).toList();
-          },
-          items: [
-            for (final value in _viewerProfiles)
-              DropdownMenuItem(
-                value: value,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: value.color,
-                      child: Text(
-                        value.badge,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          value.name,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        Text(
-                          value.label,
-                          style: const TextStyle(
-                            color: _mutedColor,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }

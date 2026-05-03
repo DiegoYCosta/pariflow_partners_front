@@ -7,9 +7,10 @@ void main() {
     await tester.pumpWidget(const PariFlowPartnersApp());
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.text('Empresas'), findsWidgets);
-    expect(find.text('Clientes'), findsWidgets);
-    expect(find.text('Contratos'), findsWidgets);
-    expect(find.text('Teia Visual'), findsOneWidget);
+    expect(find.text('Search people, companies...'), findsOneWidget);
+    expect(find.text('Companies'), findsWidgets);
+    expect(find.text('Clients'), findsWidgets);
+    expect(find.text('Contracts'), findsWidgets);
+    expect(find.text('Visual Network'), findsWidgets);
   });
 }
