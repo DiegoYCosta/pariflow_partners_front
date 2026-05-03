@@ -1754,7 +1754,7 @@ class _RelationalLaneRail extends StatelessWidget {
             Positioned(
               top: top,
               left: 0,
-              right: 10,
+              width: hiddenLanes.contains(lane) ? 96 : 126,
               child: SizedBox(
                 height: hiddenLanes.contains(lane)
                     ? 82
@@ -1807,18 +1807,13 @@ class _RelationalLaneButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
+        hoverColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        splashColor: color.withValues(alpha: 0.10),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
-          decoration: BoxDecoration(
-            color: selected
-                ? color.withValues(alpha: 0.08)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-            border: selected
-                ? Border.all(color: color.withValues(alpha: 0.18))
-                : null,
-          ),
+          padding: EdgeInsets.fromLTRB(0, 0, hidden ? 2 : 6, 0),
+          decoration: const BoxDecoration(color: Colors.transparent),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1830,9 +1825,15 @@ class _RelationalLaneButton extends StatelessWidget {
                     width: 52,
                     height: iconHeight,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: selected && !hidden
+                          ? color.withValues(alpha: 0.07)
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(hidden ? 13 : 16),
-                      border: Border.all(color: color.withValues(alpha: 0.36)),
+                      border: Border.all(
+                        color: color.withValues(
+                          alpha: selected && !hidden ? 0.72 : 0.36,
+                        ),
+                      ),
                     ),
                     child: Center(
                       child: Text(
