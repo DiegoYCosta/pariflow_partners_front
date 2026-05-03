@@ -907,62 +907,69 @@ class _CrmDashboardQuote extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 860) {
-          return Text(
-            '" Clarity drives better decisions. Insight builds stronger partnerships. "',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: _deepTealColor,
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w500,
+          return Padding(
+            padding: const EdgeInsets.only(top: 40),
+            child: Text(
+              '" Clarity drives better decisions. Insight builds stronger partnerships. "',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: _deepTealColor,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           );
         }
 
-        return Row(
-          children: [
-            const Expanded(child: Divider(indent: 120)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '"',
-                    style: TextStyle(
-                      color: _amberColor,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: min(constraints.maxWidth * 0.56, 560.0),
-                    ),
-                    child: Text(
-                      'Clarity drives better decisions. Insight builds stronger partnerships.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: _deepTealColor,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w500,
+        return Padding(
+          padding: const EdgeInsets.only(top: 40),
+          child: Row(
+            children: [
+              const Expanded(child: Divider(indent: 120)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '"',
+                      style: TextStyle(
+                        color: _amberColor,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    '"',
-                    style: TextStyle(
-                      color: _amberColor,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(width: 12),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: min(constraints.maxWidth * 0.56, 560.0),
+                      ),
+                      child: Text(
+                        'Clarity drives better decisions. Insight builds stronger partnerships.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: _deepTealColor,
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    const Text(
+                      '"',
+                      style: TextStyle(
+                        color: _amberColor,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Expanded(child: Divider(endIndent: 120)),
-          ],
+              const Expanded(child: Divider(endIndent: 120)),
+            ],
+          ),
         );
       },
     );
