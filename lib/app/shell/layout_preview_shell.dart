@@ -147,6 +147,8 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   }
 
   Widget _buildCrmShell(_PageInfo page, double width, bool showSidebar) {
+    final sidebarWidth = width >= 1500 ? 332.0 : 292.0;
+
     return Scaffold(
       drawer: showSidebar
           ? null
@@ -191,7 +193,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
           children: [
             if (showSidebar)
               Container(
-                width: 332,
+                width: sidebarWidth,
                 color: _deepTealColor,
                 child: _CrmSidebar(
                   current: _destination,
@@ -223,10 +225,10 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                         Expanded(
                           child: SingleChildScrollView(
                             padding: EdgeInsets.fromLTRB(
-                              showSidebar ? 32 : 18,
-                              28,
-                              showSidebar ? 32 : 18,
-                              showSidebar ? 32 : 104,
+                              showSidebar ? 28 : 16,
+                              _destination == _Destination.home ? 16 : 24,
+                              showSidebar ? 28 : 16,
+                              showSidebar ? 24 : 96,
                             ),
                             child: Align(
                               alignment: Alignment.topCenter,

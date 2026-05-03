@@ -33,7 +33,7 @@ class _CrmTopBar extends StatelessWidget {
             : min(220.0, constraints.maxWidth * 0.38);
 
         return Container(
-          height: 58,
+          height: 54,
           padding: EdgeInsets.symmetric(
             horizontal: constraints.maxWidth >= 980 ? 24 : 14,
           ),
@@ -358,22 +358,23 @@ class _CrmSidebar extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.asset(_crmLogoAsset, width: 210, fit: BoxFit.contain),
-            const SizedBox(height: 26),
+            Image.asset(_crmLogoAsset, width: 198, fit: BoxFit.contain),
+            const SizedBox(height: 20),
             Container(
               width: double.infinity,
               height: 1,
               color: Colors.white.withValues(alpha: 0.10),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 22),
             Expanded(
               child: ListView.separated(
+                padding: EdgeInsets.zero,
                 itemCount: _pageInfo.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 14),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final item = _pageInfo.values.elementAt(index);
                   return _CrmSidebarNavItem(
@@ -389,11 +390,11 @@ class _CrmSidebar extends StatelessWidget {
               height: 1,
               color: Colors.white.withValues(alpha: 0.10),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Row(
               children: [
                 CircleAvatar(
-                  radius: 24,
+                  radius: 22,
                   backgroundColor: Colors.white.withValues(alpha: 0.10),
                   child: Text(
                     viewerProfile.badge,
@@ -403,7 +404,7 @@ class _CrmSidebar extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,17 +416,17 @@ class _CrmSidebar extends StatelessWidget {
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
-                          fontSize: 18,
+                          fontSize: 16,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         viewerProfile.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFFC7D5D0),
-                          fontSize: 14,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -463,12 +464,12 @@ class _CrmDashboardContent extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardsPerRow = constraints.maxWidth >= 1380
+        final cardsPerRow = constraints.maxWidth >= 1000
             ? 4
-            : constraints.maxWidth >= 800
+            : constraints.maxWidth >= 620
             ? 2
             : 1;
-        const spacing = 22.0;
+        const spacing = 20.0;
         final cardWidth = cardsPerRow == 1
             ? double.infinity
             : (constraints.maxWidth - (spacing * (cardsPerRow - 1))) /
@@ -478,7 +479,7 @@ class _CrmDashboardContent extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _CrmDashboardHero(),
-            const SizedBox(height: 40),
+            const SizedBox(height: 22),
             Wrap(
               spacing: spacing,
               runSpacing: spacing,
@@ -493,7 +494,7 @@ class _CrmDashboardContent extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 18),
             const _CrmDashboardQuote(),
           ],
         );
@@ -510,273 +511,268 @@ class _CrmDashboardHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final stacked = constraints.maxWidth < 980;
-        final headlineSize = stacked ? 44.0 : 60.0;
+        final headlineSize = stacked ? 38.0 : 48.0;
         final headlineColor = stacked ? _deepTealColor : Colors.white;
         final headlineAccentColor = stacked
             ? const Color(0xFFC8891F)
             : const Color(0xFFE5A64C);
-        final chipColor = stacked ? _deepTealColor : Colors.white;
-        final chipBackground = stacked
-            ? Colors.white.withValues(alpha: 0.78)
-            : Colors.white.withValues(alpha: 0.14);
         final accentBarColor = stacked
             ? const Color(0xFFC8891F)
             : const Color(0xFFE5A64C);
         final mobileFeatureWidth = min(constraints.maxWidth * 0.84, 360.0);
 
-        return Container(
-          width: double.infinity,
-          height: stacked ? 600 : 418,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(40),
-            boxShadow: [
-              BoxShadow(
-                color: _deepTealColor.withValues(alpha: 0.16),
-                blurRadius: 36,
-                offset: const Offset(0, 18),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(40),
-            child: Stack(
-              children: [
-                if (stacked) ...[
-                  Positioned.fill(
-                    child: Image.asset(
-                      _crmBannerMobileAsset,
-                      fit: BoxFit.cover,
-                      alignment: const Alignment(0.56, 0.58),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: Opacity(
-                      opacity: 0.56,
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 7.0, sigmaY: 7.0),
-                        child: Image.asset(
-                          _crmBackgroundAsset,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.center,
-                        ),
+        return Semantics(
+          label: _ShellVariant.crm.label,
+          child: Container(
+            width: double.infinity,
+            height: stacked ? 520 : 320,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: _deepTealColor.withValues(alpha: 0.16),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Stack(
+                children: [
+                  if (stacked) ...[
+                    Positioned.fill(
+                      child: Image.asset(
+                        _crmBannerMobileAsset,
+                        fit: BoxFit.cover,
+                        alignment: const Alignment(0.56, 0.58),
                       ),
                     ),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xF7FFF8F0),
-                            const Color(0xE8F8F0DF),
-                            const Color(0xD8F1E6CF),
-                            const Color(0xA8D0C7A7),
-                          ],
-                          stops: const [0.0, 0.32, 0.72, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: const Alignment(0.80, -0.08),
-                          radius: 0.94,
-                          colors: [
-                            const Color(0x56A7AE74),
-                            const Color(0x18A7AE74),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.34, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: -6,
-                    bottom: 10,
-                    width: mobileFeatureWidth,
-                    height: 324,
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(34),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _deepTealColor.withValues(alpha: 0.14),
-                              blurRadius: 28,
-                              offset: const Offset(0, 20),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.30),
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: 0.56,
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: 7.0,
+                            sigmaY: 7.0,
+                          ),
+                          child: Image.asset(
+                            _crmBackgroundAsset,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
                           ),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(34),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ImageFiltered(
-                                imageFilter: ImageFilter.blur(
-                                  sigmaX: 1.2,
-                                  sigmaY: 1.2,
-                                ),
-                                child: Image.asset(
-                                  _crmBannerWebAsset,
-                                  fit: BoxFit.cover,
-                                  alignment: const Alignment(0.74, 0.50),
-                                ),
-                              ),
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        const Color(0xA8F0DFC0),
-                                        const Color(0x72E2D4B1),
-                                        const Color(0x82C7C08F),
-                                      ],
-                                      stops: const [0.0, 0.54, 1.0],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: RadialGradient(
-                                      center: const Alignment(0.84, 0.18),
-                                      radius: 0.90,
-                                      colors: [
-                                        const Color(0x42A5AE76),
-                                        const Color(0x14A5AE76),
-                                        Colors.transparent,
-                                      ],
-                                      stops: const [0.0, 0.34, 1.0],
-                                    ),
-                                  ),
-                                ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xF7FFF8F0),
+                              const Color(0xE8F8F0DF),
+                              const Color(0xD8F1E6CF),
+                              const Color(0xA8D0C7A7),
+                            ],
+                            stops: const [0.0, 0.32, 0.72, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: const Alignment(0.80, -0.08),
+                            radius: 0.94,
+                            colors: [
+                              const Color(0x56A7AE74),
+                              const Color(0x18A7AE74),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.34, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: -6,
+                      bottom: 8,
+                      width: mobileFeatureWidth,
+                      height: 280,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(34),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _deepTealColor.withValues(alpha: 0.14),
+                                blurRadius: 28,
+                                offset: const Offset(0, 20),
                               ),
                             ],
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.30),
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(34),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                ImageFiltered(
+                                  imageFilter: ImageFilter.blur(
+                                    sigmaX: 1.2,
+                                    sigmaY: 1.2,
+                                  ),
+                                  child: Image.asset(
+                                    _crmBannerWebAsset,
+                                    fit: BoxFit.cover,
+                                    alignment: const Alignment(0.74, 0.50),
+                                  ),
+                                ),
+                                Positioned.fill(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          const Color(0xA8F0DFC0),
+                                          const Color(0x72E2D4B1),
+                                          const Color(0x82C7C08F),
+                                        ],
+                                        stops: const [0.0, 0.54, 1.0],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned.fill(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: RadialGradient(
+                                        center: const Alignment(0.84, 0.18),
+                                        radius: 0.90,
+                                        colors: [
+                                          const Color(0x42A5AE76),
+                                          const Color(0x14A5AE76),
+                                          Colors.transparent,
+                                        ],
+                                        stops: const [0.0, 0.34, 1.0],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ] else ...[
-                  Positioned.fill(
-                    child: Image.asset(
-                      _crmBannerWebAsset,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.centerRight,
+                  ] else ...[
+                    Positioned.fill(
+                      child: Image.asset(
+                        _crmBannerWebAsset,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.centerRight,
+                      ),
                     ),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xF205262B),
-                            const Color(0xE2124B4E),
-                            const Color(0xB3124B4E),
-                            const Color(0x5C124B4E),
-                          ],
-                          stops: const [0.0, 0.34, 0.70, 1.0],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xF205262B),
+                              const Color(0xE2124B4E),
+                              const Color(0xB3124B4E),
+                              const Color(0x5C124B4E),
+                            ],
+                            stops: const [0.0, 0.34, 0.70, 1.0],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: -8,
-                    height: 152,
-                    child: Opacity(
-                      opacity: 0.92,
-                      child: HighTechLightWaves(
-                        primaryColor: const Color(0xFF63E6E2),
-                        accentColor: const Color(0xFFE4A23B),
-                        numberOfWaves: 6,
-                        waveAmplitude: 0.108,
-                        waveFrequency: 0.038,
-                        waveSpeed: 0.0054,
-                        pulseSpeedMultiplier: 1.55,
-                        pulseSize: 6.8,
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: -8,
+                      height: 118,
+                      child: Opacity(
+                        opacity: 0.92,
+                        child: HighTechLightWaves(
+                          primaryColor: const Color(0xFF63E6E2),
+                          accentColor: const Color(0xFFE4A23B),
+                          numberOfWaves: 6,
+                          waveAmplitude: 0.108,
+                          waveFrequency: 0.038,
+                          waveSpeed: 0.0054,
+                          pulseSpeedMultiplier: 1.55,
+                          pulseSize: 6.8,
+                        ),
+                      ),
+                    ),
+                  ],
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Padding(
+                        padding: EdgeInsets.all(stacked ? 24 : 38),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: stacked
+                                  ? constraints.maxWidth
+                                  : min(constraints.maxWidth * 0.58, 760.0),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      color: headlineColor,
+                                      fontSize: headlineSize,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: -1.4,
+                                      height: 0.98,
+                                    ),
+                                    children: [
+                                      const TextSpan(
+                                        text: 'O que voce gostaria de\n',
+                                      ),
+                                      TextSpan(
+                                        text: 'consultar hoje?',
+                                        style: TextStyle(
+                                          color: headlineAccentColor,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  width: 74,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: accentBarColor,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Padding(
-                      padding: EdgeInsets.all(stacked ? 28 : 42),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: stacked
-                                ? constraints.maxWidth
-                                : min(constraints.maxWidth * 0.58, 760.0),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _Tag(
-                                label: _ShellVariant.crm.label,
-                                icon: Icons.auto_awesome_mosaic_outlined,
-                                color: chipColor,
-                                background: chipBackground,
-                              ),
-                              const SizedBox(height: 18),
-                              RichText(
-                                text: TextSpan(
-                                  style: TextStyle(
-                                    color: headlineColor,
-                                    fontSize: headlineSize,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: -2.4,
-                                    height: 0.98,
-                                  ),
-                                  children: [
-                                    const TextSpan(
-                                      text: 'O que voce gostaria de\n',
-                                    ),
-                                    TextSpan(
-                                      text: 'consultar hoje?',
-                                      style: TextStyle(
-                                        color: headlineAccentColor,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              Container(
-                                width: 92,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: accentBarColor,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -818,18 +814,18 @@ class _CrmEntryCard extends StatelessWidget {
     };
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(26),
       child: Ink(
-        padding: const EdgeInsets.fromLTRB(28, 34, 28, 28),
+        padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(26),
           border: Border.all(color: const Color(0xFFE8ECEB)),
           boxShadow: [
             BoxShadow(
               color: _deepTealColor.withValues(alpha: 0.07),
-              blurRadius: 34,
-              offset: const Offset(0, 16),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -837,8 +833,8 @@ class _CrmEntryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 122,
-              height: 122,
+              width: 104,
+              height: 104,
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   colors: [
@@ -857,35 +853,36 @@ class _CrmEntryCard extends StatelessWidget {
                     choice.target,
                     choice.color,
                   ),
-                  size: 70,
+                  size: 58,
                   semanticLabel: copy.title,
                 ),
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
             Text(
               copy.title,
               textAlign: TextAlign.center,
               style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 26,
+                fontSize: 23,
                 color: _deepTealColor,
                 fontWeight: FontWeight.w500,
                 letterSpacing: -1.1,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               copy.subtitle,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: _mutedColor,
-                height: 1.45,
+                fontSize: 14,
+                height: 1.35,
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             Container(
-              width: 58,
-              height: 58,
+              width: 50,
+              height: 50,
               decoration: const BoxDecoration(
                 color: _amberColor,
                 shape: BoxShape.circle,
@@ -1033,7 +1030,7 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
             onTap: widget.onTap,
             borderRadius: BorderRadius.circular(26),
             child: Ink(
-              padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               decoration: BoxDecoration(
                 gradient: selected
                     ? const LinearGradient(
@@ -1102,7 +1099,7 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
                         color: selected ? null : const Color(0xFFDCE9E3),
                         size: 34,
                       ),
-                      const SizedBox(width: 18),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 180),
@@ -1111,10 +1108,10 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                             fontSize: selected
-                                ? 18
+                                ? 17
                                 : _hovered
-                                ? 17.5
-                                : 17,
+                                ? 16.5
+                                : 16,
                             letterSpacing: -0.2,
                           ),
                           child: Text(widget.item.shortLabel),
