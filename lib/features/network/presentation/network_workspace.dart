@@ -214,312 +214,121 @@ class _RelationalNetworkWorkspaceBodyState
   Widget build(BuildContext context) {
     final view = _filteredView();
     final selectedNode = view.selectedNodeFor(widget.selectedNodeId);
-    final legendEntries = _payload.legend.relationshipStates;
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final workspaceHeight = max(760.0, viewportHeight - 54);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 1340;
-        final graphWidth = wide
-            ? constraints.maxWidth - 448
-            : constraints.maxWidth;
+        final wide = constraints.maxWidth >= 1180;
         final graphSection = _buildGraphSection(
           context,
-          graphWidth: graphWidth,
+          compact: !wide,
           view: view,
           selectedNode: selectedNode,
         );
         final detailPanel = _buildDetailPanel(
           context,
           selectedNode: selectedNode,
-          visibleNodes: view.nodes,
         );
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Panel(
-              padding: const EdgeInsets.fromLTRB(28, 26, 28, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    runSpacing: 18,
-                    spacing: 18,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: _tealColor.withValues(alpha: 0.10),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.hub_outlined,
-                              size: 38,
-                              color: _tealColor,
-                            ),
-                          ),
-                          const SizedBox(width: 18),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+        return SizedBox(
+          height: workspaceHeight,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(color: Colors.white),
+            child: Column(
+              children: [
+                _RelationalNetworkHeader(
+                  searchController: _searchController,
+                  zoom: _zoom,
+                  periodPresets: _payload.filters.available.periodPresets,
+                  selectedPeriodPreset: _periodPreset,
+                  showFilters: _showFilters,
+                  onSearchChanged: () => setState(() {}),
+                  onClearSearch: () {
+                    setState(() {
+                      _searchController.clear();
+                    });
+                  },
+                  onZoomOut: () => _adjustZoom(-0.05),
+                  onZoomIn: () => _adjustZoom(0.05),
+                  onResetViewport: _resetViewport,
+                  onPeriodChanged: _setPeriodPreset,
+                  onToggleFilters: () {
+                    setState(() {
+                      _showFilters = !_showFilters;
+                    });
+                  },
+                ),
+                AnimatedCrossFade(
+                  duration: const Duration(milliseconds: 220),
+                  crossFadeState: _showFilters
+                      ? CrossFadeState.showFirst
+                      : CrossFadeState.showSecond,
+                  firstChild: Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 18, 28, 0),
+                    child: _RelationalFilterPanel(
+                      payload: _payload,
+                      selectedRootIds: _selectedRootIds,
+                      selectedClientIds: _selectedClientIds,
+                      contractStatuses: _contractStatuses,
+                      employeeStatuses: _employeeStatuses,
+                      includeHistorical: _includeHistorical,
+                      includeIndirect: _includeIndirect,
+                      onToggleRoot: (publicId) {
+                        setState(() {
+                          _toggleInSet(_selectedRootIds, publicId);
+                        });
+                      },
+                      onToggleClient: (publicId) {
+                        setState(() {
+                          _toggleInSet(_selectedClientIds, publicId);
+                        });
+                      },
+                      onToggleContractStatus: (value) {
+                        setState(() {
+                          _toggleInSet(_contractStatuses, value);
+                        });
+                      },
+                      onToggleEmployeeStatus: (value) {
+                        setState(() {
+                          _toggleInSet(_employeeStatuses, value);
+                        });
+                      },
+                      onToggleHistorical: (value) {
+                        setState(() {
+                          _includeHistorical = value;
+                        });
+                      },
+                      onToggleIndirect: (value) {
+                        setState(() {
+                          _includeIndirect = value;
+                        });
+                      },
+                      onRestore: _restoreFilters,
+                    ),
+                  ),
+                  secondChild: const SizedBox.shrink(),
+                ),
+                Expanded(
+                  child: wide
+                      ? Row(
+                          children: [
+                            Expanded(child: graphSection),
+                            SizedBox(width: 424, child: detailPanel),
+                          ],
+                        )
+                      : SingleChildScrollView(
+                          child: Column(
                             children: [
-                              Text(
-                                'Visual Network',
-                                style: Theme.of(context).textTheme.displaySmall
-                                    ?.copyWith(
-                                      fontSize: 34,
-                                      letterSpacing: -1.4,
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Business Overview',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(
-                                      color: _mutedColor,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                              ),
+                              SizedBox(height: 720, child: graphSection),
+                              detailPanel,
                             ],
                           ),
-                        ],
-                      ),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _RelationalControlCard(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _RelationalIconButton(
-                                  icon: Icons.remove_rounded,
-                                  onTap: () => _adjustZoom(-0.05),
-                                ),
-                                SizedBox(
-                                  width: 86,
-                                  child: Center(
-                                    child: Text(
-                                      '${(_zoom * 100).round()}%',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleLarge,
-                                    ),
-                                  ),
-                                ),
-                                _RelationalIconButton(
-                                  icon: Icons.add_rounded,
-                                  onTap: () => _adjustZoom(0.05),
-                                ),
-                                const SizedBox(width: 6),
-                                _RelationalIconButton(
-                                  icon: Icons.fit_screen_outlined,
-                                  onTap: _resetViewport,
-                                ),
-                              ],
-                            ),
-                          ),
-                          _RelationalControlCard(
-                            width: 540,
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.search_rounded,
-                                  color: _slateColor,
-                                  size: 28,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    onChanged: (_) => setState(() {}),
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText:
-                                          'Search companies, contracts, employees...',
-                                      isCollapsed: true,
-                                    ),
-                                  ),
-                                ),
-                                if (_searchController.text.isNotEmpty)
-                                  IconButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _searchController.clear();
-                                      });
-                                    },
-                                    icon: const Icon(Icons.close_rounded),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          _RelationalControlCard(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Period:',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                const SizedBox(width: 12),
-                                for (final preset
-                                    in _payload.filters.available.periodPresets)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: _RelationalPeriodChip(
-                                      label: preset,
-                                      selected: preset == _periodPreset,
-                                      onTap: () => _setPeriodPreset(preset),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          _RelationalControlCard(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(22),
-                              onTap: () {
-                                setState(() {
-                                  _showFilters = !_showFilters;
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 16,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.filter_alt_outlined,
-                                      color: _inkColor,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Filters',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleMedium,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 220),
-                    crossFadeState: _showFilters
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
-                    firstChild: Padding(
-                      padding: const EdgeInsets.only(top: 24),
-                      child: _RelationalFilterPanel(
-                        payload: _payload,
-                        selectedRootIds: _selectedRootIds,
-                        selectedClientIds: _selectedClientIds,
-                        contractStatuses: _contractStatuses,
-                        employeeStatuses: _employeeStatuses,
-                        includeHistorical: _includeHistorical,
-                        includeIndirect: _includeIndirect,
-                        onToggleRoot: (publicId) {
-                          setState(() {
-                            _toggleInSet(_selectedRootIds, publicId);
-                          });
-                        },
-                        onToggleClient: (publicId) {
-                          setState(() {
-                            _toggleInSet(_selectedClientIds, publicId);
-                          });
-                        },
-                        onToggleContractStatus: (value) {
-                          setState(() {
-                            _toggleInSet(_contractStatuses, value);
-                          });
-                        },
-                        onToggleEmployeeStatus: (value) {
-                          setState(() {
-                            _toggleInSet(_employeeStatuses, value);
-                          });
-                        },
-                        onToggleHistorical: (value) {
-                          setState(() {
-                            _includeHistorical = value;
-                          });
-                        },
-                        onToggleIndirect: (value) {
-                          setState(() {
-                            _includeIndirect = value;
-                          });
-                        },
-                        onRestore: _restoreFilters,
-                      ),
-                    ),
-                    secondChild: const SizedBox.shrink(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (wide)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: graphSection),
-                  const SizedBox(width: 24),
-                  SizedBox(width: 424, child: detailPanel),
-                ],
-              )
-            else
-              Column(
-                children: [
-                  graphSection,
-                  const SizedBox(height: 24),
-                  detailPanel,
-                ],
-              ),
-            const SizedBox(height: 18),
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    for (final entry in legendEntries)
-                      _Tag(
-                        label: entry.label,
-                        icon: _legendIconForState(entry.value),
-                        color: _edgeColorForState(entry.value),
-                        background: _edgeColorForState(
-                          entry.value,
-                        ).withValues(alpha: 0.12),
-                      ),
-                  ],
-                ),
-                TextButton.icon(
-                  onPressed: widget.onAction,
-                  icon: const Icon(Icons.reply_rounded),
-                  label: Text(widget.actionLabel),
+                        ),
                 ),
               ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -527,144 +336,138 @@ class _RelationalNetworkWorkspaceBodyState
 
   Widget _buildGraphSection(
     BuildContext context, {
-    required double graphWidth,
+    required bool compact,
     required _RelationalNetworkView view,
     required _NetworkGraphNode? selectedNode,
   }) {
-    return _Panel(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (view.nodes.isEmpty) {
-            return SizedBox(
-              height: 460,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.filter_alt_off_outlined,
-                      size: 44,
-                      color: _slateColor,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (view.nodes.isEmpty) {
+          return SizedBox(
+            height: max(460, constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.filter_alt_off_outlined,
+                    size: 44,
+                    color: _slateColor,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Nenhum no ficou visivel com esse recorte.',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Revise a busca ou restaure os filtros para voltar ao layout completo.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton.tonalIcon(
+                    onPressed: _restoreFilters,
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Restaurar filtros'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final compactCanvas = compact || constraints.maxWidth < 980;
+        const legendHeight = 62.0;
+        final canvasAreaHeight = max(
+          520.0,
+          constraints.maxHeight - legendHeight,
+        );
+        final cardWidth = compactCanvas ? 176.0 : 216.0;
+        final cardHeight = compactCanvas ? 86.0 : 92.0;
+        final laneSpacing = max(
+          136.0,
+          min(184.0, (canvasAreaHeight - 44 - cardHeight - 42) / 3),
+        );
+        final layout = _RelationalCanvasLayout.compute(
+          canvasWidth: max(constraints.maxWidth, 760),
+          laneRailWidth: compactCanvas ? 118 : 146,
+          topPadding: 34,
+          laneSpacing: laneSpacing,
+          horizontalPadding: compactCanvas ? 18 : 26,
+          cardWidth: cardWidth,
+          cardHeight: cardHeight,
+          payload: _payload,
+          nodes: view.nodes,
+        );
+
+        final connectedIds = selectedNode == null
+            ? <String>{}
+            : {
+                selectedNode.publicId,
+                for (final edge in view.edges)
+                  if (edge.fromPublicId == selectedNode.publicId ||
+                      edge.toPublicId == selectedNode.publicId) ...{
+                    edge.fromPublicId,
+                    edge.toPublicId,
+                  },
+              };
+        final scaledHeight = canvasAreaHeight;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: legendHeight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(28, 18, 28, 0),
+                child: Row(
+                  children: const [
+                    _RelationalLegendItem(
+                      color: _tealColor,
+                      label: 'Active Relationship',
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Nenhum no ficou visivel com esse recorte.',
-                      style: Theme.of(context).textTheme.titleLarge,
+                    SizedBox(width: 42),
+                    _RelationalLegendItem(
+                      color: _amberColor,
+                      label: 'Historical Relationship',
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Revise a busca ou restaure os filtros para voltar ao layout completo.',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton.tonalIcon(
-                      onPressed: _restoreFilters,
-                      icon: const Icon(Icons.restart_alt_rounded),
-                      label: const Text('Restaurar filtros'),
+                    SizedBox(width: 42),
+                    _RelationalLegendItem(
+                      color: Color(0xFF8C8C92),
+                      label: 'Indirect Relationship',
+                      dashed: true,
                     ),
                   ],
                 ),
               ),
-            );
-          }
-
-          final cardWidth = constraints.maxWidth >= 980 ? 228.0 : 176.0;
-          final cardHeight = constraints.maxWidth >= 980 ? 120.0 : 104.0;
-          final layout = _RelationalCanvasLayout.compute(
-            canvasWidth: max(constraints.maxWidth - 16, 760),
-            laneRailWidth: constraints.maxWidth >= 980 ? 156 : 122,
-            topPadding: 44,
-            laneSpacing: constraints.maxWidth >= 980 ? 214 : 188,
-            horizontalPadding: constraints.maxWidth >= 980 ? 26 : 18,
-            cardWidth: cardWidth,
-            cardHeight: cardHeight,
-            payload: _payload,
-            nodes: view.nodes,
-          );
-
-          final connectedIds = selectedNode == null
-              ? <String>{}
-              : {
-                  selectedNode.publicId,
-                  for (final edge in view.edges)
-                    if (edge.fromPublicId == selectedNode.publicId ||
-                        edge.toPublicId == selectedNode.publicId) ...{
-                      edge.fromPublicId,
-                      edge.toPublicId,
-                    },
-                };
-          final scaledHeight = layout.canvasHeight * max(_zoom, 1.0);
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
+            ),
+            SizedBox(
+              height: scaledHeight,
+              child: Stack(
                 children: [
-                  _Tag(
-                    label: '${view.nodes.length} nos visiveis',
-                    icon: Icons.device_hub_outlined,
-                    color: _tealColor,
-                    background: _tealColor.withValues(alpha: 0.12),
-                  ),
-                  _Tag(
-                    label: '${view.edges.length} relacoes ativas no recorte',
-                    icon: Icons.route_outlined,
-                    color: _slateColor,
-                    background: _slateColor.withValues(alpha: 0.12),
-                  ),
-                  if (_searchController.text.isNotEmpty)
-                    _Tag(
-                      label: 'busca: ${_searchController.text}',
-                      icon: Icons.search_rounded,
-                      color: _amberColor,
-                      background: _amberColor.withValues(alpha: 0.12),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                height: scaledHeight,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: layout.laneRailWidth,
-                            child: _RelationalLaneRail(
-                              laneTops: layout.laneTops,
-                              cardHeight: layout.cardHeight,
-                            ),
+                  Positioned.fill(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: layout.laneRailWidth,
+                          child: _RelationalLaneRail(
+                            laneTops: layout.laneTops,
+                            cardHeight: layout.cardHeight,
                           ),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: Stack(
-                                children: [
-                                  Positioned.fill(
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(28),
-                                        gradient: RadialGradient(
-                                          center: const Alignment(-0.24, -0.72),
-                                          radius: 1.18,
-                                          colors: [
-                                            _tealColor.withValues(alpha: 0.06),
-                                            Colors.transparent,
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned.fill(
+                        ),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.zero,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: ColoredBox(color: Colors.white),
+                                ),
+                                Positioned.fill(
+                                  child: ClipRect(
                                     child: Transform.scale(
                                       scale: _zoom,
                                       alignment: Alignment.topCenter,
@@ -721,39 +524,38 @@ class _RelationalNetworkWorkspaceBodyState
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    Positioned(
-                      left: layout.laneRailWidth + 18,
-                      bottom: 18,
-                      child: _RelationalViewportDock(
-                        onCenterTap: () {
-                          if (selectedNode != null) {
-                            widget.onSelectNode(selectedNode.publicId);
-                          }
-                        },
-                        onResetTap: _resetViewport,
-                      ),
+                  ),
+                  Positioned(
+                    left: layout.laneRailWidth + 18,
+                    bottom: 18,
+                    child: _RelationalViewportDock(
+                      onCenterTap: () {
+                        if (selectedNode != null) {
+                          widget.onSelectNode(selectedNode.publicId);
+                        }
+                      },
+                      onResetTap: _resetViewport,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          );
-        },
-      ),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildDetailPanel(
     BuildContext context, {
     required _NetworkGraphNode? selectedNode,
-    required List<_NetworkGraphNode> visibleNodes,
   }) {
     if (!_showDetailPanel) {
       return _Panel(
@@ -815,7 +617,6 @@ class _RelationalNetworkWorkspaceBodyState
 
     return _RelationalNetworkDetailPanel(
       node: selectedNode,
-      payload: _payload,
       onClose: () {
         setState(() {
           _showDetailPanel = false;
@@ -823,7 +624,6 @@ class _RelationalNetworkWorkspaceBodyState
       },
       onSelectNode: widget.onSelectNode,
       onOpenEmployeeProfile: widget.onOpenEmployeeProfile,
-      visibleNodes: visibleNodes,
     );
   }
 
@@ -1045,6 +845,330 @@ class _RelationalCanvasLayout {
   }
 }
 
+class _RelationalNetworkHeader extends StatelessWidget {
+  const _RelationalNetworkHeader({
+    required this.searchController,
+    required this.zoom,
+    required this.periodPresets,
+    required this.selectedPeriodPreset,
+    required this.showFilters,
+    required this.onSearchChanged,
+    required this.onClearSearch,
+    required this.onZoomOut,
+    required this.onZoomIn,
+    required this.onResetViewport,
+    required this.onPeriodChanged,
+    required this.onToggleFilters,
+  });
+
+  final TextEditingController searchController;
+  final double zoom;
+  final List<String> periodPresets;
+  final String selectedPeriodPreset;
+  final bool showFilters;
+  final VoidCallback onSearchChanged;
+  final VoidCallback onClearSearch;
+  final VoidCallback onZoomOut;
+  final VoidCallback onZoomIn;
+  final VoidCallback onResetViewport;
+  final ValueChanged<String> onPeriodChanged;
+  final VoidCallback onToggleFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 104,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE9E6DF))),
+      ),
+      child: Row(
+        children: [
+          const _RelationalNetworkMark(),
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 270,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Relational Network',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontSize: 26,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Business Overview',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: _mutedColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _RelationalControlCard(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _RelationalIconButton(
+                            icon: Icons.remove_rounded,
+                            onTap: onZoomOut,
+                          ),
+                          SizedBox(
+                            width: 88,
+                            child: Center(
+                              child: Text(
+                                '${(zoom * 100).round()}%',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(color: _mutedColor),
+                              ),
+                            ),
+                          ),
+                          _RelationalIconButton(
+                            icon: Icons.add_rounded,
+                            onTap: onZoomIn,
+                          ),
+                          Container(width: 1, height: 44, color: _lineColor),
+                          _RelationalIconButton(
+                            icon: Icons.fit_screen_outlined,
+                            onTap: onResetViewport,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 22),
+                    _RelationalControlCard(
+                      width: 410,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.search_rounded,
+                              color: _slateColor,
+                              size: 25,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: searchController,
+                                onChanged: (_) => onSearchChanged(),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText:
+                                      'Search companies, contracts, employees...',
+                                  isCollapsed: true,
+                                ),
+                              ),
+                            ),
+                            if (searchController.text.isNotEmpty)
+                              IconButton(
+                                onPressed: onClearSearch,
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 22),
+                    Text(
+                      'Period:',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: _mutedColor),
+                    ),
+                    const SizedBox(width: 12),
+                    _RelationalControlCard(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final preset in periodPresets)
+                            _RelationalPeriodChip(
+                              label: preset,
+                              selected: preset == selectedPeriodPreset,
+                              onTap: () => onPeriodChanged(preset),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 22),
+                    _RelationalControlCard(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: onToggleFilters,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 17,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                showFilters
+                                    ? Icons.filter_alt_rounded
+                                    : Icons.filter_alt_outlined,
+                                color: _inkColor,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Filters',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RelationalNetworkMark extends StatelessWidget {
+  const _RelationalNetworkMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: CustomPaint(painter: _RelationalNetworkMarkPainter()),
+    );
+  }
+}
+
+class _RelationalNetworkMarkPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _tealColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    final points = [
+      Offset(size.width * 0.50, size.height * 0.08),
+      Offset(size.width * 0.88, size.height * 0.50),
+      Offset(size.width * 0.50, size.height * 0.92),
+      Offset(size.width * 0.12, size.height * 0.50),
+    ];
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+    for (final point in points) {
+      canvas.drawCircle(point, 5, Paint()..color = Colors.white);
+      canvas.drawCircle(point, 5, paint);
+    }
+    canvas.drawCircle(
+      Offset(size.width * 0.50, size.height * 0.50),
+      5,
+      Paint()..color = _tealColor,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _RelationalLegendItem extends StatelessWidget {
+  const _RelationalLegendItem({
+    required this.color,
+    required this.label,
+    this.dashed = false,
+  });
+
+  final Color color;
+  final String label;
+  final bool dashed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 40,
+          height: 12,
+          child: CustomPaint(
+            painter: _RelationalLegendLinePainter(color: color, dashed: dashed),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: _mutedColor,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RelationalLegendLinePainter extends CustomPainter {
+  const _RelationalLegendLinePainter({
+    required this.color,
+    required this.dashed,
+  });
+
+  final Color color;
+  final bool dashed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round;
+    if (!dashed) {
+      canvas.drawLine(
+        Offset(0, size.height / 2),
+        Offset(size.width, size.height / 2),
+        paint,
+      );
+      return;
+    }
+    var x = 0.0;
+    while (x < size.width) {
+      canvas.drawLine(
+        Offset(x, size.height / 2),
+        Offset(min(x + 8, size.width), size.height / 2),
+        paint,
+      );
+      x += 14;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RelationalLegendLinePainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.dashed != dashed;
+  }
+}
+
 class _RelationalControlCard extends StatelessWidget {
   const _RelationalControlCard({required this.child, this.width});
 
@@ -1058,13 +1182,13 @@ class _RelationalControlCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _lineColor),
         boxShadow: [
           BoxShadow(
             color: _deepTealColor.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1083,10 +1207,10 @@ class _RelationalIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Icon(icon, color: _inkColor, size: 28),
+        padding: const EdgeInsets.all(14),
+        child: Icon(icon, color: _inkColor, size: 24),
       ),
     );
   }
@@ -1110,7 +1234,7 @@ class _RelationalPeriodChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
         decoration: BoxDecoration(
           color: selected ? _tealColor : Colors.transparent,
           borderRadius: BorderRadius.circular(18),
@@ -1415,18 +1539,18 @@ class _RelationalNetworkNodeCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(14),
       child: Ink(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: emphasis, width: selected ? 2.2 : 1.0),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: emphasis, width: selected ? 2.0 : 1.0),
           boxShadow: [
             BoxShadow(
               color: shadowColor,
-              blurRadius: selected ? 26 : 20,
-              offset: const Offset(0, 10),
+              blurRadius: selected ? 22 : 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -1444,31 +1568,19 @@ class _RelationalNetworkNodeCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontSize: node.lane == _NetworkGraphLane.employee
-                          ? 18
-                          : 17,
+                          ? 16
+                          : 15,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     node.subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(
                       context,
-                    ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
+                    ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
                   ),
-                  if (node.badges.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      node.badges.first,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: laneColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -1489,8 +1601,8 @@ class _RelationalNodeAvatar extends StatelessWidget {
     final laneColor = _laneColor(node.lane);
     if (node.lane == _NetworkGraphLane.employee) {
       return Container(
-        width: 64,
-        height: 64,
+        width: 50,
+        height: 50,
         decoration: BoxDecoration(
           color: laneColor.withValues(alpha: 0.10),
           shape: BoxShape.circle,
@@ -1508,14 +1620,14 @@ class _RelationalNodeAvatar extends StatelessWidget {
     }
 
     return Container(
-      width: 64,
-      height: 64,
+      width: 50,
+      height: 50,
       decoration: BoxDecoration(
         color: laneColor.withValues(alpha: 0.10),
         shape: BoxShape.circle,
         border: Border.all(color: laneColor.withValues(alpha: 0.24)),
       ),
-      child: Icon(_iconForLane(node.lane), color: laneColor, size: 34),
+      child: Icon(_iconForLane(node.lane), color: laneColor, size: 29),
     );
   }
 }
@@ -1799,19 +1911,15 @@ class _RelationalNetworkEdgePainter extends CustomPainter {
 class _RelationalNetworkDetailPanel extends StatelessWidget {
   const _RelationalNetworkDetailPanel({
     required this.node,
-    required this.payload,
     required this.onClose,
     required this.onSelectNode,
     required this.onOpenEmployeeProfile,
-    required this.visibleNodes,
   });
 
   final _NetworkGraphNode node;
-  final _NetworkGraphPayload payload;
   final VoidCallback onClose;
   final ValueChanged<String> onSelectNode;
   final ValueChanged<String> onOpenEmployeeProfile;
-  final List<_NetworkGraphNode> visibleNodes;
 
   @override
   Widget build(BuildContext context) {
@@ -1820,148 +1928,157 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
     final cta = node.detailSnapshot.cta;
     final employeeNode = node.lane == _NetworkGraphLane.employee;
 
-    return _Panel(
-      padding: const EdgeInsets.fromLTRB(26, 22, 26, 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _detailTitleFor(node),
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontSize: 30,
-                    letterSpacing: -1.0,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 10, 22, 22),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final boundedHeight =
+              constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+          final fieldRows = ListView.separated(
+            padding: EdgeInsets.zero,
+            shrinkWrap: !boundedHeight,
+            physics: boundedHeight
+                ? const BouncingScrollPhysics()
+                : const NeverScrollableScrollPhysics(),
+            itemBuilder: (context, index) {
+              return _RelationalDetailRow(field: fields[index]);
+            },
+            separatorBuilder: (context, index) => const SizedBox(height: 0),
+            itemCount: fields.length,
+          );
+          final ctaTarget = cta?.targetPublicId ?? node.publicId;
+          final ctaLabel = employeeNode ? 'View Full Profile' : cta?.label;
+
+          return Container(
+            constraints: boundedHeight
+                ? const BoxConstraints()
+                : const BoxConstraints(minHeight: 560),
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: _lineColor),
+              boxShadow: [
+                BoxShadow(
+                  color: _deepTealColor.withValues(alpha: 0.06),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
                 ),
-              ),
-              IconButton(
-                onPressed: onClose,
-                icon: const Icon(Icons.close_rounded, size: 34),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 116,
-                height: 116,
-                decoration: BoxDecoration(
-                  color: laneColor.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: laneColor, width: 2),
-                ),
-                alignment: Alignment.center,
-                child: node.lane == _NetworkGraphLane.employee
-                    ? Text(
-                        _initialsFor(node.displayName),
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(color: laneColor, fontSize: 34),
-                      )
-                    : Icon(_iconForLane(node.lane), color: laneColor, size: 50),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      node.displayName,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontSize: 28, letterSpacing: -1.1),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      node.subtitle,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: laneColor,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        _detailTitleFor(node),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontSize: 24, letterSpacing: -0.4),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _Tag(
-                          label: _titleCase(node.status),
-                          icon: Icons.circle_outlined,
-                          color: laneColor,
-                          background: laneColor.withValues(alpha: 0.12),
-                        ),
-                        for (final badge in node.badges.take(2))
-                          _Tag(
-                            label: badge,
-                            icon: Icons.local_offer_outlined,
-                            color: _slateColor,
-                            background: _slateColor.withValues(alpha: 0.12),
-                          ),
-                      ],
+                    IconButton(
+                      onPressed: onClose,
+                      icon: const Icon(Icons.close_rounded, size: 28),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Text(
-            node.detailSnapshot.summary,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
-          ),
-          if (employeeNode) ...[
-            const SizedBox(height: 20),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: const Color(0xFFF1D8BF)),
-              ),
-              child: Text(
-                'Os dados completos do employee saem da Visual Network e abrem na pagina de pessoas. Aqui a leitura fica restrita ao contexto relacional.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
-              ),
+                const SizedBox(height: 26),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 112,
+                      height: 112,
+                      decoration: BoxDecoration(
+                        color: laneColor.withValues(alpha: 0.10),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: laneColor, width: 2),
+                      ),
+                      alignment: Alignment.center,
+                      child: node.lane == _NetworkGraphLane.employee
+                          ? Text(
+                              _initialsFor(node.displayName),
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(color: laneColor, fontSize: 32),
+                            )
+                          : Icon(
+                              _iconForLane(node.lane),
+                              color: laneColor,
+                              size: 48,
+                            ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            node.displayName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontSize: 25, letterSpacing: -0.7),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            node.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: laneColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                if (boundedHeight) Expanded(child: fieldRows) else fieldRows,
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: ctaLabel == null
+                        ? null
+                        : () {
+                            if (employeeNode) {
+                              onOpenEmployeeProfile(ctaTarget);
+                              return;
+                            }
+                            onSelectNode(ctaTarget);
+                          },
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(58),
+                      foregroundColor: _inkColor,
+                      side: const BorderSide(color: _lineColor),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ctaLabel ?? 'View Details',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded, size: 30),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-          const SizedBox(height: 24),
-          for (var index = 0; index < fields.length; index++) ...[
-            _RelationalDetailRow(field: fields[index]),
-            if (index < fields.length - 1) const SizedBox(height: 4),
-          ],
-          const SizedBox(height: 24),
-          if (cta != null)
-            FilledButton.tonalIcon(
-              onPressed: () {
-                if (employeeNode) {
-                  onOpenEmployeeProfile(cta.targetPublicId);
-                  return;
-                }
-                onSelectNode(cta.targetPublicId);
-              },
-              icon: Icon(
-                employeeNode
-                    ? Icons.person_search_outlined
-                    : Icons.arrow_forward_rounded,
-              ),
-              label: Text(
-                employeeNode ? 'Abrir ficha do colaborador' : cta.label,
-              ),
-            ),
-          if (cta == null && employeeNode)
-            FilledButton.tonalIcon(
-              onPressed: () => onOpenEmployeeProfile(node.publicId),
-              icon: const Icon(Icons.person_search_outlined),
-              label: const Text('Abrir ficha do colaborador'),
-            ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -1978,6 +2095,16 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
             icon: Icons.badge_outlined,
             label: 'Employee ID',
             value: '${extras['employeeId'] ?? node.publicId}',
+          ),
+          _RelationalDetailField(
+            icon: Icons.mail_outline_rounded,
+            label: 'Email',
+            value: '${extras['email'] ?? '-'}',
+          ),
+          _RelationalDetailField(
+            icon: Icons.phone_outlined,
+            label: 'Phone',
+            value: '${extras['phone'] ?? '-'}',
           ),
           _RelationalDetailField(
             icon: Icons.apartment_outlined,
@@ -2004,6 +2131,16 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
             label: 'Status',
             value: '${extras['statusLabel'] ?? _titleCase(node.status)}',
             accent: node.status == 'active' ? _tealColor : _amberColor,
+          ),
+          _RelationalDetailField(
+            icon: Icons.calendar_today_outlined,
+            label: 'Start Date',
+            value: '${extras['startDate'] ?? '-'}',
+          ),
+          _RelationalDetailField(
+            icon: Icons.location_on_outlined,
+            label: 'Location',
+            value: '${extras['location'] ?? '-'}',
           ),
         ]);
         break;
@@ -2120,18 +2257,23 @@ class _RelationalDetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = field.accent;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: _lineColor)),
       ),
       child: Row(
         children: [
-          Icon(field.icon, color: _slateColor, size: 28),
+          Icon(field.icon, color: _slateColor, size: 24),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               field.label,
-              style: Theme.of(context).textTheme.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: _inkColor,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -2153,6 +2295,8 @@ class _RelationalDetailRow extends StatelessWidget {
                   child: Text(
                     field.value,
                     textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: accent,
                       fontWeight: accent == null
@@ -2219,24 +2363,6 @@ Color _edgeColor(_NetworkGraphRelationshipState state) {
     _NetworkGraphRelationshipState.active => _tealColor,
     _NetworkGraphRelationshipState.historical => _amberColor,
     _NetworkGraphRelationshipState.indirect => const Color(0xFF8C8C92),
-  };
-}
-
-Color _edgeColorForState(String state) {
-  return switch (state) {
-    'active' => _tealColor,
-    'historical' => _amberColor,
-    'indirect' => const Color(0xFF8C8C92),
-    _ => _slateColor,
-  };
-}
-
-IconData _legendIconForState(String state) {
-  return switch (state) {
-    'active' => Icons.timeline_outlined,
-    'historical' => Icons.history_toggle_off_outlined,
-    'indirect' => Icons.more_horiz_rounded,
-    _ => Icons.device_hub_outlined,
   };
 }
 
