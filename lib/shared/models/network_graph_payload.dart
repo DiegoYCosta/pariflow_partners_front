@@ -1,8 +1,20 @@
 part of '../../app/app.dart';
 
-enum _NetworkGraphLane { rootCompany, clientCompany, contract, employee }
+enum _NetworkGraphLane {
+  rootCompany,
+  clientCompany,
+  contract,
+  position,
+  employee,
+}
 
-enum _NetworkGraphNodeType { rootCompany, clientCompany, contract, employee }
+enum _NetworkGraphNodeType {
+  rootCompany,
+  clientCompany,
+  contract,
+  position,
+  employee,
+}
 
 enum _NetworkGraphRelationshipState { active, historical, indirect }
 
@@ -200,7 +212,9 @@ class _NetworkDetailSnapshot {
       ],
       cta: map['cta'] == null
           ? null
-          : _NetworkDetailCta.fromMap((map['cta'] as Map).cast<String, dynamic>()),
+          : _NetworkDetailCta.fromMap(
+              (map['cta'] as Map).cast<String, dynamic>(),
+            ),
       extras: {
         for (final entry in map.entries)
           if (!knownKeys.contains(entry.key)) entry.key: entry.value,
@@ -224,10 +238,7 @@ class _NetworkDetailSnapshot {
 }
 
 class _NetworkDetailCta {
-  const _NetworkDetailCta({
-    required this.label,
-    required this.targetPublicId,
-  });
+  const _NetworkDetailCta({required this.label, required this.targetPublicId});
 
   factory _NetworkDetailCta.fromMap(Map<String, dynamic> map) {
     return _NetworkDetailCta(
@@ -253,7 +264,8 @@ class _NetworkGraphEdge {
   });
 
   factory _NetworkGraphEdge.fromMap(Map<String, dynamic> map) {
-    final metadata = (map['metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final metadata =
+        (map['metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
     return _NetworkGraphEdge(
       publicId: map['publicId'] as String,
       fromPublicId: map['fromPublicId'] as String,
@@ -363,19 +375,21 @@ class _NetworkGraphAvailableFilters {
   factory _NetworkGraphAvailableFilters.fromMap(Map<String, dynamic> map) {
     return _NetworkGraphAvailableFilters(
       periodPresets: [
-        for (final item
-            in (map['periodPresets'] as List<dynamic>? ?? const []))
+        for (final item in (map['periodPresets'] as List<dynamic>? ?? const []))
           item as String,
       ],
       rootCompanies: [
-        for (final item
-            in (map['rootCompanies'] as List<dynamic>? ?? const []))
-          _NetworkGraphFilterOption.fromMap((item as Map).cast<String, dynamic>()),
+        for (final item in (map['rootCompanies'] as List<dynamic>? ?? const []))
+          _NetworkGraphFilterOption.fromMap(
+            (item as Map).cast<String, dynamic>(),
+          ),
       ],
       clientCompanies: [
         for (final item
             in (map['clientCompanies'] as List<dynamic>? ?? const []))
-          _NetworkGraphFilterOption.fromMap((item as Map).cast<String, dynamic>()),
+          _NetworkGraphFilterOption.fromMap(
+            (item as Map).cast<String, dynamic>(),
+          ),
       ],
       contractStatuses: [
         for (final item
@@ -428,7 +442,9 @@ class _NetworkGraphLegend {
       relationshipStates: [
         for (final item
             in (map['relationshipStates'] as List<dynamic>? ?? const []))
-          _NetworkGraphLegendEntry.fromMap((item as Map).cast<String, dynamic>()),
+          _NetworkGraphLegendEntry.fromMap(
+            (item as Map).cast<String, dynamic>(),
+          ),
       ],
     );
   }
@@ -437,10 +453,7 @@ class _NetworkGraphLegend {
 }
 
 class _NetworkGraphLegendEntry {
-  const _NetworkGraphLegendEntry({
-    required this.value,
-    required this.label,
-  });
+  const _NetworkGraphLegendEntry({required this.value, required this.label});
 
   factory _NetworkGraphLegendEntry.fromMap(Map<String, dynamic> map) {
     return _NetworkGraphLegendEntry(
@@ -488,6 +501,7 @@ _NetworkGraphLane _networkGraphLaneFromApi(String value) {
     'root_company' => _NetworkGraphLane.rootCompany,
     'client_company' => _NetworkGraphLane.clientCompany,
     'contract' => _NetworkGraphLane.contract,
+    'position' => _NetworkGraphLane.position,
     'employee' => _NetworkGraphLane.employee,
     _ => throw ArgumentError.value(value, 'value', 'Lane desconhecida'),
   };
@@ -498,6 +512,7 @@ _NetworkGraphNodeType _networkGraphNodeTypeFromApi(String value) {
     'root_company' => _NetworkGraphNodeType.rootCompany,
     'client_company' => _NetworkGraphNodeType.clientCompany,
     'contract' => _NetworkGraphNodeType.contract,
+    'position' => _NetworkGraphNodeType.position,
     'employee' => _NetworkGraphNodeType.employee,
     _ => throw ArgumentError.value(value, 'value', 'Tipo de no desconhecido'),
   };

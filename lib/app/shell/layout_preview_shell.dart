@@ -35,7 +35,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   _ViewerAccessProfile _viewerProfile = _diegoViewerProfile;
   _NetworkFilterState _networkFilters = const _NetworkFilterState();
   bool _showAdvancedNetworkFilters = false;
-  String _selectedNetworkNodeId = 'contract_maintenance';
+  String _selectedNetworkNodeId = 'employee_sarah_johnson';
   String? _hoveredNetworkNodeId;
   final Map<_Destination, int> _selectedItemIndex = {
     _Destination.companies: 0,
@@ -225,16 +225,34 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                         Expanded(
                           child: SingleChildScrollView(
                             padding: EdgeInsets.fromLTRB(
-                              showSidebar ? 28 : 16,
-                              _destination == _Destination.home ? 16 : 24,
-                              showSidebar ? 28 : 16,
-                              showSidebar ? 24 : 96,
+                              _destination == _Destination.network
+                                  ? 0
+                                  : showSidebar
+                                  ? 28
+                                  : 16,
+                              _destination == _Destination.network
+                                  ? 0
+                                  : _destination == _Destination.home
+                                  ? 16
+                                  : 24,
+                              _destination == _Destination.network
+                                  ? 0
+                                  : showSidebar
+                                  ? 28
+                                  : 16,
+                              _destination == _Destination.network
+                                  ? 0
+                                  : showSidebar
+                                  ? 24
+                                  : 96,
                             ),
                             child: Align(
                               alignment: Alignment.topCenter,
                               child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 1560,
+                                constraints: BoxConstraints(
+                                  maxWidth: _destination == _Destination.network
+                                      ? double.infinity
+                                      : 1560,
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
