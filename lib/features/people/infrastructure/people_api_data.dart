@@ -28,19 +28,25 @@ class _PeopleApiRepository {
       _EntityWorkspaceData(
         title: 'Funcionarios com dados reais',
         subtitle:
-            'Consulta de pessoas vinda da API, preservando registro-base, vinculos, tags sensiveis e anexos autorizados pelo backend.',
+            'Consulta de pessoas vinda da API, preservando registro-base, vinculos, ocorrencias, tags sensiveis e anexos autorizados pelo backend.',
         searchHint: 'GET /api/v1/pessoas',
         listHint:
             'A lista usa publicId e envelope padrao da API para abrir a ficha operacional.',
         productionHint:
-            'Corte vertical ativo: sessao dev-token, pessoas, vinculos, tags e anexos lidos do backend com fallback local.',
+            'Corte vertical ativo: sessao dev-token, pessoas, vinculos, ocorrencias, tags e anexos lidos do backend com fallback local.',
         integrationFocus: [
           'API real',
           'publicId',
           'ACL no backend',
           'fallback seguro',
         ],
-        filters: ['pessoas', 'vinculos', 'tags-entidade', 'anexos'],
+        filters: [
+          'pessoas',
+          'vinculos',
+          'ocorrencias',
+          'tags-entidade',
+          'anexos',
+        ],
         accent: _roseColor,
         items: items,
       ),
@@ -60,6 +66,10 @@ class _PeopleApiRepository {
       'vinculos',
       query: {'personPublicId': publicId, 'perPage': '20'},
     );
+    final occurrencesFuture = _safeItems(
+      'ocorrencias',
+      query: {'personPublicId': publicId, 'perPage': '20'},
+    );
     final tagsFuture = _safeItems(
       'tags-entidade',
       query: {'targetType': 'PERSON', 'targetPublicId': publicId},
@@ -72,6 +82,7 @@ class _PeopleApiRepository {
     return _PeopleApiBundle(
       detail: await detailFuture,
       links: await linksFuture,
+      occurrences: await occurrencesFuture,
       tags: await tagsFuture,
       attachments: await attachmentsFuture,
     );
@@ -149,12 +160,14 @@ class _PeopleApiBundle {
   const _PeopleApiBundle({
     required this.detail,
     required this.links,
+    required this.occurrences,
     required this.tags,
     required this.attachments,
   });
 
   final Map<String, dynamic> detail;
   final List<Map<String, dynamic>> links;
+  final List<Map<String, dynamic>> occurrences;
   final List<Map<String, dynamic>> tags;
   final List<Map<String, dynamic>> attachments;
 }
@@ -194,6 +207,7 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
       .where((tag) => tag['canView'] != false)
       .map(_sensitiveNoteFromApi)
       .toList(growable: false);
+  final occurrenceCount = bundle.occurrences.length;
   final attachments = bundle.attachments
       .where((attachment) => attachment['canView'] != false)
       .map(_attachmentFromApi)
@@ -203,12 +217,13 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
     publicId: publicId,
     title: name,
     subtitle: '$roleTitle | $clientCompany',
-    meta: '$statusLabel | $linkCount vinculos | $providerCompany',
+    meta:
+        '$statusLabel | $linkCount vinculos | $occurrenceCount ocorrencias | $providerCompany',
     status: statusLabel,
     icon: icon,
     color: color,
     detailSummary:
-        'Registro carregado do backend com pessoa, vinculos, tags sensiveis e anexos autorizados por ACL.',
+        'Registro carregado do backend com pessoa, vinculos, ocorrencias, tags sensiveis e anexos autorizados por ACL.',
     relations: [
       'CPF: ${_apiText(person['cpf'], fallback: 'nao informado')}',
       'Email: ${_apiText(person['email'], fallback: 'nao informado')}',
@@ -216,18 +231,20 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
       'Prestadora atual: $providerCompany',
       'Cliente conectado: $clientCompany',
       'Vinculos carregados: $linkCount',
+      'Ocorrencias carregadas: $occurrenceCount',
       'Tags visiveis: ${tags.length}',
       'Anexos visiveis: ${attachments.length}',
     ],
     attachments: attachments,
     sensitiveNotes: tags,
-    personProfile: _personProfileFromApi(person, links),
+    personProfile: _personProfileFromApi(person, links, bundle.occurrences),
   );
 }
 
 _PersonProfileData _personProfileFromApi(
   Map<String, dynamic> person,
   List<Map<String, dynamic>> links,
+  List<Map<String, dynamic>> occurrences,
 ) {
   final currentLink = _currentApiLink(links);
   final roleTitle = _apiRoleTitle(currentLink);
@@ -307,7 +324,7 @@ _PersonProfileData _personProfileFromApi(
       fallback: _apiText(position['status'], fallback: 'Operacao'),
     ),
     timelineSummary:
-        '${links.length} vinculos carregados diretamente de /api/v1/vinculos.',
+        '${links.length} vinculos e ${occurrences.length} ocorrencias carregados diretamente da API.',
     employmentLinks: links.map(_employmentLinkFromApi).toList(growable: false),
   );
 }
