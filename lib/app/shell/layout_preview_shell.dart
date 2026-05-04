@@ -286,12 +286,12 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     required bool isHome,
     required bool showSidebar,
   }) {
-    final blurSigma = isHome ? 2.0 : (showSidebar ? 11.0 : 7.0);
-    final textureOpacity = isHome ? 0.38 : (showSidebar ? 0.50 : 0.44);
-    final veilLeadOpacity = isHome ? 0.24 : (showSidebar ? 0.68 : 0.56);
-    final veilMidOpacity = isHome ? 0.10 : (showSidebar ? 0.42 : 0.30);
-    final veilTailOpacity = isHome ? 0.16 : (showSidebar ? 0.52 : 0.40);
-    final oliveGlowOpacity = isHome ? 0.08 : (showSidebar ? 0.18 : 0.12);
+    final blurSigma = isHome ? 1.2 : (showSidebar ? 11.0 : 7.0);
+    final textureOpacity = isHome ? 0.52 : (showSidebar ? 0.50 : 0.44);
+    final veilLeadOpacity = isHome ? 0.18 : (showSidebar ? 0.68 : 0.56);
+    final veilMidOpacity = isHome ? 0.07 : (showSidebar ? 0.42 : 0.30);
+    final veilTailOpacity = isHome ? 0.11 : (showSidebar ? 0.52 : 0.40);
+    final oliveGlowOpacity = isHome ? 0.10 : (showSidebar ? 0.18 : 0.12);
 
     return IgnorePointer(
       child: Stack(

@@ -526,21 +526,16 @@ class _CrmDashboardHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final stacked = constraints.maxWidth < 980;
-        final headlineSize = stacked ? 38.0 : 48.0;
-        final headlineColor = stacked ? _deepTealColor : Colors.white;
-        final headlineAccentColor = stacked
-            ? const Color(0xFFC8891F)
-            : const Color(0xFFE5A64C);
-        final accentBarColor = stacked
-            ? const Color(0xFFC8891F)
-            : const Color(0xFFE5A64C);
-        final mobileFeatureWidth = min(constraints.maxWidth * 0.84, 360.0);
+        final headlineSize = stacked ? 34.0 : 48.0;
+        const headlineColor = Colors.white;
+        const headlineAccentColor = Color(0xFFE5A64C);
+        const accentBarColor = Color(0xFFE5A64C);
 
         return Semantics(
           label: _ShellVariant.crm.label,
           child: Container(
             width: double.infinity,
-            height: stacked ? 520 : 290,
+            height: stacked ? 320 : 290,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
@@ -557,24 +552,17 @@ class _CrmDashboardHero extends StatelessWidget {
                 children: [
                   if (stacked) ...[
                     Positioned.fill(
-                      child: Image.asset(
-                        _crmBannerMobileAsset,
-                        fit: BoxFit.cover,
-                        alignment: const Alignment(0.56, 0.58),
-                      ),
-                    ),
-                    Positioned.fill(
                       child: Opacity(
-                        opacity: 0.56,
+                        opacity: 0.46,
                         child: ImageFiltered(
                           imageFilter: ImageFilter.blur(
-                            sigmaX: 7.0,
-                            sigmaY: 7.0,
+                            sigmaX: 1.4,
+                            sigmaY: 1.4,
                           ),
                           child: Image.asset(
-                            _crmBackgroundAsset,
+                            _crmBannerWebAsset,
                             fit: BoxFit.cover,
-                            alignment: Alignment.center,
+                            alignment: const Alignment(-0.86, 0.82),
                           ),
                         ),
                       ),
@@ -583,15 +571,15 @@ class _CrmDashboardHero extends StatelessWidget {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
                             colors: [
-                              const Color(0xF7FFF8F0),
-                              const Color(0xE8F8F0DF),
-                              const Color(0xD8F1E6CF),
-                              const Color(0xA8D0C7A7),
+                              const Color(0xF205262B),
+                              const Color(0xEA124B4E),
+                              const Color(0xCC124B4E),
+                              const Color(0x94124B4E),
                             ],
-                            stops: const [0.0, 0.32, 0.72, 1.0],
+                            stops: const [0.0, 0.36, 0.72, 1.0],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
                           ),
                         ),
                       ),
@@ -600,11 +588,11 @@ class _CrmDashboardHero extends StatelessWidget {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: const Alignment(0.80, -0.08),
-                            radius: 0.94,
+                            center: const Alignment(0.82, -0.10),
+                            radius: 0.92,
                             colors: [
-                              const Color(0x56A7AE74),
-                              const Color(0x18A7AE74),
+                              const Color(0x2263E6E2),
+                              const Color(0x0F63E6E2),
                               Colors.transparent,
                             ],
                             stops: const [0.0, 0.34, 1.0],
@@ -613,76 +601,21 @@ class _CrmDashboardHero extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      right: -6,
-                      bottom: 8,
-                      width: mobileFeatureWidth,
-                      height: 280,
-                      child: IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(34),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _deepTealColor.withValues(alpha: 0.14),
-                                blurRadius: 28,
-                                offset: const Offset(0, 20),
-                              ),
-                            ],
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.30),
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(34),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                ImageFiltered(
-                                  imageFilter: ImageFilter.blur(
-                                    sigmaX: 1.2,
-                                    sigmaY: 1.2,
-                                  ),
-                                  child: Image.asset(
-                                    _crmBannerWebAsset,
-                                    fit: BoxFit.cover,
-                                    alignment: const Alignment(0.74, 0.50),
-                                  ),
-                                ),
-                                Positioned.fill(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          const Color(0xA8F0DFC0),
-                                          const Color(0x72E2D4B1),
-                                          const Color(0x82C7C08F),
-                                        ],
-                                        stops: const [0.0, 0.54, 1.0],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Positioned.fill(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: RadialGradient(
-                                        center: const Alignment(0.84, 0.18),
-                                        radius: 0.90,
-                                        colors: [
-                                          const Color(0x42A5AE76),
-                                          const Color(0x14A5AE76),
-                                          Colors.transparent,
-                                        ],
-                                        stops: const [0.0, 0.34, 1.0],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      left: 0,
+                      right: 0,
+                      bottom: -12,
+                      height: 112,
+                      child: Opacity(
+                        opacity: 0.72,
+                        child: HighTechLightWaves(
+                          primaryColor: const Color(0xFF63E6E2),
+                          accentColor: const Color(0xFFE4A23B),
+                          numberOfWaves: 5,
+                          waveAmplitude: 0.096,
+                          waveFrequency: 0.040,
+                          waveSpeed: 0.0048,
+                          pulseSpeedMultiplier: 1.45,
+                          pulseSize: 5.8,
                         ),
                       ),
                     ),
@@ -1117,7 +1050,6 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                               child: ShaderMask(
                                 blendMode: BlendMode.srcATop,
                                 shaderCallback: (rect) {
-                                  final x = -1.5 + (value * 3.0);
                                   return LinearGradient(
                                     begin: Alignment.centerLeft,
                                     end: Alignment.centerRight,
