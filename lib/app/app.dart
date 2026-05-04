@@ -4,11 +4,14 @@ import 'dart:math';
 import 'dart:ui' show ImageFilter;
 import 'dart:ui' as ui;
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import '../firebase_options.dart';
 import '../widgets/high_tech_light_waves.dart';
 
 part '../core/api/api_client.dart';
@@ -22,6 +25,7 @@ part '../shared/models/viewer_access.dart';
 part '../core/widgets/master_detail_workspace.dart';
 part '../core/widgets/entity_crud_actions.dart';
 part '../shared/infrastructure/entity_workspace_api_data.dart';
+part '../features/auth/auth_gate.dart';
 part '../features/companies/companies_feature.dart';
 part '../features/companies/infrastructure/companies_mock_data.dart';
 part '../features/client_companies/client_companies_feature.dart';
@@ -66,6 +70,15 @@ const _crmLogoSymbolAsset = 'assets/images/logo_transparent.webp';
 const _crmLogoWordmarkAsset = 'assets/images/PFP.webp';
 const _crmLogoBackdropAsset = 'assets/images/background-logo.webp';
 const _spriteMoldSheetAsset = 'assets/images/Icones.webp';
+
+Future<void> initializePariFlowFirebase() async {
+  if (!DefaultFirebaseOptions.isConfiguredForCurrentPlatform ||
+      Firebase.apps.isNotEmpty) {
+    return;
+  }
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
 
 class PariFlowPartnersApp extends StatelessWidget {
   const PariFlowPartnersApp({super.key});
@@ -131,7 +144,7 @@ class PariFlowPartnersApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LayoutPreviewPage(),
+      home: const _AuthGate(child: LayoutPreviewPage()),
     );
   }
 }

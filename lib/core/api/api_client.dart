@@ -17,9 +17,35 @@ class _ApiClient {
       return _session!;
     }
 
+    final firebaseIdToken = await _currentFirebaseIdToken();
+    final previewToken = _previewFirebaseIdToken;
+
+    if (firebaseIdToken != null) {
+      try {
+        return _exchangeSession(firebaseIdToken);
+      } on _ApiException {
+        if (previewToken == null) {
+          rethrow;
+        }
+      }
+    }
+
+    if (previewToken == null) {
+      throw const _ApiException(
+        statusCode: 0,
+        code: 'AUTH_NOT_CONFIGURED',
+        message:
+            'Sessao Firebase nao encontrada e o dev-token esta desativado.',
+      );
+    }
+
+    return _exchangeSession(previewToken);
+  }
+
+  Future<_SessionSnapshot> _exchangeSession(String firebaseIdToken) async {
     final data = await postMap(
       'auth/session/exchange',
-      body: const {'firebaseIdToken': 'dev-token'},
+      body: {'firebaseIdToken': firebaseIdToken},
       requiresAuth: false,
     );
     final session = _SessionSnapshot.fromMap(data);
@@ -174,6 +200,24 @@ class _ApiClient {
   }
 }
 
+Future<String?> _currentFirebaseIdToken() async {
+  if (!DefaultFirebaseOptions.isConfiguredForCurrentPlatform ||
+      Firebase.apps.isEmpty) {
+    return null;
+  }
+
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    return user.getIdToken();
+  } on FirebaseException {
+    return null;
+  }
+}
+
 class _SessionSnapshot {
   const _SessionSnapshot({
     required this.accessToken,
@@ -254,4 +298,13 @@ String get _defaultApiBaseUrl {
   }
 
   return 'http://localhost:3000/api/v1';
+}
+
+String? get _previewFirebaseIdToken {
+  const enabled = bool.fromEnvironment(
+    'PARIFLOW_ENABLE_DEV_TOKEN',
+    defaultValue: true,
+  );
+
+  return enabled ? 'dev-token' : null;
 }

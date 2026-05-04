@@ -4,6 +4,8 @@ import 'app/app.dart';
 
 export 'app/app.dart' show PariFlowPartnersApp;
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializePariFlowFirebase();
   runApp(const PariFlowPartnersApp());
 }
