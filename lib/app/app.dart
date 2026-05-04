@@ -19,6 +19,7 @@ part '../shared/models/attachment_record.dart';
 part '../shared/models/network_graph_payload.dart';
 part '../shared/models/sensitive_note_tag.dart';
 part '../shared/models/viewer_access.dart';
+part '../shared/infrastructure/entity_workspace_api_data.dart';
 part '../features/companies/companies_feature.dart';
 part '../features/companies/infrastructure/companies_mock_data.dart';
 part '../features/client_companies/client_companies_feature.dart';

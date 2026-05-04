@@ -6,16 +6,43 @@ class _EntityWorkspace extends StatelessWidget {
     required this.viewerProfile,
     required this.selectedIndex,
     required this.onSelectItem,
+    this.sourceLabel,
+    this.isLive = false,
+    this.isLoading = false,
+    this.errorMessage,
+    this.searchController,
+    this.onSubmitSearch,
+    this.onClearSearch,
+    this.onRefresh,
+    this.primaryActionLabel,
+    this.primaryActionIcon,
+    this.onPrimaryAction,
   });
 
   final _EntityWorkspaceData data;
   final _ViewerAccessProfile viewerProfile;
   final int selectedIndex;
   final ValueChanged<int> onSelectItem;
+  final String? sourceLabel;
+  final bool isLive;
+  final bool isLoading;
+  final String? errorMessage;
+  final TextEditingController? searchController;
+  final VoidCallback? onSubmitSearch;
+  final VoidCallback? onClearSearch;
+  final VoidCallback? onRefresh;
+  final String? primaryActionLabel;
+  final IconData? primaryActionIcon;
+  final VoidCallback? onPrimaryAction;
 
   @override
   Widget build(BuildContext context) {
-    final selectedItem = data.items[selectedIndex];
+    final safeSelectedIndex = data.items.isEmpty
+        ? 0
+        : min(max(selectedIndex, 0), data.items.length - 1);
+    final selectedItem = data.items.isEmpty
+        ? null
+        : data.items[safeSelectedIndex];
     final readableNoteCount = data.items.fold<int>(
       0,
       (total, item) =>
@@ -30,9 +57,8 @@ class _EntityWorkspace extends StatelessWidget {
           total +
           item.attachments
               .where(
-                (attachment) => attachment.accessPolicy.canViewerRead(
-                  viewerProfile,
-                ),
+                (attachment) =>
+                    attachment.accessPolicy.canViewerRead(viewerProfile),
               )
               .length,
     );
@@ -53,14 +79,74 @@ class _EntityWorkspace extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(data.title, style: Theme.of(context).textTheme.displaySmall),
-              const SizedBox(height: 12),
-              Text(
-                data.subtitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final titleBlock = ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data.title,
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          data.subtitle,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  final controls = _EntityWorkspaceControls(
+                    sourceLabel: sourceLabel,
+                    isLive: isLive,
+                    isLoading: isLoading,
+                    onRefresh: onRefresh,
+                    primaryActionLabel: primaryActionLabel,
+                    primaryActionIcon: primaryActionIcon,
+                    onPrimaryAction: onPrimaryAction,
+                  );
+
+                  if (!controls.hasControls) {
+                    return titleBlock;
+                  }
+
+                  if (constraints.maxWidth < 980) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleBlock,
+                        const SizedBox(height: 18),
+                        controls,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: titleBlock),
+                      const SizedBox(width: 22),
+                      controls,
+                    ],
+                  );
+                },
               ),
+              if (searchController != null) ...[
+                const SizedBox(height: 20),
+                _EntitySearchField(
+                  controller: searchController!,
+                  hintText: data.searchHint,
+                  accent: data.accent,
+                  onSubmitSearch: onSubmitSearch,
+                  onClearSearch: onClearSearch,
+                  enabled: !isLoading,
+                ),
+              ],
               const SizedBox(height: 20),
               Wrap(
                 spacing: 10,
@@ -80,12 +166,14 @@ class _EntityWorkspace extends StatelessWidget {
                   ),
                   if (viewerProfile.isAuthenticated && readableNoteCount > 0)
                     _Tag(
-                      label: '$readableNoteCount tags visiveis para este perfil',
+                      label:
+                          '$readableNoteCount tags visiveis para este perfil',
                       icon: Icons.lock_open_rounded,
                       color: _roseColor,
                       background: _roseColor.withValues(alpha: 0.12),
                     ),
-                  if (viewerProfile.isAuthenticated && readableAttachmentCount > 0)
+                  if (viewerProfile.isAuthenticated &&
+                      readableAttachmentCount > 0)
                     _Tag(
                       label:
                           '$readableAttachmentCount anexos visiveis para este perfil',
@@ -154,10 +242,17 @@ class _EntityWorkspace extends StatelessWidget {
             ],
           ),
         ),
+        if (errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _EntityRuntimeNotice(message: errorMessage!, onRetry: onRefresh),
+        ],
         const SizedBox(height: 24),
         LayoutBuilder(
           builder: (context, constraints) {
             final stacked = constraints.maxWidth < 1120;
+            if (selectedItem == null) {
+              return const _Panel(child: _EntityEmptyState());
+            }
 
             if (stacked) {
               return Column(
@@ -165,7 +260,7 @@ class _EntityWorkspace extends StatelessWidget {
                   _Panel(
                     child: _EntityListCard(
                       data: data,
-                      selectedIndex: selectedIndex,
+                      selectedIndex: safeSelectedIndex,
                       onSelectItem: onSelectItem,
                     ),
                   ),
@@ -188,7 +283,7 @@ class _EntityWorkspace extends StatelessWidget {
                   child: _Panel(
                     child: _EntityListCard(
                       data: data,
-                      selectedIndex: selectedIndex,
+                      selectedIndex: safeSelectedIndex,
                       onSelectItem: onSelectItem,
                     ),
                   ),
@@ -206,6 +301,216 @@ class _EntityWorkspace extends StatelessWidget {
               ],
             );
           },
+        ),
+      ],
+    );
+  }
+}
+
+class _EntityWorkspaceControls extends StatelessWidget {
+  const _EntityWorkspaceControls({
+    required this.sourceLabel,
+    required this.isLive,
+    required this.isLoading,
+    required this.onRefresh,
+    required this.primaryActionLabel,
+    required this.primaryActionIcon,
+    required this.onPrimaryAction,
+  });
+
+  final String? sourceLabel;
+  final bool isLive;
+  final bool isLoading;
+  final VoidCallback? onRefresh;
+  final String? primaryActionLabel;
+  final IconData? primaryActionIcon;
+  final VoidCallback? onPrimaryAction;
+
+  bool get hasControls =>
+      sourceLabel != null || onRefresh != null || onPrimaryAction != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (sourceLabel != null)
+          _Tag(
+            label: sourceLabel!,
+            icon: isLoading
+                ? Icons.sync_rounded
+                : isLive
+                ? Icons.cloud_done_outlined
+                : Icons.storage_outlined,
+            color: isLive ? _tealColor : _slateColor,
+            background: (isLive ? _tealColor : _slateColor).withValues(
+              alpha: 0.12,
+            ),
+          ),
+        if (onRefresh != null)
+          IconButton.outlined(
+            tooltip: 'Sincronizar',
+            onPressed: isLoading ? null : onRefresh,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        if (onPrimaryAction != null && primaryActionLabel != null)
+          FilledButton.icon(
+            onPressed: isLoading ? null : onPrimaryAction,
+            icon: Icon(primaryActionIcon ?? Icons.add_rounded),
+            label: Text(primaryActionLabel!),
+          ),
+      ],
+    );
+  }
+}
+
+class _EntitySearchField extends StatelessWidget {
+  const _EntitySearchField({
+    required this.controller,
+    required this.hintText,
+    required this.accent,
+    required this.enabled,
+    this.onSubmitSearch,
+    this.onClearSearch,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final Color accent;
+  final bool enabled;
+  final VoidCallback? onSubmitSearch;
+  final VoidCallback? onClearSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 760),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _lineColor),
+      ),
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => onSubmitSearch?.call(),
+        decoration: InputDecoration(
+          hintText: hintText,
+          border: InputBorder.none,
+          prefixIcon: Icon(Icons.search_rounded, color: accent),
+          suffixIcon: SizedBox(
+            width: 96,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: 'Limpar busca',
+                  onPressed: enabled ? onClearSearch : null,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+                IconButton(
+                  tooltip: 'Buscar',
+                  onPressed: enabled ? onSubmitSearch : null,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                ),
+              ],
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 17,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EntityRuntimeNotice extends StatelessWidget {
+  const _EntityRuntimeNotice({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final text = Text(
+            message,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+          );
+          final action = TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Tentar novamente'),
+          );
+
+          if (constraints.maxWidth < 640) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: _amberColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: text),
+                  ],
+                ),
+                if (onRetry != null) ...[const SizedBox(height: 8), action],
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                color: _amberColor,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: text),
+              if (onRetry != null) ...[const SizedBox(width: 10), action],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EntityEmptyState extends StatelessWidget {
+  const _EntityEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Nenhum registro encontrado',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'A pagina esta pronta, mas a API nao retornou itens para este recorte.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
         ),
       ],
     );
@@ -249,10 +554,7 @@ class _EntityListCard extends StatelessWidget {
 }
 
 class _EntityDetailCard extends StatelessWidget {
-  const _EntityDetailCard({
-    required this.item,
-    required this.viewerProfile,
-  });
+  const _EntityDetailCard({required this.item, required this.viewerProfile});
 
   final _EntityItem item;
   final _ViewerAccessProfile viewerProfile;
@@ -264,7 +566,9 @@ class _EntityDetailCard extends StatelessWidget {
       ..retainWhere((note) => note.accessPolicy.canViewerRead(viewerProfile))
       ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
     final visibleAttachments = item.attachments
-        .where((attachment) => attachment.accessPolicy.canViewerRead(viewerProfile))
+        .where(
+          (attachment) => attachment.accessPolicy.canViewerRead(viewerProfile),
+        )
         .toList();
 
     return Column(
@@ -351,10 +655,11 @@ class _EntityDetailCard extends StatelessWidget {
                     color: viewerProfile.canViewSensitive
                         ? _tealColor
                         : _roseColor,
-                    background: (viewerProfile.canViewSensitive
-                            ? _tealColor
-                            : _roseColor)
-                        .withValues(alpha: 0.12),
+                    background:
+                        (viewerProfile.canViewSensitive
+                                ? _tealColor
+                                : _roseColor)
+                            .withValues(alpha: 0.12),
                   ),
                   _Tag(
                     label: viewerProfile.managementSummary,
@@ -388,10 +693,7 @@ class _EntityDetailCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Entrada publica',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Entrada publica', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Text(
                   'Quem nao esta logado pode enviar observacoes curtas para esta ficha. Leitura, edicao e exclusao continuam restritas a sessao autenticada e ao compartilhamento definido pela autora ou pelo autor.',
@@ -506,10 +808,7 @@ class _EntityDetailCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    'Compartilhamento',
-                    style: theme.textTheme.titleMedium,
-                  ),
+                  Text('Compartilhamento', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 10,
@@ -618,7 +917,9 @@ class _EntityDetailCard extends StatelessWidget {
                               color: _amberColor,
                               background: _amberColor.withValues(alpha: 0.12),
                             ),
-                            if (note.accessPolicy.canViewerManage(viewerProfile))
+                            if (note.accessPolicy.canViewerManage(
+                              viewerProfile,
+                            ))
                               _Tag(
                                 label: 'voce gerencia esta tag',
                                 icon: Icons.settings_suggest_outlined,
@@ -645,14 +946,18 @@ class _EntityDetailCard extends StatelessWidget {
                               color: _slateColor,
                               background: _slateColor.withValues(alpha: 0.12),
                             ),
-                            if (note.accessPolicy.canViewerManage(viewerProfile))
+                            if (note.accessPolicy.canViewerManage(
+                              viewerProfile,
+                            ))
                               _Tag(
                                 label: 'cor e ordem editaveis',
                                 icon: Icons.palette_outlined,
                                 color: _amberColor,
                                 background: _amberColor.withValues(alpha: 0.12),
                               ),
-                            if (note.accessPolicy.canViewerManage(viewerProfile))
+                            if (note.accessPolicy.canViewerManage(
+                              viewerProfile,
+                            ))
                               _Tag(
                                 label: 'exclusao restrita a autoria',
                                 icon: Icons.delete_sweep_outlined,
