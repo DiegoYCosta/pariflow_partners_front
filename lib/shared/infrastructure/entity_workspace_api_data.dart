@@ -160,6 +160,72 @@ class _EntityWorkspaceApiRepository {
     await _apiClient.postMap('contratos', body: body);
   }
 
+  Future<List<_EntitySelectOption>> loadContractTypes() async {
+    await _apiClient.ensureDevelopmentSession();
+    final data = await _apiClient.getMap('contratos/tipos');
+    return _apiMapList(data['items']).map(_contractTypeOptionFromApi).toList();
+  }
+
+  Future<List<_EntitySelectOption>> loadContractModels() async {
+    await _apiClient.ensureDevelopmentSession();
+    final data = await _apiClient.getMap('contratos/modelos');
+    return _apiMapList(data['items']).map(_contractModelOptionFromApi).toList();
+  }
+
+  Future<void> createContractType(Map<String, dynamic> body) async {
+    await _apiClient.postMap('contratos/tipos', body: body);
+  }
+
+  Future<void> updateContractType(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('contratos/tipos/$publicId', body: body);
+  }
+
+  Future<void> removeContractType(String publicId) async {
+    await _apiClient.deleteMap('contratos/tipos/$publicId');
+  }
+
+  Future<void> createContractModel(Map<String, dynamic> body) async {
+    await _apiClient.postMap('contratos/modelos', body: body);
+  }
+
+  Future<void> updateContractModel(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('contratos/modelos/$publicId', body: body);
+  }
+
+  Future<void> removeContractModel(String publicId) async {
+    await _apiClient.deleteMap('contratos/modelos/$publicId');
+  }
+
+  Future<void> createContractDocument(
+    String contractPublicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.postMap(
+      'contratos/$contractPublicId/documentos',
+      body: body,
+    );
+  }
+
+  Future<void> updateContractDocument(
+    String documentPublicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap(
+      'contratos/documentos/$documentPublicId',
+      body: body,
+    );
+  }
+
+  Future<void> removeContractDocument(String documentPublicId) async {
+    await _apiClient.deleteMap('contratos/documentos/$documentPublicId');
+  }
+
   Future<_ContractLookupData> loadContractLookups() async {
     await _apiClient.ensureDevelopmentSession();
     final results = await Future.wait([
@@ -168,11 +234,15 @@ class _EntityWorkspaceApiRepository {
         query: const {'page': '1', 'perPage': '100'},
       ),
       _safeItems('clientes', query: const {'page': '1', 'perPage': '100'}),
+      _safeItems('contratos/tipos'),
+      _safeItems('contratos/modelos'),
     ]);
 
     return _ContractLookupData(
       providerCompanies: results[0].map(_providerOptionFromApi).toList(),
       clientCompanies: results[1].map(_clientOptionFromApi).toList(),
+      contractTypes: results[2].map(_contractTypeOptionFromApi).toList(),
+      contractModels: results[3].map(_contractModelOptionFromApi).toList(),
     );
   }
 
@@ -250,10 +320,14 @@ class _ContractLookupData {
   const _ContractLookupData({
     required this.providerCompanies,
     required this.clientCompanies,
+    required this.contractTypes,
+    required this.contractModels,
   });
 
   final List<_EntitySelectOption> providerCompanies;
   final List<_EntitySelectOption> clientCompanies;
+  final List<_EntitySelectOption> contractTypes;
+  final List<_EntitySelectOption> contractModels;
 }
 
 class _EntitySelectOption {
@@ -261,11 +335,15 @@ class _EntitySelectOption {
     required this.publicId,
     required this.label,
     this.description = '',
+    this.status = '',
+    this.parentPublicId = '',
   });
 
   final String publicId;
   final String label;
   final String description;
+  final String status;
+  final String parentPublicId;
 }
 
 Map<String, String?> _entityListQuery(String search) {
@@ -418,18 +496,33 @@ _EntityItem _contractItemFromApi(Map<String, dynamic> contract) {
   final startsAt = _apiLongDate(contract['startsAt']);
   final endsAt = _apiLongDate(contract['endsAt']);
   final notes = _apiText(contract['notes']);
+  final contractType = _apiMap(contract['contractType']);
+  final contractModel = _apiMap(contract['contractModel']);
+  final typeName = _apiText(
+    contractType['name'],
+    fallback: 'tipo nao definido',
+  );
+  final modelName = _apiText(contractModel['name']);
+  final documents = _apiMapList(
+    contract['documents'],
+  ).map(_contractDocumentFromApi).toList(growable: false);
 
   return _EntityItem(
     publicId: publicId,
-    title: 'Contrato $publicId',
+    title: modelName.isEmpty ? 'Contrato $publicId' : modelName,
     subtitle: notes.isEmpty ? '$providerName atende $clientName.' : notes,
-    meta: '${_entityStatusLabel(status)} | inicio $startsAt | fim $endsAt',
+    meta:
+        '${_entityStatusLabel(status)} | $typeName | inicio $startsAt | ${_pluralCount(documents.length, 'documento', 'documentos')}',
     status: _entityStatusLabel(status),
     icon: Icons.description_outlined,
     color: color,
     detailSummary:
-        'Contrato carregado da API com cliente e prestadora agregados no mesmo payload, pronto para receber postos, anexos e notas sensiveis quando o backend evoluir.',
+        'Contrato carregado da API com cliente, prestadora, tipo, modelo reutilizavel e documentos proprios. Usar o mesmo modelo em empresas diferentes nao cria relacao entre elas.',
     relations: [
+      'Tipo de contrato: $typeName',
+      if (modelName.isNotEmpty) 'Modelo reutilizavel: $modelName',
+      if (_apiText(contractModel['defaultSchedule']).isNotEmpty)
+        'Escala padrao do modelo: ${_apiText(contractModel['defaultSchedule'])}',
       'Prestadora: $providerName',
       'Prestadora publicId: ${_apiText(provider['publicId'], fallback: 'nao informado')}',
       'Cliente: $clientName',
@@ -441,6 +534,7 @@ _EntityItem _contractItemFromApi(Map<String, dynamic> contract) {
       if (notes.isNotEmpty) 'Notas: $notes',
       'Atualizado em: ${_apiLongDate(contract['updatedAt'])}',
     ],
+    attachments: documents,
   );
 }
 
@@ -459,6 +553,62 @@ _EntitySelectOption _clientOptionFromApi(Map<String, dynamic> client) {
     publicId: _apiText(client['publicId']),
     label: _apiText(client['name'], fallback: 'Cliente sem nome'),
     description: _apiText(client['clientType']),
+  );
+}
+
+_EntitySelectOption _contractTypeOptionFromApi(Map<String, dynamic> type) {
+  return _EntitySelectOption(
+    publicId: _apiText(type['publicId']),
+    label: _apiText(type['name'], fallback: 'Tipo sem nome'),
+    description: _apiText(type['description']),
+    status: _apiText(type['status'], fallback: 'ACTIVE'),
+  );
+}
+
+_EntitySelectOption _contractModelOptionFromApi(Map<String, dynamic> model) {
+  final type = _apiMap(model['contractType']);
+  return _EntitySelectOption(
+    publicId: _apiText(model['publicId']),
+    label: _apiText(model['name'], fallback: 'Modelo sem nome'),
+    description: _apiText(
+      model['defaultSchedule'],
+      fallback: _apiText(model['description']),
+    ),
+    status: _apiText(model['status'], fallback: 'ACTIVE'),
+    parentPublicId: _apiText(type['publicId']),
+  );
+}
+
+_AttachmentRecord _contractDocumentFromApi(Map<String, dynamic> document) {
+  final externalLink = _apiText(document['externalLink']);
+  final fileName = _apiText(document['fileName']);
+  final physicalLocation = _apiText(document['physicalLocation']);
+  final summaryParts = [
+    if (fileName.isNotEmpty) fileName,
+    if (externalLink.isNotEmpty) externalLink,
+    if (physicalLocation.isNotEmpty) physicalLocation,
+  ];
+
+  return _AttachmentRecord(
+    publicId: _apiText(document['publicId']),
+    title: _apiText(document['title'], fallback: 'Documento de contrato'),
+    classification: _attachmentClassificationFromApi(
+      _apiText(document['classification']),
+    ),
+    summary: summaryParts.isEmpty
+        ? _apiText(
+            document['notes'],
+            fallback: 'Documento vinculado ao contrato.',
+          )
+        : summaryParts.join(' | '),
+    status: _apiText(document['status'], fallback: 'ACTIVE').toLowerCase(),
+    updatedAtLabel: 'atualizado em ${_apiLongDate(document['updatedAt'])}',
+    accessPolicy: _apiReturnedContentAccessPolicy,
+    mimeType: _apiText(document['mimeType']),
+    externalLink: externalLink,
+    physicalLocation: physicalLocation,
+    canEdit: true,
+    canDelete: true,
   );
 }
 
