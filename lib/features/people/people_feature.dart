@@ -138,6 +138,66 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
     );
   }
 
+  Future<void> _openCreateEmploymentLinkDialog(_EntityItem item) async {
+    if (!_runtimeData.isLive) {
+      _showUnavailableAction();
+      return;
+    }
+
+    late final _EmploymentLinkLookupData lookups;
+    try {
+      lookups = await _repository.loadEmploymentLinkLookups();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_peopleMutationErrorMessage(error)),
+          backgroundColor: _roseColor,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final hasUsableContract = lookups.contracts.any(
+      (contract) => contract.positions.isNotEmpty,
+    );
+    if (lookups.providerCompanies.isEmpty ||
+        lookups.contracts.isEmpty ||
+        !hasUsableContract) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Cadastre ao menos uma prestadora, um contrato e um posto antes de vincular contrato a pessoa.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _EmploymentLinkCrudDialog(
+        personPublicId: item.publicId,
+        lookups: lookups,
+      ),
+    );
+
+    if (body == null) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.createEmploymentLink(body),
+      successMessage: 'Contrato vinculado a pessoa na API.',
+    );
+  }
+
   Future<void> _openCreateOccurrenceDialog(_EntityItem item) async {
     final body = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -471,7 +531,12 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
               item: selectedItem,
               profile: profile,
             );
-            final linksPanel = _EmploymentLinksPanel(profile: profile);
+            final linksPanel = _EmploymentLinksPanel(
+              profile: profile,
+              onAddLink: _runtimeData.isLoading
+                  ? null
+                  : () => _openCreateEmploymentLinkDialog(selectedItem),
+            );
             final sideColumn = _PeopleSideColumn(
               viewerProfile: widget.viewerProfile,
               item: selectedItem,
@@ -834,9 +899,10 @@ class _PeopleMetaBlock extends StatelessWidget {
 }
 
 class _EmploymentLinksPanel extends StatefulWidget {
-  const _EmploymentLinksPanel({required this.profile});
+  const _EmploymentLinksPanel({required this.profile, required this.onAddLink});
 
   final _PersonProfileData profile;
+  final VoidCallback? onAddLink;
 
   @override
   State<_EmploymentLinksPanel> createState() => _EmploymentLinksPanelState();
@@ -890,9 +956,9 @@ class _EmploymentLinksPanelState extends State<_EmploymentLinksPanel> {
                 ],
               ),
               OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add Link'),
+                onPressed: widget.onAddLink,
+                icon: const Icon(Icons.add_link_rounded),
+                label: const Text('Vincular contrato'),
               ),
             ],
           ),
@@ -1050,6 +1116,24 @@ class _EmploymentLinkCard extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w500),
                         ),
+                        if (record.linkStatusLabel.isNotEmpty)
+                          _Tag(
+                            label: record.linkStatusLabel,
+                            icon: record.linkStatusLabel == 'encerrado'
+                                ? Icons.event_busy_outlined
+                                : record.linkStatusLabel == 'vencido'
+                                ? Icons.warning_amber_rounded
+                                : Icons.verified_outlined,
+                            color: record.accent,
+                            background: record.accent.withValues(alpha: 0.12),
+                          ),
+                        if (record.contractPublicId.isNotEmpty)
+                          _Tag(
+                            label: record.contractPublicId,
+                            icon: Icons.description_outlined,
+                            color: _slateColor,
+                            background: _slateColor.withValues(alpha: 0.12),
+                          ),
                         if (record.isCurrent)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -1098,6 +1182,16 @@ class _EmploymentLinkCard extends StatelessWidget {
                 icon: Icons.calendar_month_outlined,
                 value: record.fullDateLabel,
               ),
+              if (record.contractLabel.isNotEmpty)
+                _EmploymentMetaLine(
+                  icon: Icons.description_outlined,
+                  value: record.contractLabel,
+                ),
+              if (record.contractStatusLabel.isNotEmpty)
+                _EmploymentMetaLine(
+                  icon: Icons.fact_check_outlined,
+                  value: 'Contrato ${record.contractStatusLabel}',
+                ),
               _EmploymentMetaLine(
                 icon: Icons.location_on_outlined,
                 value: record.locationLabel,
@@ -1772,6 +1866,334 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
   }
 }
 
+class _EmploymentLinkCrudDialog extends StatefulWidget {
+  const _EmploymentLinkCrudDialog({
+    required this.personPublicId,
+    required this.lookups,
+  });
+
+  final String personPublicId;
+  final _EmploymentLinkLookupData lookups;
+
+  @override
+  State<_EmploymentLinkCrudDialog> createState() =>
+      _EmploymentLinkCrudDialogState();
+}
+
+class _EmploymentLinkCrudDialogState extends State<_EmploymentLinkCrudDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _type;
+  late final TextEditingController _startsAt;
+  late final TextEditingController _endsAt;
+  late String _providerCompanyPublicId;
+  late String _contractPublicId;
+  late String _positionPublicId;
+  late String _status;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialContract = _firstUsableContract();
+    _providerCompanyPublicId =
+        initialContract?.providerCompanyPublicId ??
+        (widget.lookups.providerCompanies.isEmpty
+            ? ''
+            : widget.lookups.providerCompanies.first.publicId);
+    _contractPublicId = initialContract?.publicId ?? '';
+    _positionPublicId = initialContract?.positions.isEmpty == false
+        ? initialContract!.positions.first.publicId
+        : '';
+    _status = 'ACTIVE';
+    _type = TextEditingController(text: 'CLT');
+    _startsAt = TextEditingController(text: _todayInputDate());
+    _endsAt = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _type.dispose();
+    _startsAt.dispose();
+    _endsAt.dispose();
+    super.dispose();
+  }
+
+  _EmploymentContractOption? _firstUsableContract() {
+    for (final contract in widget.lookups.contracts) {
+      if (contract.providerCompanyPublicId.isNotEmpty &&
+          contract.positions.isNotEmpty) {
+        return contract;
+      }
+    }
+    for (final contract in widget.lookups.contracts) {
+      if (contract.positions.isNotEmpty) {
+        return contract;
+      }
+    }
+    return widget.lookups.contracts.isEmpty
+        ? null
+        : widget.lookups.contracts.first;
+  }
+
+  List<_EmploymentContractOption> get _contractsForProvider {
+    return widget.lookups.contracts
+        .where(
+          (contract) =>
+              contract.providerCompanyPublicId == _providerCompanyPublicId,
+        )
+        .toList(growable: false);
+  }
+
+  _EmploymentContractOption? get _selectedContract {
+    for (final contract in _contractsForProvider) {
+      if (contract.publicId == _contractPublicId) {
+        return contract;
+      }
+    }
+    return null;
+  }
+
+  List<_EmploymentPositionOption> get _positionsForSelectedContract {
+    return _selectedContract?.positions ?? const [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final contracts = _contractsForProvider;
+    final positions = _positionsForSelectedContract;
+    final providerValues = widget.lookups.providerCompanies
+        .map((company) => company.publicId)
+        .where((publicId) => publicId.isNotEmpty)
+        .toList(growable: false);
+    final providerLabels = {
+      for (final company in widget.lookups.providerCompanies)
+        company.publicId: company.label,
+    };
+    final contractValues = contracts
+        .map((contract) => contract.publicId)
+        .where((publicId) => publicId.isNotEmpty)
+        .toList(growable: false);
+    final contractLabels = {
+      for (final contract in contracts)
+        contract.publicId: '${contract.label} | ${contract.clientLabel}',
+    };
+    final positionValues = positions
+        .map((position) => position.publicId)
+        .where((publicId) => publicId.isNotEmpty)
+        .toList(growable: false);
+    final positionLabels = {
+      for (final position in positions) position.publicId: position.label,
+    };
+
+    return AlertDialog(
+      title: const Text('Vincular contrato'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 620),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogDropdown(
+                  fieldKey: const ValueKey('employment-provider'),
+                  label: 'Prestadora',
+                  value: _providerCompanyPublicId,
+                  icon: Icons.business_outlined,
+                  values: providerValues,
+                  labels: providerLabels,
+                  onChanged: _selectProvider,
+                ),
+                _dialogDropdown(
+                  fieldKey: ValueKey(
+                    'employment-contract-$_providerCompanyPublicId',
+                  ),
+                  label: 'Contrato',
+                  value: _contractPublicId,
+                  icon: Icons.description_outlined,
+                  values: contractValues,
+                  labels: contractLabels,
+                  onChanged: _selectContract,
+                ),
+                _dialogDropdown(
+                  fieldKey: ValueKey('employment-position-$_contractPublicId'),
+                  label: 'Posto',
+                  value: _positionPublicId,
+                  icon: Icons.work_outline_rounded,
+                  values: positionValues,
+                  labels: positionLabels,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _positionPublicId = value);
+                    }
+                  },
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _type,
+                        label: 'Tipo do vinculo',
+                        icon: Icons.badge_outlined,
+                        required: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogDropdown(
+                        label: 'Status',
+                        value: _status,
+                        icon: Icons.verified_outlined,
+                        values: const [
+                          'ACTIVE',
+                          'DISMISSED',
+                          'PENDING',
+                          'SUSPENDED',
+                          'BLOCKED',
+                        ],
+                        labels: const {
+                          'ACTIVE': 'Ativo',
+                          'DISMISSED': 'Encerrado',
+                          'PENDING': 'Pendente',
+                          'SUSPENDED': 'Suspenso',
+                          'BLOCKED': 'Bloqueado',
+                        },
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _status = value);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _startsAt,
+                        label: 'Inicio',
+                        icon: Icons.calendar_month_outlined,
+                        required: true,
+                        hintText: 'yyyy-mm-dd',
+                        dateLike: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _endsAt,
+                        label: 'Fim',
+                        icon: Icons.event_available_outlined,
+                        hintText: 'yyyy-mm-dd',
+                        dateLike: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Vincular')),
+      ],
+    );
+  }
+
+  void _selectProvider(String? value) {
+    if (value == null) {
+      return;
+    }
+
+    final contracts = widget.lookups.contracts
+        .where((contract) => contract.providerCompanyPublicId == value)
+        .toList(growable: false);
+    _EmploymentContractOption? contract;
+    for (final item in contracts) {
+      if (item.positions.isNotEmpty) {
+        contract = item;
+        break;
+      }
+    }
+    contract ??= contracts.isEmpty ? null : contracts.first;
+
+    setState(() {
+      _providerCompanyPublicId = value;
+      _contractPublicId = contract?.publicId ?? '';
+      _positionPublicId = contract?.positions.isEmpty == false
+          ? contract!.positions.first.publicId
+          : '';
+    });
+  }
+
+  void _selectContract(String? value) {
+    if (value == null) {
+      return;
+    }
+
+    _EmploymentContractOption? contract;
+    for (final item in _contractsForProvider) {
+      if (item.publicId == value) {
+        contract = item;
+        break;
+      }
+    }
+
+    setState(() {
+      _contractPublicId = value;
+      _positionPublicId = contract?.positions.isEmpty == false
+          ? contract!.positions.first.publicId
+          : '';
+    });
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final startsAt = DateTime.tryParse(_startsAt.text.trim());
+    final endsAt = DateTime.tryParse(_endsAt.text.trim());
+    if (startsAt == null) {
+      return;
+    }
+    if (endsAt != null && endsAt.isBefore(startsAt)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A data final nao pode ser anterior ao inicio.'),
+        ),
+      );
+      return;
+    }
+    if (_status == 'DISMISSED' && endsAt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Informe a data final para vinculo encerrado.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _cleanMutationBody({
+        'personPublicId': widget.personPublicId,
+        'providerCompanyPublicId': _providerCompanyPublicId,
+        'contractPublicId': _contractPublicId,
+        'positionPublicId': _positionPublicId,
+        'type': _type.text,
+        'status': _status,
+        'startsAt': _dateInputToIso(_startsAt.text),
+        'endsAt': _dateInputToIso(_endsAt.text),
+      }),
+    );
+  }
+}
+
 class _OccurrenceCrudDialog extends StatefulWidget {
   const _OccurrenceCrudDialog({required this.personPublicId, this.initial});
 
@@ -2274,6 +2696,7 @@ Widget _dialogTextField({
 }
 
 Widget _dialogDropdown({
+  Key? fieldKey,
   required String label,
   required String value,
   required IconData icon,
@@ -2284,6 +2707,7 @@ Widget _dialogDropdown({
   return Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: DropdownButtonFormField<String>(
+      key: fieldKey,
       initialValue: values.contains(value)
           ? value
           : values.isEmpty
@@ -2490,6 +2914,10 @@ class _EmploymentLinkRecord {
     required this.locationLabel,
     required this.brandMonogram,
     required this.accent,
+    this.contractLabel = '',
+    this.contractPublicId = '',
+    this.contractStatusLabel = '',
+    this.linkStatusLabel = '',
     this.isCurrent = false,
   });
 
@@ -2500,5 +2928,9 @@ class _EmploymentLinkRecord {
   final String locationLabel;
   final String brandMonogram;
   final Color accent;
+  final String contractLabel;
+  final String contractPublicId;
+  final String contractStatusLabel;
+  final String linkStatusLabel;
   final bool isCurrent;
 }

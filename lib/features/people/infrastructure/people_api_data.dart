@@ -18,6 +18,28 @@ class _PeopleApiRepository {
     await _apiClient.deleteMap('pessoas/$publicId');
   }
 
+  Future<void> createEmploymentLink(Map<String, dynamic> body) async {
+    await _apiClient.postMap('vinculos', body: body);
+  }
+
+  Future<_EmploymentLinkLookupData> loadEmploymentLinkLookups() async {
+    await _apiClient.ensureDevelopmentSession();
+    final results = await Future.wait([
+      _safeItems(
+        'empresas-prestadoras',
+        query: const {'page': '1', 'perPage': '100'},
+      ),
+      _safeItems('contratos', query: const {'page': '1', 'perPage': '100'}),
+    ]);
+
+    return _EmploymentLinkLookupData(
+      providerCompanies: results[0]
+          .map(_employmentProviderOptionFromApi)
+          .toList(),
+      contracts: results[1].map(_employmentContractOptionFromApi).toList(),
+    );
+  }
+
   Future<void> createOccurrence(Map<String, dynamic> body) async {
     await _apiClient.postMap('ocorrencias', body: body);
   }
@@ -214,6 +236,115 @@ class _PeopleApiBundle {
   final List<Map<String, dynamic>> attachments;
 }
 
+class _EmploymentLinkLookupData {
+  const _EmploymentLinkLookupData({
+    required this.providerCompanies,
+    required this.contracts,
+  });
+
+  final List<_EntitySelectOption> providerCompanies;
+  final List<_EmploymentContractOption> contracts;
+}
+
+class _EmploymentContractOption {
+  const _EmploymentContractOption({
+    required this.publicId,
+    required this.label,
+    required this.description,
+    required this.providerCompanyPublicId,
+    required this.providerLabel,
+    required this.clientLabel,
+    required this.status,
+    required this.positions,
+  });
+
+  final String publicId;
+  final String label;
+  final String description;
+  final String providerCompanyPublicId;
+  final String providerLabel;
+  final String clientLabel;
+  final String status;
+  final List<_EmploymentPositionOption> positions;
+}
+
+class _EmploymentPositionOption {
+  const _EmploymentPositionOption({
+    required this.publicId,
+    required this.label,
+  });
+
+  final String publicId;
+  final String label;
+}
+
+_EntitySelectOption _employmentProviderOptionFromApi(
+  Map<String, dynamic> company,
+) {
+  return _providerOptionFromApi(company);
+}
+
+_EmploymentContractOption _employmentContractOptionFromApi(
+  Map<String, dynamic> contract,
+) {
+  final publicId = _apiText(contract['publicId']);
+  final provider = _apiMap(contract['providerCompany']);
+  final client = _apiMap(contract['clientCompany']);
+  final contractType = _apiMap(contract['contractType']);
+  final contractModel = _apiMap(contract['contractModel']);
+  final providerLabel = _apiText(
+    provider['tradeName'],
+    fallback: _apiText(
+      provider['legalName'],
+      fallback: 'Prestadora nao informada',
+    ),
+  );
+  final clientLabel = _apiText(
+    client['name'],
+    fallback: 'Cliente nao informado',
+  );
+  final modelLabel = _apiText(contractModel['name']);
+  final typeLabel = _apiText(
+    contractType['name'],
+    fallback: 'tipo nao definido',
+  );
+  final status = _apiText(contract['status'], fallback: 'ACTIVE');
+  final startsAt = _apiLongDate(contract['startsAt']);
+  final positions = _apiMapList(contract['positions'])
+      .map(_employmentPositionOptionFromApi)
+      .where((position) => position.publicId.isNotEmpty)
+      .toList(growable: false);
+
+  return _EmploymentContractOption(
+    publicId: publicId,
+    label: modelLabel.isEmpty ? 'Contrato $publicId' : modelLabel,
+    description:
+        '$clientLabel | $typeLabel | ${_entityStatusLabel(status)} | inicio $startsAt',
+    providerCompanyPublicId: _apiText(provider['publicId']),
+    providerLabel: providerLabel,
+    clientLabel: clientLabel,
+    status: status,
+    positions: positions,
+  );
+}
+
+_EmploymentPositionOption _employmentPositionOptionFromApi(
+  Map<String, dynamic> position,
+) {
+  final service = _apiMap(position['service']);
+  final parts = [
+    _apiText(position['name'], fallback: 'Posto sem nome'),
+    _apiText(service['name']),
+    _apiText(position['location']),
+    _apiText(position['schedule'], fallback: _apiText(position['shift'])),
+  ]..removeWhere((part) => part.isEmpty);
+
+  return _EmploymentPositionOption(
+    publicId: _apiText(position['publicId']),
+    label: parts.join(' | '),
+  );
+}
+
 _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
   final person = bundle.detail;
   final links = bundle.links.isNotEmpty
@@ -399,12 +530,32 @@ _EmploymentLinkRecord _employmentLinkFromApi(Map<String, dynamic> link) {
     position['location'],
     fallback: _apiClientCompanyName(link),
   );
+  final contract = _apiMap(link['contract']);
+  final contractModel = _apiMap(contract['contractModel']);
+  final contractPublicId = _apiText(contract['publicId']);
+  final contractLabel = _apiText(
+    contractModel['name'],
+    fallback: contractPublicId.isEmpty
+        ? 'Contrato nao informado'
+        : contractPublicId,
+  );
+  final contractStatus = _apiText(contract['status'], fallback: 'ACTIVE');
+  final contractEndsAt = _apiDate(contract['endsAt']);
+  final linkStatusLabel = _employmentLinkStatusLabel(
+    status: status,
+    endsAt: effectiveEnd,
+    contractEndsAt: contractEndsAt,
+  );
 
   return _EmploymentLinkRecord(
     periodLabel:
         '${_apiShortMonthYear(startsAt)}\n- ${isCurrent ? 'Present' : _apiShortMonthYear(effectiveEnd)}',
     companyName: providerCompany,
     roleTitle: roleTitle,
+    contractLabel: contractLabel,
+    contractPublicId: contractPublicId,
+    contractStatusLabel: _entityStatusLabel(contractStatus),
+    linkStatusLabel: linkStatusLabel,
     fullDateLabel:
         '${_apiLongDate(startsAt)} - ${isCurrent ? 'Present' : _apiLongDate(effectiveEnd)}',
     locationLabel: location,
@@ -416,6 +567,25 @@ _EmploymentLinkRecord _employmentLinkFromApi(Map<String, dynamic> link) {
         : _amberColor,
     isCurrent: isCurrent,
   );
+}
+
+String _employmentLinkStatusLabel({
+  required String status,
+  required DateTime? endsAt,
+  required DateTime? contractEndsAt,
+}) {
+  final now = DateTime.now();
+  if (status == 'DISMISSED') {
+    return 'encerrado';
+  }
+  if ((endsAt != null && endsAt.isBefore(now)) ||
+      (contractEndsAt != null && contractEndsAt.isBefore(now))) {
+    return 'vencido';
+  }
+  if (status == 'ACTIVE') {
+    return 'ativo';
+  }
+  return status.toLowerCase();
 }
 
 _OccurrenceRecord _occurrenceFromApi(Map<String, dynamic> occurrence) {
