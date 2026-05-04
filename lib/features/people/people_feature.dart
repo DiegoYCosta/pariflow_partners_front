@@ -50,6 +50,244 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
     }
   }
 
+  Future<void> _runPeopleMutation(
+    Future<void> Function() action, {
+    required String successMessage,
+  }) async {
+    try {
+      setState(() {
+        _runtimeData = _runtimeData.copyWith(isLoading: true);
+      });
+      await action();
+      await _loadPeopleData();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(successMessage)));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _runtimeData = _runtimeData.copyWith(isLoading: false);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_peopleMutationErrorMessage(error)),
+          backgroundColor: _roseColor,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openCreatePersonDialog() async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _PersonCrudDialog(),
+    );
+
+    if (body == null) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.createPerson(body),
+      successMessage: 'Pessoa criada na API.',
+    );
+  }
+
+  Future<void> _openEditPersonDialog(_EntityItem item) async {
+    final snapshot = item.personProfile?.crudSnapshot;
+    if (snapshot == null) {
+      _showUnavailableAction();
+      return;
+    }
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _PersonCrudDialog(initial: snapshot),
+    );
+
+    if (body == null) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.updatePerson(item.publicId, body),
+      successMessage: 'Pessoa atualizada na API.',
+    );
+  }
+
+  Future<void> _removePerson(_EntityItem item) async {
+    final confirmed = await _confirmAction(
+      title: 'Remover pessoa',
+      message:
+          'A remocao so sera aceita se a pessoa nao tiver vinculos, ocorrencias ou tags.',
+      confirmLabel: 'Remover',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.removePerson(item.publicId),
+      successMessage: 'Pessoa removida da API.',
+    );
+  }
+
+  Future<void> _openCreateOccurrenceDialog(_EntityItem item) async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) =>
+          _OccurrenceCrudDialog(personPublicId: item.publicId),
+    );
+
+    if (body == null) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.createOccurrence(body),
+      successMessage: 'Ocorrencia criada na API.',
+    );
+  }
+
+  Future<void> _openEditOccurrenceDialog(
+    _EntityItem item,
+    _OccurrenceRecord occurrence,
+  ) async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _OccurrenceCrudDialog(
+        personPublicId: item.publicId,
+        initial: occurrence,
+      ),
+    );
+
+    if (body == null) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.updateOccurrence(occurrence.publicId, body),
+      successMessage: 'Ocorrencia atualizada na API.',
+    );
+  }
+
+  Future<void> _removeOccurrence(_OccurrenceRecord occurrence) async {
+    final confirmed = await _confirmAction(
+      title: 'Remover ocorrencia',
+      message:
+          'A ocorrencia sera marcada como removida, preservando auditoria.',
+      confirmLabel: 'Remover',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.removeOccurrence(occurrence.publicId),
+      successMessage: 'Ocorrencia removida logicamente.',
+    );
+  }
+
+  Future<void> _openCreateAttachmentDialog(_PersonProfileData profile) async {
+    final session = _runtimeData.session;
+    if (session == null || session.userPublicId.isEmpty) {
+      _showUnavailableAction();
+      return;
+    }
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _AttachmentCrudDialog(
+        occurrences: profile.occurrences,
+        ownerUserPublicId: session.userPublicId,
+        allowedGroupKeys: session.audienceGroups,
+      ),
+    );
+
+    if (body == null) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.createAttachment(body),
+      successMessage: 'Anexo registrado na API.',
+    );
+  }
+
+  Future<void> _openEditAttachmentDialog(_AttachmentRecord attachment) async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _AttachmentCrudDialog.edit(initial: attachment),
+    );
+
+    if (body == null) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.updateAttachment(attachment.publicId, body),
+      successMessage: 'Anexo atualizado na API.',
+    );
+  }
+
+  Future<void> _removeAttachment(_AttachmentRecord attachment) async {
+    final confirmed = await _confirmAction(
+      title: 'Remover anexo',
+      message:
+          'O anexo sera removido logicamente e deixara de aparecer na ficha.',
+      confirmLabel: 'Remover',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await _runPeopleMutation(
+      () => _repository.removeAttachment(attachment.publicId),
+      successMessage: 'Anexo removido logicamente.',
+    );
+  }
+
+  Future<bool> _confirmAction({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  void _showUnavailableAction() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Acao disponivel apenas com dados reais da API.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _runtimeData.data;
@@ -137,6 +375,38 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
+                  FilledButton.icon(
+                    onPressed: _runtimeData.isLoading
+                        ? null
+                        : _openCreatePersonDialog,
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    label: const Text('Nova pessoa'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _runtimeData.isLoading
+                        ? null
+                        : () => _openEditPersonDialog(selectedItem),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Editar'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _runtimeData.isLoading
+                        ? null
+                        : () => _removePerson(selectedItem),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: const Text('Remover'),
+                  ),
+                  IconButton.outlined(
+                    tooltip: 'Sincronizar People',
+                    onPressed: _runtimeData.isLoading ? null : _loadPeopleData,
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ],
+              ),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
                   _Tag(
                     label: selectedItem.publicId,
                     icon: Icons.badge_outlined,
@@ -205,8 +475,16 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
             final sideColumn = _PeopleSideColumn(
               viewerProfile: widget.viewerProfile,
               item: selectedItem,
+              profile: profile,
               sections: sensitiveSections,
               attachments: visibleAttachments,
+              onAddOccurrence: () => _openCreateOccurrenceDialog(selectedItem),
+              onEditOccurrence: (occurrence) =>
+                  _openEditOccurrenceDialog(selectedItem, occurrence),
+              onRemoveOccurrence: _removeOccurrence,
+              onAddAttachment: () => _openCreateAttachmentDialog(profile),
+              onEditAttachment: _openEditAttachmentDialog,
+              onRemoveAttachment: _removeAttachment,
             );
 
             if (wide) {
@@ -860,19 +1138,40 @@ class _PeopleSideColumn extends StatelessWidget {
   const _PeopleSideColumn({
     required this.viewerProfile,
     required this.item,
+    required this.profile,
     required this.sections,
     required this.attachments,
+    required this.onAddOccurrence,
+    required this.onEditOccurrence,
+    required this.onRemoveOccurrence,
+    required this.onAddAttachment,
+    required this.onEditAttachment,
+    required this.onRemoveAttachment,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final _EntityItem item;
+  final _PersonProfileData profile;
   final List<_SensitiveSectionGroup> sections;
   final List<_AttachmentRecord> attachments;
+  final VoidCallback onAddOccurrence;
+  final ValueChanged<_OccurrenceRecord> onEditOccurrence;
+  final ValueChanged<_OccurrenceRecord> onRemoveOccurrence;
+  final VoidCallback onAddAttachment;
+  final ValueChanged<_AttachmentRecord> onEditAttachment;
+  final ValueChanged<_AttachmentRecord> onRemoveAttachment;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        _OccurrencesPanel(
+          occurrences: profile.occurrences,
+          onAdd: onAddOccurrence,
+          onEdit: onEditOccurrence,
+          onRemove: onRemoveOccurrence,
+        ),
+        const SizedBox(height: 18),
         _SensitiveInformationPanel(
           viewerProfile: viewerProfile,
           sections: sections,
@@ -882,8 +1181,173 @@ class _PeopleSideColumn extends StatelessWidget {
           viewerProfile: viewerProfile,
           item: item,
           attachments: attachments,
+          occurrences: profile.occurrences,
+          onAdd: onAddAttachment,
+          onEdit: onEditAttachment,
+          onRemove: onRemoveAttachment,
         ),
       ],
+    );
+  }
+}
+
+class _OccurrencesPanel extends StatelessWidget {
+  const _OccurrencesPanel({
+    required this.occurrences,
+    required this.onAdd,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  final List<_OccurrenceRecord> occurrences;
+  final VoidCallback onAdd;
+  final ValueChanged<_OccurrenceRecord> onEdit;
+  final ValueChanged<_OccurrenceRecord> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.event_note_outlined,
+                color: _slateColor,
+                size: 30,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Ocorrencias',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Nova'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const Divider(color: _lineColor),
+          if (occurrences.isEmpty) ...[
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFB),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _lineColor),
+              ),
+              child: Text(
+                'Nenhuma ocorrencia registrada para esta pessoa.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 4),
+            for (final occurrence in occurrences) ...[
+              _OccurrenceRow(
+                occurrence: occurrence,
+                onEdit: () => onEdit(occurrence),
+                onRemove: () => onRemove(occurrence),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _OccurrenceRow extends StatelessWidget {
+  const _OccurrenceRow({
+    required this.occurrence,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  final _OccurrenceRecord occurrence;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (occurrence.nature.toUpperCase()) {
+      'POSITIVE' => _tealColor,
+      'NEGATIVE' => _roseColor,
+      _ => _amberColor,
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.timeline_rounded, color: color, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  occurrence.title,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${occurrence.type} | ${occurrence.severityLevel} | ${occurrence.occurredAtLabel}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                ),
+                if (occurrence.description.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    occurrence.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Editar ocorrencia',
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            tooltip: 'Remover ocorrencia',
+            onPressed: onRemove,
+            icon: const Icon(Icons.delete_outline_rounded),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1007,11 +1471,19 @@ class _AttachmentsPanel extends StatelessWidget {
     required this.viewerProfile,
     required this.item,
     required this.attachments,
+    required this.occurrences,
+    required this.onAdd,
+    required this.onEdit,
+    required this.onRemove,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final _EntityItem item;
   final List<_AttachmentRecord> attachments;
+  final List<_OccurrenceRecord> occurrences;
+  final VoidCallback onAdd;
+  final ValueChanged<_AttachmentRecord> onEdit;
+  final ValueChanged<_AttachmentRecord> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -1034,7 +1506,11 @@ class _AttachmentsPanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              OutlinedButton(onPressed: () {}, child: const Text('Upload')),
+              OutlinedButton.icon(
+                onPressed: occurrences.isEmpty ? null : onAdd,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Novo'),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -1061,15 +1537,15 @@ class _AttachmentsPanel extends StatelessWidget {
           ] else ...[
             const SizedBox(height: 4),
             for (final attachment in attachments) ...[
-              _AttachmentRow(attachment: attachment),
+              _AttachmentRow(
+                attachment: attachment,
+                onEdit: attachment.canEdit ? () => onEdit(attachment) : null,
+                onRemove: attachment.canDelete
+                    ? () => onRemove(attachment)
+                    : null,
+              ),
               const SizedBox(height: 12),
             ],
-            const SizedBox(height: 6),
-            TextButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('View All Attachments'),
-            ),
           ],
         ],
       ),
@@ -1078,9 +1554,15 @@ class _AttachmentsPanel extends StatelessWidget {
 }
 
 class _AttachmentRow extends StatelessWidget {
-  const _AttachmentRow({required this.attachment});
+  const _AttachmentRow({
+    required this.attachment,
+    required this.onEdit,
+    required this.onRemove,
+  });
 
   final _AttachmentRecord attachment;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -1126,15 +1608,552 @@ class _AttachmentRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          Icon(
-            attachment.canDownload
-                ? Icons.download_rounded
-                : Icons.lock_outline_rounded,
-            color: _mutedColor,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                attachment.canDownload
+                    ? Icons.download_rounded
+                    : Icons.lock_outline_rounded,
+                color: _mutedColor,
+              ),
+              IconButton(
+                tooltip: 'Editar anexo',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                tooltip: 'Remover anexo',
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline_rounded),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+}
+
+class _PersonCrudDialog extends StatefulWidget {
+  const _PersonCrudDialog({this.initial});
+
+  final _PersonCrudSnapshot? initial;
+
+  @override
+  State<_PersonCrudDialog> createState() => _PersonCrudDialogState();
+}
+
+class _PersonCrudDialogState extends State<_PersonCrudDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _name;
+  late final TextEditingController _cpf;
+  late final TextEditingController _rg;
+  late final TextEditingController _email;
+  late final TextEditingController _phone;
+  late final TextEditingController _birthDate;
+  late final TextEditingController _notes;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _name = TextEditingController(text: initial?.name ?? '');
+    _cpf = TextEditingController(text: initial?.cpf ?? '');
+    _rg = TextEditingController(text: initial?.rg ?? '');
+    _email = TextEditingController(text: initial?.email ?? '');
+    _phone = TextEditingController(text: initial?.phone ?? '');
+    _birthDate = TextEditingController(text: initial?.birthDateInput ?? '');
+    _notes = TextEditingController(text: initial?.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _cpf.dispose();
+    _rg.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _birthDate.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final editing = widget.initial != null;
+
+    return AlertDialog(
+      title: Text(editing ? 'Editar pessoa' : 'Nova pessoa'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 560),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogTextField(
+                  controller: _name,
+                  label: 'Nome',
+                  icon: Icons.person_outline_rounded,
+                  required: true,
+                ),
+                _dialogTextField(
+                  controller: _cpf,
+                  label: 'CPF',
+                  icon: Icons.badge_outlined,
+                ),
+                _dialogTextField(
+                  controller: _rg,
+                  label: 'RG',
+                  icon: Icons.assignment_ind_outlined,
+                ),
+                _dialogTextField(
+                  controller: _email,
+                  label: 'Email',
+                  icon: Icons.mail_outline_rounded,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                _dialogTextField(
+                  controller: _phone,
+                  label: 'Telefone',
+                  icon: Icons.call_outlined,
+                  keyboardType: TextInputType.phone,
+                ),
+                _dialogTextField(
+                  controller: _birthDate,
+                  label: 'Nascimento',
+                  icon: Icons.cake_outlined,
+                  hintText: 'yyyy-mm-dd',
+                  dateLike: true,
+                ),
+                _dialogTextField(
+                  controller: _notes,
+                  label: 'Notas',
+                  icon: Icons.notes_outlined,
+                  minLines: 3,
+                  maxLines: 5,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(editing ? 'Salvar' : 'Criar'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _cleanMutationBody({
+        'name': _name.text,
+        'cpf': _cpf.text,
+        'rg': _rg.text,
+        'email': _email.text,
+        'phone': _phone.text,
+        'birthDate': _dateInputToIso(_birthDate.text),
+        'notes': _notes.text,
+      }),
+    );
+  }
+}
+
+class _OccurrenceCrudDialog extends StatefulWidget {
+  const _OccurrenceCrudDialog({required this.personPublicId, this.initial});
+
+  final String personPublicId;
+  final _OccurrenceRecord? initial;
+
+  @override
+  State<_OccurrenceCrudDialog> createState() => _OccurrenceCrudDialogState();
+}
+
+class _OccurrenceCrudDialogState extends State<_OccurrenceCrudDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _type;
+  late final TextEditingController _scope;
+  late final TextEditingController _title;
+  late final TextEditingController _description;
+  late final TextEditingController _occurredAt;
+  late final TextEditingController _severityLevel;
+  late String _nature;
+  late String _visibility;
+  late bool _showInExecutivePanel;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _type = TextEditingController(text: initial?.type ?? 'REGISTRO');
+    _scope = TextEditingController(text: initial?.scope ?? 'people-dossie');
+    _title = TextEditingController(text: initial?.title ?? '');
+    _description = TextEditingController(text: initial?.description ?? '');
+    _occurredAt = TextEditingController(
+      text: initial?.occurredAtInput ?? _todayInputDate(),
+    );
+    _severityLevel = TextEditingController(
+      text: initial?.severityLevel ?? 'LOW',
+    );
+    _nature = initial?.nature ?? 'NEUTRAL';
+    _visibility = initial?.visibility ?? 'INTERNAL';
+    _showInExecutivePanel = initial?.showInExecutivePanel ?? false;
+  }
+
+  @override
+  void dispose() {
+    _type.dispose();
+    _scope.dispose();
+    _title.dispose();
+    _description.dispose();
+    _occurredAt.dispose();
+    _severityLevel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final editing = widget.initial != null;
+
+    return AlertDialog(
+      title: Text(editing ? 'Editar ocorrencia' : 'Nova ocorrencia'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 600),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogTextField(
+                  controller: _title,
+                  label: 'Titulo',
+                  icon: Icons.title_rounded,
+                  required: true,
+                ),
+                _dialogTextField(
+                  controller: _description,
+                  label: 'Descricao',
+                  icon: Icons.notes_outlined,
+                  required: true,
+                  minLines: 3,
+                  maxLines: 5,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _type,
+                        label: 'Tipo',
+                        icon: Icons.category_outlined,
+                        required: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _scope,
+                        label: 'Escopo',
+                        icon: Icons.account_tree_outlined,
+                        required: true,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _occurredAt,
+                        label: 'Data',
+                        icon: Icons.calendar_month_outlined,
+                        required: true,
+                        hintText: 'yyyy-mm-dd',
+                        dateLike: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _severityLevel,
+                        label: 'Severidade',
+                        icon: Icons.priority_high_rounded,
+                        required: true,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogDropdown(
+                        label: 'Natureza',
+                        value: _nature,
+                        icon: Icons.timeline_rounded,
+                        values: const ['POSITIVE', 'NEUTRAL', 'NEGATIVE'],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _nature = value);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogDropdown(
+                        label: 'Visibilidade',
+                        value: _visibility,
+                        icon: Icons.visibility_outlined,
+                        values: const ['INTERNAL', 'SENSITIVE', 'CRITICAL'],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _visibility = value);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _showInExecutivePanel,
+                  onChanged: (value) {
+                    setState(() => _showInExecutivePanel = value);
+                  },
+                  title: const Text('Painel executivo'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(editing ? 'Salvar' : 'Criar'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _cleanMutationBody({
+        'personPublicId': widget.personPublicId,
+        'type': _type.text,
+        'scope': _scope.text,
+        'nature': _nature,
+        'title': _title.text,
+        'description': _description.text,
+        'occurredAt': _dateInputToIso(_occurredAt.text),
+        'severityLevel': _severityLevel.text,
+        'visibility': _visibility,
+        'showInExecutivePanel': _showInExecutivePanel,
+      }),
+    );
+  }
+}
+
+class _AttachmentCrudDialog extends StatefulWidget {
+  const _AttachmentCrudDialog({
+    required this.occurrences,
+    required this.ownerUserPublicId,
+    required this.allowedGroupKeys,
+  }) : initial = null;
+
+  const _AttachmentCrudDialog.edit({required this.initial})
+    : occurrences = const [],
+      ownerUserPublicId = '',
+      allowedGroupKeys = const [];
+
+  final List<_OccurrenceRecord> occurrences;
+  final String ownerUserPublicId;
+  final List<String> allowedGroupKeys;
+  final _AttachmentRecord? initial;
+
+  @override
+  State<_AttachmentCrudDialog> createState() => _AttachmentCrudDialogState();
+}
+
+class _AttachmentCrudDialogState extends State<_AttachmentCrudDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _fileName;
+  late final TextEditingController _displayScope;
+  late final TextEditingController _mimeType;
+  late final TextEditingController _externalLink;
+  late final TextEditingController _physicalLocation;
+  late String _classification;
+  late String _occurrencePublicId;
+
+  bool get _editing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _fileName = TextEditingController(text: initial?.title ?? '');
+    _displayScope = TextEditingController(
+      text: initial?.displayScope ?? 'dossie-rh',
+    );
+    _mimeType = TextEditingController(text: initial?.mimeType ?? '');
+    _externalLink = TextEditingController(text: initial?.externalLink ?? '');
+    _physicalLocation = TextEditingController(
+      text: initial?.physicalLocation ?? '',
+    );
+    _classification = _attachmentClassificationApiValue(
+      initial?.classification ?? _AttachmentClassification.supportingReference,
+    );
+    _occurrencePublicId =
+        initial?.occurrencePublicId ??
+        (widget.occurrences.isEmpty ? '' : widget.occurrences.first.publicId);
+  }
+
+  @override
+  void dispose() {
+    _fileName.dispose();
+    _displayScope.dispose();
+    _mimeType.dispose();
+    _externalLink.dispose();
+    _physicalLocation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_editing ? 'Editar anexo' : 'Novo anexo'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 580),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!_editing)
+                  _dialogDropdown(
+                    label: 'Ocorrencia',
+                    value: _occurrencePublicId,
+                    icon: Icons.event_note_outlined,
+                    values: [
+                      for (final occurrence in widget.occurrences)
+                        occurrence.publicId,
+                    ],
+                    labels: {
+                      for (final occurrence in widget.occurrences)
+                        occurrence.publicId: occurrence.title,
+                    },
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _occurrencePublicId = value);
+                      }
+                    },
+                  ),
+                _dialogTextField(
+                  controller: _fileName,
+                  label: 'Arquivo',
+                  icon: Icons.insert_drive_file_outlined,
+                  required: true,
+                ),
+                _dialogTextField(
+                  controller: _displayScope,
+                  label: 'Escopo',
+                  icon: Icons.account_tree_outlined,
+                  required: true,
+                ),
+                _dialogDropdown(
+                  label: 'Classificacao',
+                  value: _classification,
+                  icon: Icons.lock_outline_rounded,
+                  values: const [
+                    'FORMAL_DOCUMENT',
+                    'SENSITIVE_ATTACHMENT',
+                    'SUPPORTING_REFERENCE',
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _classification = value);
+                    }
+                  },
+                ),
+                _dialogTextField(
+                  controller: _mimeType,
+                  label: 'MIME',
+                  icon: Icons.code_rounded,
+                ),
+                _dialogTextField(
+                  controller: _externalLink,
+                  label: 'Link externo',
+                  icon: Icons.link_rounded,
+                ),
+                _dialogTextField(
+                  controller: _physicalLocation,
+                  label: 'Local fisico',
+                  icon: Icons.inventory_2_outlined,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_editing ? 'Salvar' : 'Criar'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final baseBody = <String, Object?>{
+      'displayScope': _displayScope.text,
+      'classification': _classification,
+      'fileName': _fileName.text,
+      'mimeType': _mimeType.text,
+      'externalLink': _externalLink.text,
+      'physicalLocation': _physicalLocation.text,
+      'visibleInContext': true,
+    };
+
+    if (!_editing) {
+      baseBody.addAll({
+        'occurrencePublicId': _occurrencePublicId,
+        'ownerUserPublicId': widget.ownerUserPublicId,
+        'allowedGroupKeys': widget.allowedGroupKeys,
+      });
+    }
+
+    Navigator.of(context).pop(_cleanMutationBody(baseBody));
   }
 }
 
@@ -1216,6 +2235,144 @@ Color _attachmentColorFor(_AttachmentRecord attachment) {
   return attachment.classification.color;
 }
 
+Widget _dialogTextField({
+  required TextEditingController controller,
+  required String label,
+  required IconData icon,
+  bool required = false,
+  bool dateLike = false,
+  String? hintText,
+  int minLines = 1,
+  int maxLines = 1,
+  TextInputType? keyboardType,
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextFormField(
+      controller: controller,
+      minLines: minLines,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+      validator: (value) {
+        final text = value?.trim() ?? '';
+        if (required && text.isEmpty) {
+          return 'Campo obrigatorio';
+        }
+        if (dateLike && text.isNotEmpty && !_isValidInputDate(text)) {
+          return 'Use yyyy-mm-dd';
+        }
+        return null;
+      },
+    ),
+  );
+}
+
+Widget _dialogDropdown({
+  required String label,
+  required String value,
+  required IconData icon,
+  required List<String> values,
+  required ValueChanged<String?> onChanged,
+  Map<String, String> labels = const {},
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DropdownButtonFormField<String>(
+      initialValue: values.contains(value)
+          ? value
+          : values.isEmpty
+          ? null
+          : values.first,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        for (final item in values)
+          DropdownMenuItem<String>(
+            value: item,
+            child: Text(labels[item] ?? item, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: values.isEmpty ? null : onChanged,
+      validator: (value) =>
+          value == null || value.isEmpty ? 'Campo obrigatorio' : null,
+    ),
+  );
+}
+
+Map<String, dynamic> _cleanMutationBody(Map<String, Object?> raw) {
+  final body = <String, dynamic>{};
+
+  for (final entry in raw.entries) {
+    final value = entry.value;
+    if (value == null) {
+      continue;
+    }
+    if (value is String) {
+      final text = value.trim();
+      if (text.isNotEmpty) {
+        body[entry.key] = text;
+      }
+      continue;
+    }
+    if (value is List && value.isEmpty) {
+      continue;
+    }
+    body[entry.key] = value;
+  }
+
+  return body;
+}
+
+String? _dateInputToIso(String value) {
+  final text = value.trim();
+  if (text.isEmpty) {
+    return null;
+  }
+  final date = DateTime.tryParse(text);
+  if (date == null) {
+    return null;
+  }
+  return DateTime.utc(date.year, date.month, date.day).toIso8601String();
+}
+
+bool _isValidInputDate(String value) {
+  final match = RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value.trim());
+  return match && DateTime.tryParse(value.trim()) != null;
+}
+
+String _todayInputDate() {
+  final now = DateTime.now();
+  final month = now.month.toString().padLeft(2, '0');
+  final day = now.day.toString().padLeft(2, '0');
+  return '${now.year}-$month-$day';
+}
+
+String _attachmentClassificationApiValue(
+  _AttachmentClassification classification,
+) {
+  return switch (classification) {
+    _AttachmentClassification.formalDocument => 'FORMAL_DOCUMENT',
+    _AttachmentClassification.sensitiveAttachment => 'SENSITIVE_ATTACHMENT',
+    _AttachmentClassification.supportingReference => 'SUPPORTING_REFERENCE',
+  };
+}
+
+String _peopleMutationErrorMessage(Object error) {
+  if (error is _ApiException) {
+    return 'Falha na API (${error.code}): ${error.message}';
+  }
+  return 'Nao foi possivel concluir a operacao.';
+}
+
 class _SensitiveSectionGroup {
   const _SensitiveSectionGroup({
     required this.title,
@@ -1240,6 +2397,8 @@ class _PersonProfileData {
     required this.departmentLabel,
     required this.timelineSummary,
     required this.employmentLinks,
+    this.crudSnapshot,
+    this.occurrences = const [],
   });
 
   final String roleTitle;
@@ -1252,6 +2411,62 @@ class _PersonProfileData {
   final String departmentLabel;
   final String timelineSummary;
   final List<_EmploymentLinkRecord> employmentLinks;
+  final _PersonCrudSnapshot? crudSnapshot;
+  final List<_OccurrenceRecord> occurrences;
+}
+
+class _PersonCrudSnapshot {
+  const _PersonCrudSnapshot({
+    required this.publicId,
+    required this.name,
+    required this.cpf,
+    required this.rg,
+    required this.email,
+    required this.phone,
+    required this.birthDateInput,
+    required this.notes,
+  });
+
+  final String publicId;
+  final String name;
+  final String cpf;
+  final String rg;
+  final String email;
+  final String phone;
+  final String birthDateInput;
+  final String notes;
+}
+
+class _OccurrenceRecord {
+  const _OccurrenceRecord({
+    required this.publicId,
+    required this.type,
+    required this.scope,
+    required this.nature,
+    required this.title,
+    required this.description,
+    required this.occurredAtInput,
+    required this.occurredAtLabel,
+    required this.severityLevel,
+    required this.visibility,
+    required this.status,
+    required this.attachmentCount,
+    this.showInExecutivePanel = false,
+  });
+
+  final String publicId;
+  final String type;
+  final String scope;
+  final String nature;
+  final String title;
+  final String description;
+  final String occurredAtInput;
+  final String occurredAtLabel;
+  final String severityLevel;
+  final String visibility;
+  final String status;
+  final int attachmentCount;
+  final bool showInExecutivePanel;
 }
 
 class _PersonInfoField {

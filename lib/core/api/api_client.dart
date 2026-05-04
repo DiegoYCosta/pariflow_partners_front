@@ -63,6 +63,40 @@ class _ApiClient {
     return _decodeMap(response);
   }
 
+  Future<Map<String, dynamic>> patchMap(
+    String path, {
+    required Map<String, dynamic> body,
+    bool requiresAuth = true,
+  }) async {
+    if (requiresAuth) {
+      await ensureDevelopmentSession();
+    }
+
+    final response = await _httpClient.patch(
+      _uri(path),
+      headers: _headers(requiresAuth: requiresAuth),
+      body: jsonEncode(body),
+    );
+
+    return _decodeMap(response);
+  }
+
+  Future<Map<String, dynamic>> deleteMap(
+    String path, {
+    bool requiresAuth = true,
+  }) async {
+    if (requiresAuth) {
+      await ensureDevelopmentSession();
+    }
+
+    final response = await _httpClient.delete(
+      _uri(path),
+      headers: _headers(requiresAuth: requiresAuth),
+    );
+
+    return _decodeMap(response);
+  }
+
   Uri _uri(String path, {Map<String, String?> query = const {}}) {
     final base = Uri.parse(baseUrl);
     final cleanQuery = <String, String>{};

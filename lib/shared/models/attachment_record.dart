@@ -23,12 +23,9 @@ extension on _AttachmentClassification {
   };
 
   IconData get icon => switch (this) {
-    _AttachmentClassification.formalDocument =>
-      Icons.description_outlined,
-    _AttachmentClassification.sensitiveAttachment =>
-      Icons.lock_outline_rounded,
-    _AttachmentClassification.supportingReference =>
-      Icons.attach_file_rounded,
+    _AttachmentClassification.formalDocument => Icons.description_outlined,
+    _AttachmentClassification.sensitiveAttachment => Icons.lock_outline_rounded,
+    _AttachmentClassification.supportingReference => Icons.attach_file_rounded,
   };
 
   Color get color => switch (this) {
@@ -36,29 +33,42 @@ extension on _AttachmentClassification {
     _AttachmentClassification.sensitiveAttachment => _roseColor,
     _AttachmentClassification.supportingReference => _amberColor,
   };
-
 }
 
 class _AttachmentRecord {
   const _AttachmentRecord({
     required this.publicId,
+    this.occurrencePublicId = '',
     required this.title,
     required this.classification,
     required this.summary,
     required this.status,
     required this.updatedAtLabel,
     required this.accessPolicy,
+    this.displayScope = '',
+    this.mimeType = '',
+    this.externalLink = '',
+    this.physicalLocation = '',
     this.canDownload = true,
+    this.canEdit = false,
+    this.canDelete = false,
   });
 
   final String publicId;
+  final String occurrencePublicId;
   final String title;
   final _AttachmentClassification classification;
   final String summary;
   final String status;
   final String updatedAtLabel;
   final _ProtectedAccessPolicy accessPolicy;
+  final String displayScope;
+  final String mimeType;
+  final String externalLink;
+  final String physicalLocation;
   final bool canDownload;
+  final bool canEdit;
+  final bool canDelete;
 
   String accessSummary(_ViewerAccessProfile viewer) {
     if (!accessPolicy.canViewerRead(viewer)) {

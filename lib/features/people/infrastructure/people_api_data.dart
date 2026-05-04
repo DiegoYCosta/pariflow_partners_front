@@ -6,6 +6,48 @@ class _PeopleApiRepository {
 
   final _ApiClient _apiClient;
 
+  Future<void> createPerson(Map<String, dynamic> body) async {
+    await _apiClient.postMap('pessoas', body: body);
+  }
+
+  Future<void> updatePerson(String publicId, Map<String, dynamic> body) async {
+    await _apiClient.patchMap('pessoas/$publicId', body: body);
+  }
+
+  Future<void> removePerson(String publicId) async {
+    await _apiClient.deleteMap('pessoas/$publicId');
+  }
+
+  Future<void> createOccurrence(Map<String, dynamic> body) async {
+    await _apiClient.postMap('ocorrencias', body: body);
+  }
+
+  Future<void> updateOccurrence(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('ocorrencias/$publicId', body: body);
+  }
+
+  Future<void> removeOccurrence(String publicId) async {
+    await _apiClient.deleteMap('ocorrencias/$publicId');
+  }
+
+  Future<void> createAttachment(Map<String, dynamic> body) async {
+    await _apiClient.postMap('anexos', body: body);
+  }
+
+  Future<void> updateAttachment(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('anexos/$publicId', body: body);
+  }
+
+  Future<void> removeAttachment(String publicId) async {
+    await _apiClient.deleteMap('anexos/$publicId');
+  }
+
   Future<_PeopleRuntimeData> loadWorkspaceData() async {
     final session = await _apiClient.ensureDevelopmentSession();
     final peopleEnvelope = await _apiClient.getMap(
@@ -207,7 +249,10 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
       .where((tag) => tag['canView'] != false)
       .map(_sensitiveNoteFromApi)
       .toList(growable: false);
-  final occurrenceCount = bundle.occurrences.length;
+  final occurrences = bundle.occurrences
+      .map(_occurrenceFromApi)
+      .toList(growable: false);
+  final occurrenceCount = occurrences.length;
   final attachments = bundle.attachments
       .where((attachment) => attachment['canView'] != false)
       .map(_attachmentFromApi)
@@ -237,14 +282,14 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
     ],
     attachments: attachments,
     sensitiveNotes: tags,
-    personProfile: _personProfileFromApi(person, links, bundle.occurrences),
+    personProfile: _personProfileFromApi(person, links, occurrences),
   );
 }
 
 _PersonProfileData _personProfileFromApi(
   Map<String, dynamic> person,
   List<Map<String, dynamic>> links,
-  List<Map<String, dynamic>> occurrences,
+  List<_OccurrenceRecord> occurrences,
 ) {
   final currentLink = _currentApiLink(links);
   final roleTitle = _apiRoleTitle(currentLink);
@@ -326,6 +371,17 @@ _PersonProfileData _personProfileFromApi(
     timelineSummary:
         '${links.length} vinculos e ${occurrences.length} ocorrencias carregados diretamente da API.',
     employmentLinks: links.map(_employmentLinkFromApi).toList(growable: false),
+    crudSnapshot: _PersonCrudSnapshot(
+      publicId: _apiText(person['publicId']),
+      name: _apiText(person['name']),
+      cpf: _apiText(person['cpf']),
+      rg: _apiText(person['rg']),
+      email: _apiText(person['email']),
+      phone: _apiText(person['phone']),
+      birthDateInput: _apiDateInput(person['birthDate']),
+      notes: _apiText(person['notes']),
+    ),
+    occurrences: occurrences,
   );
 }
 
@@ -362,6 +418,24 @@ _EmploymentLinkRecord _employmentLinkFromApi(Map<String, dynamic> link) {
   );
 }
 
+_OccurrenceRecord _occurrenceFromApi(Map<String, dynamic> occurrence) {
+  return _OccurrenceRecord(
+    publicId: _apiText(occurrence['publicId']),
+    type: _apiText(occurrence['type'], fallback: 'REGISTRO'),
+    scope: _apiText(occurrence['scope'], fallback: 'people-dossie'),
+    nature: _apiText(occurrence['nature'], fallback: 'NEUTRAL'),
+    title: _apiText(occurrence['title'], fallback: 'Ocorrencia sem titulo'),
+    description: _apiText(occurrence['description']),
+    occurredAtInput: _apiDateInput(occurrence['occurredAt']),
+    occurredAtLabel: _apiLongDate(occurrence['occurredAt']),
+    severityLevel: _apiText(occurrence['severityLevel'], fallback: 'LOW'),
+    visibility: _apiText(occurrence['visibility'], fallback: 'INTERNAL'),
+    status: _apiText(occurrence['status'], fallback: 'ACTIVE'),
+    attachmentCount: _apiInt(occurrence['attachmentCount']),
+    showInExecutivePanel: occurrence['showInExecutivePanel'] == true,
+  );
+}
+
 _SensitiveNoteTag _sensitiveNoteFromApi(Map<String, dynamic> tag) {
   final classification = _sensitiveClassificationFromApi(
     _apiText(tag['classification']),
@@ -389,13 +463,21 @@ _AttachmentRecord _attachmentFromApi(Map<String, dynamic> attachment) {
 
   return _AttachmentRecord(
     publicId: _apiText(attachment['publicId']),
+    occurrencePublicId: _apiText(attachment['occurrencePublicId']),
     title: _apiText(attachment['fileName'], fallback: 'Anexo protegido'),
     classification: classification,
     summary: _attachmentSummaryFromApi(attachment),
     status: _apiText(attachment['status'], fallback: 'ACTIVE').toLowerCase(),
     updatedAtLabel: 'atualizado em ${_apiLongDate(updatedAt)}',
     accessPolicy: _apiReturnedContentAccessPolicy,
+    displayScope: _apiText(attachment['displayScope']),
+    mimeType: _apiText(attachment['mimeType']),
+    externalLink: _apiText(attachment['externalLink']),
+    physicalLocation: _apiText(attachment['physicalLocation']),
     canDownload: attachment['canDownload'] != false,
+    canEdit: attachment['canEdit'] == true || attachment['canManage'] == true,
+    canDelete:
+        attachment['canDelete'] == true || attachment['canManage'] == true,
   );
 }
 
@@ -526,6 +608,16 @@ String _apiLongDate(Object? value) {
   final day = date.day.toString().padLeft(2, '0');
   final month = date.month.toString().padLeft(2, '0');
   return '$day/$month/${date.year}';
+}
+
+String _apiDateInput(Object? value) {
+  final date = _apiDate(value);
+  if (date == null) {
+    return '';
+  }
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return '${date.year}-$month-$day';
 }
 
 Color _apiColor(String value, {required Color fallback}) {
