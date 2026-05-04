@@ -115,33 +115,101 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
     );
   }
 
+  Future<void> _openEditCompanyDialog(_EntityItem item) async {
+    final snapshot = item.providerCompanySnapshot;
+    if (snapshot == null) {
+      _showEntityUnavailableAction(context);
+      return;
+    }
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _ProviderCompanyCrudDialog(initial: snapshot),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.updateProviderCompany(item.publicId, body),
+      successMessage: 'Empresa prestadora atualizada na API.',
+    );
+  }
+
+  Future<void> _removeCompany(_EntityItem item) async {
+    final confirmed = await _confirmEntityAction(
+      context: context,
+      title: 'Inativar prestadora',
+      message:
+          'A prestadora sera inativada sem apagar contratos, vinculos ou historico.',
+      confirmLabel: 'Inativar',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.removeProviderCompany(item.publicId),
+      successMessage: 'Empresa prestadora inativada.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _EntityWorkspace(
-      data: _runtimeData.data,
-      viewerProfile: widget.viewerProfile,
-      selectedIndex: widget.selectedIndex,
-      onSelectItem: widget.onSelectItem,
-      sourceLabel: _runtimeData.sourceLabel,
-      isLive: _runtimeData.isLive,
-      isLoading: _runtimeData.isLoading,
-      errorMessage: _runtimeData.errorMessage,
-      searchController: _searchController,
-      onSubmitSearch: _loadCompanies,
-      onClearSearch: () {
-        _searchController.clear();
-        _loadCompanies();
-      },
-      onRefresh: _loadCompanies,
-      primaryActionLabel: 'Nova prestadora',
-      primaryActionIcon: Icons.apartment_outlined,
-      onPrimaryAction: _openCreateCompanyDialog,
+    final data = _runtimeData.data;
+    final selectedItem = data.items.isEmpty
+        ? null
+        : data.items[min(max(widget.selectedIndex, 0), data.items.length - 1)];
+
+    return Column(
+      children: [
+        _EntityWorkspace(
+          data: data,
+          viewerProfile: widget.viewerProfile,
+          selectedIndex: widget.selectedIndex,
+          onSelectItem: widget.onSelectItem,
+          sourceLabel: _runtimeData.sourceLabel,
+          isLive: _runtimeData.isLive,
+          isLoading: _runtimeData.isLoading,
+          errorMessage: _runtimeData.errorMessage,
+          searchController: _searchController,
+          onSubmitSearch: _loadCompanies,
+          onClearSearch: () {
+            _searchController.clear();
+            _loadCompanies();
+          },
+          onRefresh: _loadCompanies,
+          primaryActionLabel: 'Nova prestadora',
+          primaryActionIcon: Icons.apartment_outlined,
+          onPrimaryAction: _openCreateCompanyDialog,
+        ),
+        const SizedBox(height: 24),
+        _EntityCrudActionsPanel(
+          item: selectedItem,
+          title: 'Gestao da prestadora',
+          summary:
+              'Edicao e inativacao preservam historico para contratos, People e Network.',
+          editLabel: 'Editar prestadora',
+          removeLabel: 'Inativar prestadora',
+          isLoading: _runtimeData.isLoading,
+          onEdit: selectedItem == null
+              ? null
+              : () => _openEditCompanyDialog(selectedItem),
+          onRemove: selectedItem == null
+              ? null
+              : () => _removeCompany(selectedItem),
+        ),
+      ],
     );
   }
 }
 
 class _ProviderCompanyCrudDialog extends StatefulWidget {
-  const _ProviderCompanyCrudDialog();
+  const _ProviderCompanyCrudDialog({this.initial});
+
+  final _ProviderCompanyCrudSnapshot? initial;
 
   @override
   State<_ProviderCompanyCrudDialog> createState() =>
@@ -159,6 +227,23 @@ class _ProviderCompanyCrudDialogState
   final TextEditingController _notes = TextEditingController();
   String _status = 'ACTIVE';
 
+  bool get _editing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _legalName.text = initial.legalName;
+      _tradeName.text = initial.tradeName;
+      _document.text = initial.document;
+      _email.text = initial.email;
+      _phone.text = initial.phone;
+      _notes.text = initial.notes;
+      _status = initial.status.isEmpty ? 'ACTIVE' : initial.status;
+    }
+  }
+
   @override
   void dispose() {
     _legalName.dispose();
@@ -173,7 +258,7 @@ class _ProviderCompanyCrudDialogState
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nova prestadora'),
+      title: Text(_editing ? 'Editar prestadora' : 'Nova prestadora'),
       content: SizedBox(
         width: min(MediaQuery.sizeOf(context).width - 48, 620),
         child: Form(
@@ -246,7 +331,10 @@ class _ProviderCompanyCrudDialogState
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Criar')),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_editing ? 'Salvar' : 'Criar'),
+        ),
       ],
     );
   }
@@ -272,4 +360,122 @@ class _ProviderCompanyCrudDialogState
       }),
     );
   }
+}
+
+class _EntityCrudActionsPanel extends StatelessWidget {
+  const _EntityCrudActionsPanel({
+    required this.item,
+    required this.title,
+    required this.summary,
+    required this.editLabel,
+    required this.removeLabel,
+    required this.isLoading,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  final _EntityItem? item;
+  final String title;
+  final String summary;
+  final String editLabel;
+  final String removeLabel;
+  final bool isLoading;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _Panel(
+      padding: const EdgeInsets.all(22),
+      child: Wrap(
+        spacing: 14,
+        runSpacing: 14,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(title, style: theme.textTheme.titleLarge),
+                    if (item != null)
+                      _Tag(
+                        label: item!.publicId,
+                        icon: Icons.tag_outlined,
+                        color: _slateColor,
+                        background: _slateColor.withValues(alpha: 0.12),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  item == null ? 'Selecione um registro para editar.' : summary,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: _mutedColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton.icon(
+                onPressed: isLoading ? null : onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: Text(editLabel),
+              ),
+              OutlinedButton.icon(
+                onPressed: isLoading ? null : onRemove,
+                icon: const Icon(Icons.archive_outlined),
+                label: Text(removeLabel),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<bool> _confirmEntityAction({
+  required BuildContext context,
+  required String title,
+  required String message,
+  required String confirmLabel,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+  return result == true;
+}
+
+void _showEntityUnavailableAction(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Acao disponivel apenas com dados reais da API.'),
+    ),
+  );
 }

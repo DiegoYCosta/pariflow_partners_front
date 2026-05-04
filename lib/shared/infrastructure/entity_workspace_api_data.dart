@@ -152,12 +152,45 @@ class _EntityWorkspaceApiRepository {
     await _apiClient.postMap('empresas-prestadoras', body: body);
   }
 
+  Future<void> updateProviderCompany(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('empresas-prestadoras/$publicId', body: body);
+  }
+
+  Future<void> removeProviderCompany(String publicId) async {
+    await _apiClient.deleteMap('empresas-prestadoras/$publicId');
+  }
+
   Future<void> createClientCompany(Map<String, dynamic> body) async {
     await _apiClient.postMap('clientes', body: body);
   }
 
+  Future<void> updateClientCompany(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('clientes/$publicId', body: body);
+  }
+
+  Future<void> removeClientCompany(String publicId) async {
+    await _apiClient.deleteMap('clientes/$publicId');
+  }
+
   Future<void> createContract(Map<String, dynamic> body) async {
     await _apiClient.postMap('contratos', body: body);
+  }
+
+  Future<void> updateContract(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('contratos/$publicId', body: body);
+  }
+
+  Future<void> removeContract(String publicId) async {
+    await _apiClient.deleteMap('contratos/$publicId');
   }
 
   Future<List<_EntitySelectOption>> loadContractTypes() async {
@@ -200,6 +233,47 @@ class _EntityWorkspaceApiRepository {
 
   Future<void> removeContractModel(String publicId) async {
     await _apiClient.deleteMap('contratos/modelos/$publicId');
+  }
+
+  Future<List<_EntitySelectOption>> loadContractServices() async {
+    await _apiClient.ensureDevelopmentSession();
+    final data = await _apiClient.getMap('contratos/servicos');
+    return _apiMapList(
+      data['items'],
+    ).map(_contractServiceOptionFromApi).toList();
+  }
+
+  Future<void> createContractService(Map<String, dynamic> body) async {
+    await _apiClient.postMap('contratos/servicos', body: body);
+  }
+
+  Future<void> updateContractService(
+    String publicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('contratos/servicos/$publicId', body: body);
+  }
+
+  Future<void> removeContractService(String publicId) async {
+    await _apiClient.deleteMap('contratos/servicos/$publicId');
+  }
+
+  Future<void> createContractPosition(
+    String contractPublicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.postMap('contratos/$contractPublicId/postos', body: body);
+  }
+
+  Future<void> updateContractPosition(
+    String positionPublicId,
+    Map<String, dynamic> body,
+  ) async {
+    await _apiClient.patchMap('contratos/postos/$positionPublicId', body: body);
+  }
+
+  Future<void> removeContractPosition(String positionPublicId) async {
+    await _apiClient.deleteMap('contratos/postos/$positionPublicId');
   }
 
   Future<void> createContractDocument(
@@ -330,6 +404,98 @@ class _ContractLookupData {
   final List<_EntitySelectOption> contractModels;
 }
 
+class _ProviderCompanyCrudSnapshot {
+  const _ProviderCompanyCrudSnapshot({
+    required this.publicId,
+    required this.legalName,
+    required this.tradeName,
+    required this.document,
+    required this.status,
+    required this.email,
+    required this.phone,
+    required this.notes,
+  });
+
+  final String publicId;
+  final String legalName;
+  final String tradeName;
+  final String document;
+  final String status;
+  final String email;
+  final String phone;
+  final String notes;
+}
+
+class _ClientCompanyCrudSnapshot {
+  const _ClientCompanyCrudSnapshot({
+    required this.publicId,
+    required this.name,
+    required this.document,
+    required this.clientType,
+    required this.status,
+    required this.contactName,
+    required this.city,
+    required this.state,
+  });
+
+  final String publicId;
+  final String name;
+  final String document;
+  final String clientType;
+  final String status;
+  final String contactName;
+  final String city;
+  final String state;
+}
+
+class _ContractCrudSnapshot {
+  const _ContractCrudSnapshot({
+    required this.publicId,
+    required this.providerCompanyPublicId,
+    required this.clientCompanyPublicId,
+    required this.contractTypePublicId,
+    required this.contractModelPublicId,
+    required this.startsAtInput,
+    required this.endsAtInput,
+    required this.status,
+    required this.notes,
+  });
+
+  final String publicId;
+  final String providerCompanyPublicId;
+  final String clientCompanyPublicId;
+  final String contractTypePublicId;
+  final String contractModelPublicId;
+  final String startsAtInput;
+  final String endsAtInput;
+  final String status;
+  final String notes;
+}
+
+class _ContractPositionRecord {
+  const _ContractPositionRecord({
+    required this.publicId,
+    required this.servicePublicId,
+    required this.serviceName,
+    required this.name,
+    required this.location,
+    required this.shift,
+    required this.schedule,
+    required this.requirements,
+    required this.status,
+  });
+
+  final String publicId;
+  final String servicePublicId;
+  final String serviceName;
+  final String name;
+  final String location;
+  final String shift;
+  final String schedule;
+  final String requirements;
+  final String status;
+}
+
 class _EntitySelectOption {
   const _EntitySelectOption({
     required this.publicId,
@@ -388,6 +554,16 @@ _EntityItem _providerCompanyItemFromApi(
   final linkCount = _apiInt(company['linkCount']);
   final occurrenceCount = _apiInt(company['occurrenceCount']);
   final contacts = _apiMap(company['contactsJson']);
+  final snapshot = _ProviderCompanyCrudSnapshot(
+    publicId: publicId,
+    legalName: legalName,
+    tradeName: tradeName,
+    document: _apiText(company['document']),
+    status: status,
+    email: _apiText(contacts['email']),
+    phone: _apiText(contacts['phone']),
+    notes: notes,
+  );
 
   return _EntityItem(
     publicId: publicId,
@@ -415,6 +591,7 @@ _EntityItem _providerCompanyItemFromApi(
       if (contacts.isNotEmpty) 'Contatos: ${_entityJsonSummary(contacts)}',
       'Atualizado em: ${_apiLongDate(company['updatedAt'])}',
     ],
+    providerCompanySnapshot: snapshot,
   );
 }
 
@@ -429,6 +606,16 @@ _EntityItem _clientCompanyItemFromApi(
   final color = _entityStatusColor(status);
   final contactName = _apiText(client['contactName']);
   final address = _apiMap(client['addressJson']);
+  final snapshot = _ClientCompanyCrudSnapshot(
+    publicId: publicId,
+    name: name,
+    document: _apiText(client['document']),
+    clientType: clientType,
+    status: status,
+    contactName: contactName,
+    city: _apiText(address['city']),
+    state: _apiText(address['state']),
+  );
   final relatedContracts = contracts
       .where(
         (contract) =>
@@ -473,6 +660,7 @@ _EntityItem _clientCompanyItemFromApi(
       'Atualizado em: ${_apiLongDate(client['updatedAt'])}',
       'Proximo backend: detalhe de cliente com prestadoras ativas, historicas e pessoas impactadas.',
     ],
+    clientCompanySnapshot: snapshot,
   );
 }
 
@@ -506,6 +694,20 @@ _EntityItem _contractItemFromApi(Map<String, dynamic> contract) {
   final documents = _apiMapList(
     contract['documents'],
   ).map(_contractDocumentFromApi).toList(growable: false);
+  final positions = _apiMapList(
+    contract['positions'],
+  ).map(_contractPositionFromApi).toList(growable: false);
+  final snapshot = _ContractCrudSnapshot(
+    publicId: publicId,
+    providerCompanyPublicId: _apiText(provider['publicId']),
+    clientCompanyPublicId: _apiText(client['publicId']),
+    contractTypePublicId: _apiText(contractType['publicId']),
+    contractModelPublicId: _apiText(contractModel['publicId']),
+    startsAtInput: _apiDateInput(contract['startsAt']),
+    endsAtInput: _apiDateInput(contract['endsAt']),
+    status: status,
+    notes: notes,
+  );
 
   return _EntityItem(
     publicId: publicId,
@@ -532,9 +734,12 @@ _EntityItem _contractItemFromApi(Map<String, dynamic> contract) {
       'Fim: $endsAt',
       'Status de dominio: $status',
       if (notes.isNotEmpty) 'Notas: $notes',
+      'Postos do contrato: ${_pluralCount(positions.length, 'posto', 'postos')}',
       'Atualizado em: ${_apiLongDate(contract['updatedAt'])}',
     ],
     attachments: documents,
+    contractSnapshot: snapshot,
+    contractPositions: positions,
   );
 }
 
@@ -576,6 +781,39 @@ _EntitySelectOption _contractModelOptionFromApi(Map<String, dynamic> model) {
     ),
     status: _apiText(model['status'], fallback: 'ACTIVE'),
     parentPublicId: _apiText(type['publicId']),
+  );
+}
+
+_EntitySelectOption _contractServiceOptionFromApi(
+  Map<String, dynamic> service,
+) {
+  final active = service['isActive'] != false;
+  final category = _apiText(service['category']);
+  final description = _apiText(service['description']);
+
+  return _EntitySelectOption(
+    publicId: _apiText(service['publicId']),
+    label: _apiText(service['name'], fallback: 'Servico sem nome'),
+    description: description,
+    status: active ? 'ACTIVE' : 'INACTIVE',
+    parentPublicId: category,
+  );
+}
+
+_ContractPositionRecord _contractPositionFromApi(
+  Map<String, dynamic> position,
+) {
+  final service = _apiMap(position['service']);
+  return _ContractPositionRecord(
+    publicId: _apiText(position['publicId']),
+    servicePublicId: _apiText(service['publicId']),
+    serviceName: _apiText(service['name'], fallback: 'Servico nao informado'),
+    name: _apiText(position['name'], fallback: 'Posto sem nome'),
+    location: _apiText(position['location']),
+    shift: _apiText(position['shift']),
+    schedule: _apiText(position['schedule']),
+    requirements: _apiText(position['requirements']),
+    status: _apiText(position['status'], fallback: 'ACTIVE'),
   );
 }
 

@@ -238,6 +238,14 @@ String get _defaultApiBaseUrl {
   }
 
   if (kIsWeb) {
+    if (kReleaseMode &&
+        Uri.base.hasScheme &&
+        Uri.base.host.isNotEmpty &&
+        Uri.base.host != 'localhost' &&
+        Uri.base.host != '127.0.0.1') {
+      return Uri.base.replace(path: 'api/v1', query: '').toString();
+    }
+
     return 'http://localhost:3000/api/v1';
   }
 

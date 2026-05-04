@@ -1167,6 +1167,10 @@ class _EntityItem {
     this.attachments = const [],
     this.sensitiveNotes = const [],
     this.personProfile,
+    this.providerCompanySnapshot,
+    this.clientCompanySnapshot,
+    this.contractSnapshot,
+    this.contractPositions = const [],
   });
 
   final String publicId;
@@ -1181,4 +1185,8 @@ class _EntityItem {
   final List<_AttachmentRecord> attachments;
   final List<_SensitiveNoteTag> sensitiveNotes;
   final _PersonProfileData? personProfile;
+  final _ProviderCompanyCrudSnapshot? providerCompanySnapshot;
+  final _ClientCompanyCrudSnapshot? clientCompanySnapshot;
+  final _ContractCrudSnapshot? contractSnapshot;
+  final List<_ContractPositionRecord> contractPositions;
 }

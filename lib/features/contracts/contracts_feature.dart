@@ -24,6 +24,7 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
   );
   List<_EntitySelectOption> _contractTypes = const [];
   List<_EntitySelectOption> _contractModels = const [];
+  List<_EntitySelectOption> _contractServices = const [];
   bool _catalogLoading = false;
   String? _catalogErrorMessage;
 
@@ -78,6 +79,7 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
       final results = await Future.wait([
         _repository.loadContractTypes(),
         _repository.loadContractModels(),
+        _repository.loadContractServices(),
       ]);
       if (!mounted) {
         return;
@@ -85,6 +87,7 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
       setState(() {
         _contractTypes = results[0];
         _contractModels = results[1];
+        _contractServices = results[2];
         _catalogLoading = false;
       });
     } catch (error) {
@@ -273,6 +276,132 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
     );
   }
 
+  Future<void> _openCreateServiceDialog() async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _ContractServiceCrudDialog(),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.createContractService(body),
+      successMessage: 'Servico criado na API.',
+      reloadCatalog: true,
+    );
+  }
+
+  Future<void> _openEditServiceDialog(_EntitySelectOption service) async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _ContractServiceCrudDialog(initial: service),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.updateContractService(service.publicId, body),
+      successMessage: 'Servico atualizado na API.',
+      reloadCatalog: true,
+    );
+  }
+
+  Future<void> _removeService(_EntitySelectOption service) async {
+    final confirmed = await _confirmContractAction(
+      title: 'Inativar servico',
+      message:
+          'O servico sera inativado. Postos existentes continuam preservados para historico.',
+      confirmLabel: 'Inativar',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.removeContractService(service.publicId),
+      successMessage: 'Servico inativado.',
+      reloadCatalog: true,
+    );
+  }
+
+  Future<void> _openCreatePositionDialog(_EntityItem item) async {
+    final activeServices = _contractServices
+        .where((service) => service.status.toUpperCase() == 'ACTIVE')
+        .toList(growable: false);
+
+    if (activeServices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Crie um servico ativo antes do posto.')),
+      );
+      return;
+    }
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) =>
+          _ContractPositionCrudDialog(services: activeServices),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.createContractPosition(item.publicId, body),
+      successMessage: 'Posto criado no contrato.',
+    );
+  }
+
+  Future<void> _openEditPositionDialog(_ContractPositionRecord position) async {
+    final activeServices = _contractServices
+        .where(
+          (service) =>
+              service.status.toUpperCase() == 'ACTIVE' ||
+              service.publicId == position.servicePublicId,
+        )
+        .toList(growable: false);
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _ContractPositionCrudDialog(
+        services: activeServices,
+        initial: position,
+      ),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.updateContractPosition(position.publicId, body),
+      successMessage: 'Posto atualizado.',
+    );
+  }
+
+  Future<void> _removePosition(_ContractPositionRecord position) async {
+    final confirmed = await _confirmContractAction(
+      title: 'Inativar posto',
+      message:
+          'O posto sera inativado sem remover vinculos historicos de pessoas.',
+      confirmLabel: 'Inativar',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.removeContractPosition(position.publicId),
+      successMessage: 'Posto inativado.',
+    );
+  }
+
   Future<void> _openCreateDocumentDialog(_EntityItem item) async {
     final body = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -388,6 +517,67 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
     );
   }
 
+  Future<void> _openEditContractDialog(_EntityItem item) async {
+    final snapshot = item.contractSnapshot;
+    if (snapshot == null) {
+      _showEntityUnavailableAction(context);
+      return;
+    }
+
+    late final _ContractLookupData lookups;
+    try {
+      lookups = await _repository.loadContractLookups();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_peopleMutationErrorMessage(error)),
+          backgroundColor: _roseColor,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) =>
+          _ContractCrudDialog(lookups: lookups, initial: snapshot),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.updateContract(item.publicId, body),
+      successMessage: 'Contrato atualizado na API.',
+    );
+  }
+
+  Future<void> _removeContract(_EntityItem item) async {
+    final confirmed = await _confirmContractAction(
+      title: 'Inativar contrato',
+      message:
+          'O contrato sera inativado sem apagar documentos, postos ou vinculos de pessoas.',
+      confirmLabel: 'Inativar',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.removeContract(item.publicId),
+      successMessage: 'Contrato inativado.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _runtimeData.data;
@@ -422,12 +612,29 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
           onPrimaryAction: _openCreateContractDialog,
         ),
         const SizedBox(height: 24),
+        _EntityCrudActionsPanel(
+          item: selectedItem,
+          title: 'Gestao do contrato',
+          summary:
+              'Edicao e inativacao preservam documentos, postos e vinculos de pessoas para auditoria.',
+          editLabel: 'Editar contrato',
+          removeLabel: 'Inativar contrato',
+          isLoading: _runtimeData.isLoading || _catalogLoading,
+          onEdit: selectedItem == null
+              ? null
+              : () => _openEditContractDialog(selectedItem),
+          onRemove: selectedItem == null
+              ? null
+              : () => _removeContract(selectedItem),
+        ),
+        const SizedBox(height: 24),
         LayoutBuilder(
           builder: (context, constraints) {
             final stacked = constraints.maxWidth < 1120;
             final catalog = _ContractCatalogPanel(
               types: _contractTypes,
               models: _contractModels,
+              services: _contractServices,
               isLoading: _catalogLoading,
               onCreateType: _openCreateTypeDialog,
               onEditType: _openEditTypeDialog,
@@ -435,6 +642,17 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
               onCreateModel: _openCreateModelDialog,
               onEditModel: _openEditModelDialog,
               onRemoveModel: _removeModel,
+              onCreateService: _openCreateServiceDialog,
+              onEditService: _openEditServiceDialog,
+              onRemoveService: _removeService,
+            );
+            final positions = _ContractPositionsPanel(
+              item: selectedItem,
+              onCreatePosition: selectedItem == null
+                  ? null
+                  : () => _openCreatePositionDialog(selectedItem),
+              onEditPosition: _openEditPositionDialog,
+              onRemovePosition: _removePosition,
             );
             final documents = _ContractDocumentsPanel(
               item: selectedItem,
@@ -448,14 +666,22 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
 
             if (stacked) {
               return Column(
-                children: [catalog, const SizedBox(height: 24), documents],
+                children: [
+                  catalog,
+                  const SizedBox(height: 24),
+                  positions,
+                  const SizedBox(height: 24),
+                  documents,
+                ],
               );
             }
 
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(flex: 6, child: catalog),
+                Expanded(flex: 5, child: catalog),
+                const SizedBox(width: 24),
+                Expanded(flex: 6, child: positions),
                 const SizedBox(width: 24),
                 Expanded(flex: 5, child: documents),
               ],
@@ -471,6 +697,7 @@ class _ContractCatalogPanel extends StatelessWidget {
   const _ContractCatalogPanel({
     required this.types,
     required this.models,
+    required this.services,
     required this.isLoading,
     required this.onCreateType,
     required this.onEditType,
@@ -478,10 +705,14 @@ class _ContractCatalogPanel extends StatelessWidget {
     required this.onCreateModel,
     required this.onEditModel,
     required this.onRemoveModel,
+    required this.onCreateService,
+    required this.onEditService,
+    required this.onRemoveService,
   });
 
   final List<_EntitySelectOption> types;
   final List<_EntitySelectOption> models;
+  final List<_EntitySelectOption> services;
   final bool isLoading;
   final VoidCallback onCreateType;
   final ValueChanged<_EntitySelectOption> onEditType;
@@ -489,6 +720,9 @@ class _ContractCatalogPanel extends StatelessWidget {
   final VoidCallback onCreateModel;
   final ValueChanged<_EntitySelectOption> onEditModel;
   final ValueChanged<_EntitySelectOption> onRemoveModel;
+  final VoidCallback onCreateService;
+  final ValueChanged<_EntitySelectOption> onEditService;
+  final ValueChanged<_EntitySelectOption> onRemoveService;
 
   @override
   Widget build(BuildContext context) {
@@ -514,6 +748,12 @@ class _ContractCatalogPanel extends StatelessWidget {
                 icon: Icons.copy_all_outlined,
                 color: _slateColor,
                 background: _slateColor.withValues(alpha: 0.12),
+              ),
+              _Tag(
+                label: '${services.length} servicos',
+                icon: Icons.design_services_outlined,
+                color: _tealColor,
+                background: _tealColor.withValues(alpha: 0.12),
               ),
               if (isLoading)
                 _Tag(
@@ -543,6 +783,11 @@ class _ContractCatalogPanel extends StatelessWidget {
                 onPressed: isLoading ? null : onCreateModel,
                 icon: const Icon(Icons.copy_all_outlined),
                 label: const Text('Novo modelo'),
+              ),
+              OutlinedButton.icon(
+                onPressed: isLoading ? null : onCreateService,
+                icon: const Icon(Icons.design_services_outlined),
+                label: const Text('Novo servico'),
               ),
             ],
           ),
@@ -579,6 +824,23 @@ class _ContractCatalogPanel extends StatelessWidget {
                 accent: _slateColor,
                 onEdit: () => onEditModel(model),
                 onRemove: () => onRemoveModel(model),
+              ),
+          const SizedBox(height: 16),
+          Text('Servicos para postos', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 10),
+          if (services.isEmpty)
+            Text(
+              'Nenhum servico carregado ainda.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
+            )
+          else
+            for (final service in services)
+              _ContractCatalogTile(
+                option: service,
+                icon: Icons.design_services_outlined,
+                accent: _tealColor,
+                onEdit: () => onEditService(service),
+                onRemove: () => onRemoveService(service),
               ),
         ],
       ),
@@ -653,6 +915,177 @@ class _ContractCatalogTile extends StatelessWidget {
             tooltip: 'Inativar',
             onPressed: inactive ? null : onRemove,
             icon: const Icon(Icons.archive_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContractPositionsPanel extends StatelessWidget {
+  const _ContractPositionsPanel({
+    required this.item,
+    required this.onCreatePosition,
+    required this.onEditPosition,
+    required this.onRemovePosition,
+  });
+
+  final _EntityItem? item;
+  final VoidCallback? onCreatePosition;
+  final ValueChanged<_ContractPositionRecord> onEditPosition;
+  final ValueChanged<_ContractPositionRecord> onRemovePosition;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final positions =
+        item?.contractPositions ?? const <_ContractPositionRecord>[];
+
+    return _Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('Postos do contrato', style: theme.textTheme.titleLarge),
+              _Tag(
+                label: '${positions.length} postos',
+                icon: Icons.work_outline_rounded,
+                color: _amberColor,
+                background: _amberColor.withValues(alpha: 0.12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            item == null
+                ? 'Selecione um contrato para gerenciar postos e vagas.'
+                : 'Postos alimentam People e Network a partir do contrato ${item!.publicId}.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onCreatePosition,
+            icon: const Icon(Icons.add_business_outlined),
+            label: const Text('Novo posto'),
+          ),
+          const SizedBox(height: 18),
+          if (positions.isEmpty)
+            Text(
+              'Nenhum posto carregado para este contrato.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
+            )
+          else
+            for (final position in positions)
+              _ContractPositionTile(
+                position: position,
+                onEdit: () => onEditPosition(position),
+                onRemove: () => onRemovePosition(position),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContractPositionTile extends StatelessWidget {
+  const _ContractPositionTile({
+    required this.position,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  final _ContractPositionRecord position;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusColor = _entityStatusColor(position.status);
+    final inactive = position.status.toUpperCase() == 'INACTIVE';
+    final meta = [
+      if (position.location.isNotEmpty) position.location,
+      if (position.shift.isNotEmpty) position.shift,
+      if (position.schedule.isNotEmpty) position.schedule,
+    ];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: inactive ? const Color(0xFFF7F1E7) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.work_outline_rounded, color: statusColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(position.name, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      position.serviceName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: _mutedColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Editar posto',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                tooltip: 'Inativar posto',
+                onPressed: inactive ? null : onRemove,
+                icon: const Icon(Icons.archive_outlined),
+              ),
+            ],
+          ),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              meta.join(' | '),
+              style: theme.textTheme.bodyMedium?.copyWith(color: _mutedColor),
+            ),
+          ],
+          if (position.requirements.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(position.requirements, style: theme.textTheme.bodyMedium),
+          ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _Tag(
+                label: _entityStatusLabel(position.status),
+                icon: Icons.verified_outlined,
+                color: statusColor,
+                background: statusColor.withValues(alpha: 0.12),
+              ),
+              _Tag(
+                label: position.publicId,
+                icon: Icons.tag_outlined,
+                color: _slateColor,
+                background: _slateColor.withValues(alpha: 0.12),
+              ),
+            ],
           ),
         ],
       ),
@@ -824,9 +1257,10 @@ class _ContractDocumentTile extends StatelessWidget {
 }
 
 class _ContractCrudDialog extends StatefulWidget {
-  const _ContractCrudDialog({required this.lookups});
+  const _ContractCrudDialog({required this.lookups, this.initial});
 
   final _ContractLookupData lookups;
+  final _ContractCrudSnapshot? initial;
 
   @override
   State<_ContractCrudDialog> createState() => _ContractCrudDialogState();
@@ -845,6 +1279,8 @@ class _ContractCrudDialogState extends State<_ContractCrudDialog> {
   String _contractModelPublicId = '';
   String _status = 'ACTIVE';
 
+  bool get _editing => widget.initial != null;
+
   List<_EntitySelectOption> get _modelsForSelectedType => widget
       .lookups
       .contractModels
@@ -854,13 +1290,30 @@ class _ContractCrudDialogState extends State<_ContractCrudDialog> {
   @override
   void initState() {
     super.initState();
-    _providerCompanyPublicId = widget.lookups.providerCompanies.first.publicId;
-    _clientCompanyPublicId = widget.lookups.clientCompanies.first.publicId;
-    _contractTypePublicId = widget.lookups.contractTypes.first.publicId;
+    final initial = widget.initial;
+    _providerCompanyPublicId =
+        initial?.providerCompanyPublicId.isNotEmpty == true
+        ? initial!.providerCompanyPublicId
+        : widget.lookups.providerCompanies.first.publicId;
+    _clientCompanyPublicId = initial?.clientCompanyPublicId.isNotEmpty == true
+        ? initial!.clientCompanyPublicId
+        : widget.lookups.clientCompanies.first.publicId;
+    _contractTypePublicId = initial?.contractTypePublicId.isNotEmpty == true
+        ? initial!.contractTypePublicId
+        : widget.lookups.contractTypes.first.publicId;
     final models = _modelsForSelectedType;
-    if (models.isNotEmpty) {
+    if (initial?.contractModelPublicId.isNotEmpty == true &&
+        models.any(
+          (model) => model.publicId == initial!.contractModelPublicId,
+        )) {
+      _contractModelPublicId = initial!.contractModelPublicId;
+    } else if (models.isNotEmpty) {
       _contractModelPublicId = models.first.publicId;
     }
+    _startsAt.text = initial?.startsAtInput ?? _todayInputDate();
+    _endsAt.text = initial?.endsAtInput ?? '';
+    _status = initial?.status.isNotEmpty == true ? initial!.status : 'ACTIVE';
+    _notes.text = initial?.notes ?? '';
   }
 
   @override
@@ -874,7 +1327,7 @@ class _ContractCrudDialogState extends State<_ContractCrudDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Novo contrato'),
+      title: Text(_editing ? 'Editar contrato' : 'Novo contrato'),
       content: SizedBox(
         width: min(MediaQuery.sizeOf(context).width - 48, 680),
         child: Form(
@@ -1014,7 +1467,10 @@ class _ContractCrudDialogState extends State<_ContractCrudDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Criar')),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_editing ? 'Salvar' : 'Criar'),
+        ),
       ],
     );
   }
@@ -1266,6 +1722,291 @@ class _ContractModelCrudDialogState extends State<_ContractModelCrudDialog> {
         'name': _name.text,
         'defaultSchedule': _defaultSchedule.text,
         'description': _description.text,
+        'status': _status,
+      }),
+    );
+  }
+}
+
+class _ContractServiceCrudDialog extends StatefulWidget {
+  const _ContractServiceCrudDialog({this.initial});
+
+  final _EntitySelectOption? initial;
+
+  @override
+  State<_ContractServiceCrudDialog> createState() =>
+      _ContractServiceCrudDialogState();
+}
+
+class _ContractServiceCrudDialogState
+    extends State<_ContractServiceCrudDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _name;
+  late final TextEditingController _category;
+  late final TextEditingController _description;
+  late bool _isActive;
+
+  bool get _editing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _name = TextEditingController(text: initial?.label ?? '');
+    _category = TextEditingController(text: initial?.parentPublicId ?? '');
+    _description = TextEditingController(text: initial?.description ?? '');
+    _isActive = initial?.status.toUpperCase() != 'INACTIVE';
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _category.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_editing ? 'Editar servico' : 'Novo servico'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 580),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogTextField(
+                  controller: _name,
+                  label: 'Nome do servico',
+                  icon: Icons.design_services_outlined,
+                  required: true,
+                ),
+                _dialogTextField(
+                  controller: _category,
+                  label: 'Categoria',
+                  icon: Icons.category_outlined,
+                ),
+                _dialogTextField(
+                  controller: _description,
+                  label: 'Descricao',
+                  icon: Icons.notes_outlined,
+                  minLines: 3,
+                  maxLines: 5,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _isActive,
+                  onChanged: (value) => setState(() => _isActive = value),
+                  title: const Text('Servico ativo'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_editing ? 'Salvar' : 'Criar'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _cleanMutationBody({
+        'name': _name.text,
+        'category': _category.text,
+        'description': _description.text,
+        'isActive': _isActive,
+      }),
+    );
+  }
+}
+
+class _ContractPositionCrudDialog extends StatefulWidget {
+  const _ContractPositionCrudDialog({required this.services, this.initial});
+
+  final List<_EntitySelectOption> services;
+  final _ContractPositionRecord? initial;
+
+  @override
+  State<_ContractPositionCrudDialog> createState() =>
+      _ContractPositionCrudDialogState();
+}
+
+class _ContractPositionCrudDialogState
+    extends State<_ContractPositionCrudDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _name;
+  late final TextEditingController _location;
+  late final TextEditingController _shift;
+  late final TextEditingController _schedule;
+  late final TextEditingController _requirements;
+  late String _servicePublicId;
+  late String _status;
+
+  bool get _editing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _name = TextEditingController(text: initial?.name ?? '');
+    _location = TextEditingController(text: initial?.location ?? '');
+    _shift = TextEditingController(text: initial?.shift ?? '');
+    _schedule = TextEditingController(text: initial?.schedule ?? '');
+    _requirements = TextEditingController(text: initial?.requirements ?? '');
+    _servicePublicId = initial?.servicePublicId.isNotEmpty == true
+        ? initial!.servicePublicId
+        : widget.services.first.publicId;
+    _status = initial?.status.isNotEmpty == true ? initial!.status : 'ACTIVE';
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _location.dispose();
+    _shift.dispose();
+    _schedule.dispose();
+    _requirements.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_editing ? 'Editar posto' : 'Novo posto'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 640),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogDropdown(
+                  label: 'Servico',
+                  value: _servicePublicId,
+                  icon: Icons.design_services_outlined,
+                  values: [
+                    for (final service in widget.services) service.publicId,
+                  ],
+                  labels: {
+                    for (final service in widget.services)
+                      service.publicId: service.label,
+                  },
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _servicePublicId = value);
+                    }
+                  },
+                ),
+                _dialogTextField(
+                  controller: _name,
+                  label: 'Nome do posto',
+                  icon: Icons.work_outline_rounded,
+                  required: true,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _location,
+                        label: 'Local',
+                        icon: Icons.location_on_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _shift,
+                        label: 'Turno',
+                        icon: Icons.access_time_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _schedule,
+                        label: 'Escala',
+                        icon: Icons.schedule_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogDropdown(
+                        label: 'Status',
+                        value: _status,
+                        icon: Icons.verified_outlined,
+                        values: const ['ACTIVE', 'INACTIVE', 'SUSPENDED'],
+                        labels: const {
+                          'ACTIVE': 'Ativo',
+                          'INACTIVE': 'Inativo',
+                          'SUSPENDED': 'Suspenso',
+                        },
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _status = value);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogTextField(
+                  controller: _requirements,
+                  label: 'Requisitos',
+                  icon: Icons.rule_folder_outlined,
+                  minLines: 3,
+                  maxLines: 5,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_editing ? 'Salvar' : 'Criar'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _cleanMutationBody({
+        'servicePublicId': _servicePublicId,
+        'name': _name.text,
+        'location': _location.text,
+        'shift': _shift.text,
+        'schedule': _schedule.text,
+        'requirements': _requirements.text,
         'status': _status,
       }),
     );

@@ -116,33 +116,101 @@ class _ClientCompaniesWorkspaceState extends State<_ClientCompaniesWorkspace> {
     );
   }
 
+  Future<void> _openEditClientDialog(_EntityItem item) async {
+    final snapshot = item.clientCompanySnapshot;
+    if (snapshot == null) {
+      _showEntityUnavailableAction(context);
+      return;
+    }
+
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _ClientCompanyCrudDialog(initial: snapshot),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.updateClientCompany(item.publicId, body),
+      successMessage: 'Cliente atualizado na API.',
+    );
+  }
+
+  Future<void> _removeClient(_EntityItem item) async {
+    final confirmed = await _confirmEntityAction(
+      context: context,
+      title: 'Inativar cliente',
+      message:
+          'O cliente sera inativado sem apagar contratos, prestadoras conectadas ou historico.',
+      confirmLabel: 'Inativar',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    await _runMutation(
+      () => _repository.removeClientCompany(item.publicId),
+      successMessage: 'Cliente inativado.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _EntityWorkspace(
-      data: _runtimeData.data,
-      viewerProfile: widget.viewerProfile,
-      selectedIndex: widget.selectedIndex,
-      onSelectItem: widget.onSelectItem,
-      sourceLabel: _runtimeData.sourceLabel,
-      isLive: _runtimeData.isLive,
-      isLoading: _runtimeData.isLoading,
-      errorMessage: _runtimeData.errorMessage,
-      searchController: _searchController,
-      onSubmitSearch: _loadClientCompanies,
-      onClearSearch: () {
-        _searchController.clear();
-        _loadClientCompanies();
-      },
-      onRefresh: _loadClientCompanies,
-      primaryActionLabel: 'Novo cliente',
-      primaryActionIcon: Icons.business_outlined,
-      onPrimaryAction: _openCreateClientDialog,
+    final data = _runtimeData.data;
+    final selectedItem = data.items.isEmpty
+        ? null
+        : data.items[min(max(widget.selectedIndex, 0), data.items.length - 1)];
+
+    return Column(
+      children: [
+        _EntityWorkspace(
+          data: data,
+          viewerProfile: widget.viewerProfile,
+          selectedIndex: widget.selectedIndex,
+          onSelectItem: widget.onSelectItem,
+          sourceLabel: _runtimeData.sourceLabel,
+          isLive: _runtimeData.isLive,
+          isLoading: _runtimeData.isLoading,
+          errorMessage: _runtimeData.errorMessage,
+          searchController: _searchController,
+          onSubmitSearch: _loadClientCompanies,
+          onClearSearch: () {
+            _searchController.clear();
+            _loadClientCompanies();
+          },
+          onRefresh: _loadClientCompanies,
+          primaryActionLabel: 'Novo cliente',
+          primaryActionIcon: Icons.business_outlined,
+          onPrimaryAction: _openCreateClientDialog,
+        ),
+        const SizedBox(height: 24),
+        _EntityCrudActionsPanel(
+          item: selectedItem,
+          title: 'Gestao do cliente',
+          summary:
+              'Edicao e inativacao mantem a memoria operacional entre prestadoras, contratos e pessoas.',
+          editLabel: 'Editar cliente',
+          removeLabel: 'Inativar cliente',
+          isLoading: _runtimeData.isLoading,
+          onEdit: selectedItem == null
+              ? null
+              : () => _openEditClientDialog(selectedItem),
+          onRemove: selectedItem == null
+              ? null
+              : () => _removeClient(selectedItem),
+        ),
+      ],
     );
   }
 }
 
 class _ClientCompanyCrudDialog extends StatefulWidget {
-  const _ClientCompanyCrudDialog();
+  const _ClientCompanyCrudDialog({this.initial});
+
+  final _ClientCompanyCrudSnapshot? initial;
 
   @override
   State<_ClientCompanyCrudDialog> createState() =>
@@ -159,6 +227,25 @@ class _ClientCompanyCrudDialogState extends State<_ClientCompanyCrudDialog> {
   String _clientType = 'CONDOMINIO';
   String _status = 'ACTIVE';
 
+  bool get _editing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _name.text = initial.name;
+      _document.text = initial.document;
+      _contactName.text = initial.contactName;
+      _city.text = initial.city;
+      _state.text = initial.state;
+      _clientType = initial.clientType.isEmpty
+          ? 'CONDOMINIO'
+          : initial.clientType;
+      _status = initial.status.isEmpty ? 'ACTIVE' : initial.status;
+    }
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -172,7 +259,7 @@ class _ClientCompanyCrudDialogState extends State<_ClientCompanyCrudDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Novo cliente'),
+      title: Text(_editing ? 'Editar cliente' : 'Novo cliente'),
       content: SizedBox(
         width: min(MediaQuery.sizeOf(context).width - 48, 620),
         child: Form(
@@ -262,7 +349,10 @@ class _ClientCompanyCrudDialogState extends State<_ClientCompanyCrudDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Criar')),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_editing ? 'Salvar' : 'Criar'),
+        ),
       ],
     );
   }
