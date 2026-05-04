@@ -363,7 +363,9 @@ class _CrmSidebar extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none, // Permite que itens saiam da borda se necessário
             children: [
-              const _CrmInteractiveBrand(), // O logo fica na camada de baixo
+              _CrmInteractiveBrand(
+                destination: current,
+              ), // O logo fica na camada de baixo
               Positioned(
                 left: 22,
                 right: 22,
@@ -992,7 +994,9 @@ class _CrmDashboardQuote extends StatelessWidget {
 }
 
 class _CrmInteractiveBrand extends StatefulWidget {
-  const _CrmInteractiveBrand();
+  const _CrmInteractiveBrand({required this.destination});
+
+  final _Destination destination;
 
   @override
   State<_CrmInteractiveBrand> createState() => _CrmInteractiveBrandState();
@@ -1002,7 +1006,8 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
     with SingleTickerProviderStateMixin {
   late final AnimationController _shineController;
   bool _hovered = false;
-  bool _isExpanded = false;
+  double _shinePeakOpacity = 0.35;
+  double _shineHighlightAlpha = 0.20;
 
   @override
   void initState() {
@@ -1019,8 +1024,21 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
     super.dispose();
   }
 
-  void _triggerShine() {
-    if (!_shineController.isAnimating) {
+  void _triggerShine({
+    double peakOpacity = 0.35,
+    double highlightAlpha = 0.20,
+  }) {
+    if (!mounted) {
+      return;
+    }
+
+    final shouldStart =
+        !_shineController.isAnimating || peakOpacity > _shinePeakOpacity;
+    if (shouldStart) {
+      setState(() {
+        _shinePeakOpacity = peakOpacity;
+        _shineHighlightAlpha = highlightAlpha;
+      });
       _shineController.forward(from: 0);
     }
   }
@@ -1029,15 +1047,19 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
   Widget build(BuildContext context) {
     // 1. Configurações para o modo EXPANDIDO (Clique)
     // Logo menor e mais discreto
-    double logoScale = _isExpanded ? 0.65 : 1.04;
-    double logoTop = _isExpanded ? 14.0 : 42.0;
-    double logoLeft = _isExpanded ? 8.0 : 16.0; // Puxado levemente para a esquerda
-    double logoOpacity = _isExpanded ? 0.30 : 1.0;
+    final isExpanded = widget.destination != _Destination.home;
+    final isVisuallyHovered =
+        widget.destination == _Destination.home || _hovered;
+
+    double logoScale = isExpanded ? 0.65 : 1.04;
+    double logoTop = isExpanded ? 14.0 : 42.0;
+    double logoLeft = isExpanded ? 8.0 : 16.0; // Puxado levemente para a esquerda
+    double logoOpacity = isExpanded ? 0.30 : 1.0;
 
     // Texto (PFP.WEBP) com mais destaque e melhor centralizado
-    double textScale = _isExpanded ? 1.42 : 1.12; // Aumentado para mais destaque
-    double textTop = _isExpanded ? 72.0 : 66.0;
-    double textLeft = _isExpanded ? 32.0 : 96.0; // Ajustado para centralizar o bloco
+    double textScale = isExpanded ? 1.42 : 1.12; // Aumentado para mais destaque
+    double textTop = isExpanded ? 72.0 : 66.0;
+    double textLeft = isExpanded ? 32.0 : 96.0; // Ajustado para centralizar o bloco
 
     const animationDuration = Duration(milliseconds: 600);
     const animationCurve = Curves.easeInOutCubic;
@@ -1051,7 +1073,7 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _isExpanded = !_isExpanded),
+        onTap: () => _triggerShine(peakOpacity: 0.12, highlightAlpha: 0.08),
         child: SizedBox(
           width: double.infinity,
           height: 180,
@@ -1073,9 +1095,11 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     center: const Alignment(-0.5, -0.1),
-                    radius: _hovered ? 2.0 : 1.0,
+                    radius: isVisuallyHovered ? 2.0 : 1.0,
                     colors: [
-                      const Color(0xFFFFD700).withValues(alpha: (_hovered || _isExpanded) ? 0.03 : 0.01),
+                      const Color(0xFFFFD700).withValues(
+                        alpha: (isVisuallyHovered || isExpanded) ? 0.03 : 0.01,
+                      ),
                       const Color(0xFF2D7872).withValues(alpha: 0.06),
                       Colors.transparent,
                     ],
@@ -1084,18 +1108,23 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
               ),
               // ESCALA GLOBAL PARA HOVER (Acompanha os novos tamanhos)
               AnimatedScale(
-                scale: _hovered ? 1.18 : 1.0,
+                scale: isVisuallyHovered ? 1.18 : 1.0,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
                   curve: Curves.easeOutCubic,
                   transform: Matrix4.identity()
-                    ..translateByDouble(0, _hovered ? -2.0 : 0.0, 0, 1),
+                    ..translateByDouble(
+                      0,
+                      isVisuallyHovered ? -2.0 : 0.0,
+                      0,
+                      1,
+                    ),
                   child: Stack(
                     children: [
                       _CrmBrandArtwork(
-                        shadowOpacity: _hovered ? 0.40 : 0.35,
+                        shadowOpacity: isVisuallyHovered ? 0.40 : 0.35,
                         logoScale: logoScale,
                         logoTop: logoTop,
                         logoLeft: logoLeft,
@@ -1109,21 +1138,28 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                       AnimatedBuilder(
                         animation: _shineController,
                         builder: (context, child) {
-                          final value = Curves.easeInOutSine.transform(_shineController.value);
-                          final visible = _shineController.isAnimating ? sin(value * pi) : 0.0;
+                          final value = Curves.easeInOutSine.transform(
+                            _shineController.value,
+                          );
+                          final visible = _shineController.isAnimating
+                              ? sin(value * pi)
+                              : 0.0;
                           return IgnorePointer(
                             child: Opacity(
-                              opacity: (visible * 0.35).clamp(0.0, 1.0).toDouble(),
+                              opacity: (visible * _shinePeakOpacity)
+                                  .clamp(0.0, 1.0)
+                                  .toDouble(),
                               child: ShaderMask(
                                 blendMode: BlendMode.srcATop,
                                 shaderCallback: (rect) {
-                                  final x = -1.5 + (value * 3.0);
                                   return LinearGradient(
                                     begin: Alignment.centerLeft,
                                     end: Alignment.centerRight,
                                     colors: [
                                       Colors.transparent,
-                                      Colors.white.withValues(alpha: 0.20),
+                                      Colors.white.withValues(
+                                        alpha: _shineHighlightAlpha,
+                                      ),
                                       Colors.transparent,
                                     ],
                                     stops: const [0.0, 0.5, 1.0],
