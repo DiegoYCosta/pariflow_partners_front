@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import '../widgets/high_tech_light_waves.dart';
 
+part '../core/api/api_client.dart';
 part '../core/widgets/primitives.dart';
 part '../core/widgets/sprite_mold_icon.dart';
 part '../core/widgets/master_detail_workspace.dart';
@@ -21,6 +26,7 @@ part '../features/client_companies/infrastructure/client_companies_mock_data.dar
 part '../features/contracts/contracts_feature.dart';
 part '../features/contracts/infrastructure/contracts_mock_data.dart';
 part '../features/people/people_feature.dart';
+part '../features/people/infrastructure/people_api_data.dart';
 part '../features/people/infrastructure/people_mock_data.dart';
 part 'shell/shell_variant.dart';
 part 'shell/shell_feature_flags.dart';

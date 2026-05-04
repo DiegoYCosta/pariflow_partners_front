@@ -1,6 +1,6 @@
 part of '../../app/app.dart';
 
-class _PeopleWorkspace extends StatelessWidget {
+class _PeopleWorkspace extends StatefulWidget {
   const _PeopleWorkspace({
     required this.viewerProfile,
     required this.selectedIndex,
@@ -12,18 +12,61 @@ class _PeopleWorkspace extends StatelessWidget {
   final ValueChanged<int> onSelectItem;
 
   @override
+  State<_PeopleWorkspace> createState() => _PeopleWorkspaceState();
+}
+
+class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
+  final _PeopleApiRepository _repository = _PeopleApiRepository();
+  _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.mock();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPeopleData();
+  }
+
+  Future<void> _loadPeopleData() async {
+    setState(() {
+      _runtimeData = _runtimeData.copyWith(isLoading: true);
+    });
+
+    try {
+      final data = await _repository.loadWorkspaceData();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _runtimeData = data;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _runtimeData = _PeopleRuntimeData.mock(
+          errorMessage: _peopleRuntimeErrorMessage(error),
+        );
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final data = _peopleWorkspaceData;
-    final safeIndex = min(max(selectedIndex, 0), data.items.length - 1);
+    final data = _runtimeData.data;
+    final safeIndex = min(max(widget.selectedIndex, 0), data.items.length - 1);
     final selectedItem = data.items[safeIndex];
-    final profile = _personProfileFor(selectedItem);
+    final profile =
+        selectedItem.personProfile ?? _personProfileFor(selectedItem);
     final visibleAttachments = selectedItem.attachments
         .where(
-          (attachment) => attachment.accessPolicy.canViewerRead(viewerProfile),
+          (attachment) =>
+              attachment.accessPolicy.canViewerRead(widget.viewerProfile),
         )
         .toList();
     final visibleNotes = [...selectedItem.sensitiveNotes]
-      ..retainWhere((note) => note.accessPolicy.canViewerRead(viewerProfile))
+      ..retainWhere(
+        (note) => note.accessPolicy.canViewerRead(widget.viewerProfile),
+      )
       ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
     final sensitiveSections = _buildSensitiveSections(visibleNotes);
 
@@ -59,7 +102,7 @@ class _PeopleWorkspace extends StatelessWidget {
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 360),
                 child: DropdownButtonFormField<int>(
-                  value: safeIndex,
+                  initialValue: safeIndex,
                   decoration: InputDecoration(
                     labelText: 'Employee record',
                     filled: true,
@@ -85,7 +128,7 @@ class _PeopleWorkspace extends StatelessWidget {
                   ],
                   onChanged: (value) {
                     if (value != null) {
-                      onSelectItem(value);
+                      widget.onSelectItem(value);
                     }
                   },
                 ),
@@ -114,7 +157,7 @@ class _PeopleWorkspace extends StatelessWidget {
                   ),
                   _Tag(
                     label: '${visibleNotes.length} sensitive tags visible',
-                    icon: viewerProfile.canViewSensitive
+                    icon: widget.viewerProfile.canViewSensitive
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
                     color: _amberColor,
@@ -126,11 +169,29 @@ class _PeopleWorkspace extends StatelessWidget {
                     color: _roseColor,
                     background: _roseColor.withValues(alpha: 0.12),
                   ),
+                  _Tag(
+                    label: _runtimeData.sourceLabel,
+                    icon: _runtimeData.isLoading
+                        ? Icons.sync_rounded
+                        : _runtimeData.isLive
+                        ? Icons.cloud_done_outlined
+                        : Icons.storage_outlined,
+                    color: _runtimeData.isLive ? _tealColor : _slateColor,
+                    background: (_runtimeData.isLive ? _tealColor : _slateColor)
+                        .withValues(alpha: 0.12),
+                  ),
                 ],
               ),
             ],
           ),
         ),
+        if (_runtimeData.errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _PeopleRuntimeNotice(
+            message: _runtimeData.errorMessage!,
+            onRetry: _loadPeopleData,
+          ),
+        ],
         const SizedBox(height: 24),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -142,7 +203,7 @@ class _PeopleWorkspace extends StatelessWidget {
             );
             final linksPanel = _EmploymentLinksPanel(profile: profile);
             final sideColumn = _PeopleSideColumn(
-              viewerProfile: viewerProfile,
+              viewerProfile: widget.viewerProfile,
               item: selectedItem,
               sections: sensitiveSections,
               attachments: visibleAttachments,
@@ -190,6 +251,71 @@ class _PeopleWorkspace extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+class _PeopleRuntimeNotice extends StatelessWidget {
+  const _PeopleRuntimeNotice({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final text = Text(
+            message,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+          );
+          final action = TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Tentar novamente'),
+          );
+
+          if (constraints.maxWidth < 640) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: _amberColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: text),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                action,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                color: _amberColor,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: text),
+              const SizedBox(width: 10),
+              action,
+            ],
+          );
+        },
+      ),
     );
   }
 }

@@ -861,6 +861,7 @@ class _EntityItem {
     required this.relations,
     this.attachments = const [],
     this.sensitiveNotes = const [],
+    this.personProfile,
   });
 
   final String publicId;
@@ -874,4 +875,5 @@ class _EntityItem {
   final List<String> relations;
   final List<_AttachmentRecord> attachments;
   final List<_SensitiveNoteTag> sensitiveNotes;
+  final _PersonProfileData? personProfile;
 }
