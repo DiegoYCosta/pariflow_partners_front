@@ -37,6 +37,7 @@ part '../features/home/home_feature.dart';
 part '../features/network/application/network_filter_state.dart';
 part '../features/network/domain/network_entities.dart';
 part '../features/network/domain/network_graph_engine.dart';
+part '../features/network/infrastructure/network_api_data.dart';
 part '../features/network/infrastructure/network_graph_payload_preview.dart';
 part '../features/network/infrastructure/network_mock_graph.dart';
 part '../features/network/presentation/network_workspace.dart';

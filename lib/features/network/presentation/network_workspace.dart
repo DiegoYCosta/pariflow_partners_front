@@ -144,8 +144,10 @@ class _RelationalNetworkWorkspaceBodyState
   static const double _minCanvasZoom = 0.65;
   static const double _maxCanvasZoom = 1.85;
 
+  final _NetworkApiRepository _repository = _NetworkApiRepository();
   late final TextEditingController _searchController;
   final TransformationController _canvasController = TransformationController();
+  _NetworkRuntimeData _runtimeData = _NetworkRuntimeData.mock();
   late String _periodPreset;
   late Set<String> _selectedRootIds;
   late Set<String> _selectedClientIds;
@@ -161,19 +163,14 @@ class _RelationalNetworkWorkspaceBodyState
   final Set<_NetworkGraphLane> _hiddenLanes = {};
   final Set<_NetworkGraphLane> _activeOnlyLanes = {};
 
-  _NetworkGraphPayload get _payload => _networkGraphContractPreview;
+  _NetworkGraphPayload get _payload => _runtimeData.payload;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController(text: _payload.filters.search);
-    _periodPreset = _payload.filters.applied.periodPreset;
-    _selectedRootIds = {..._payload.filters.applied.rootCompanyPublicIds};
-    _selectedClientIds = {..._payload.filters.applied.clientCompanyPublicIds};
-    _contractStatuses = {..._payload.filters.applied.contractStatuses};
-    _employeeStatuses = {..._payload.filters.applied.employeeStatuses};
-    _includeHistorical = _payload.filters.applied.includeHistorical;
-    _includeIndirect = _payload.filters.applied.includeIndirect;
+    _applyPayloadDefaults(_payload);
+    _loadNetworkGraph(resetFilters: true);
   }
 
   @override
@@ -192,6 +189,65 @@ class _RelationalNetworkWorkspaceBodyState
         _includeHistorical = true;
       }
     });
+  }
+
+  Future<void> _loadNetworkGraph({bool resetFilters = false}) async {
+    setState(() {
+      _runtimeData = _runtimeData.copyWith(isLoading: true);
+    });
+
+    try {
+      final payload = await _repository.loadGraph(
+        periodPreset: _periodPreset,
+        rootCompanyPublicIds: _selectedRootIds,
+        clientCompanyPublicIds: _selectedClientIds,
+        contractStatuses: _contractStatuses,
+        employeeStatuses: _employeeStatuses,
+        includeHistorical: _includeHistorical,
+        includeIndirect: _includeIndirect,
+        search: _searchController.text,
+        focusPublicId: widget.selectedNodeId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _runtimeData = _NetworkRuntimeData.live(payload);
+        if (resetFilters) {
+          _searchController.text = payload.filters.search;
+          _applyPayloadDefaults(payload);
+        }
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _runtimeData = _NetworkRuntimeData.mock(
+          errorMessage: _networkRuntimeErrorMessage(error),
+        );
+        if (resetFilters) {
+          _searchController.text = _payload.filters.search;
+          _applyPayloadDefaults(_payload);
+        }
+      });
+    }
+  }
+
+  void _applyPayloadDefaults(_NetworkGraphPayload payload) {
+    _periodPreset = payload.filters.applied.periodPreset;
+    _selectedRootIds = {...payload.filters.applied.rootCompanyPublicIds};
+    _selectedClientIds = {...payload.filters.applied.clientCompanyPublicIds};
+    _contractStatuses = {...payload.filters.applied.contractStatuses};
+    _employeeStatuses = {...payload.filters.applied.employeeStatuses};
+    _includeHistorical = payload.filters.applied.includeHistorical;
+    _includeIndirect = payload.filters.applied.includeIndirect;
+    _selectedLaneForDetails = null;
+    _hiddenLanes.clear();
+    _activeOnlyLanes.clear();
   }
 
   void _adjustZoom(double delta) {
@@ -268,16 +324,7 @@ class _RelationalNetworkWorkspaceBodyState
   void _restoreFilters() {
     setState(() {
       _searchController.text = _payload.filters.search;
-      _periodPreset = _payload.filters.applied.periodPreset;
-      _selectedRootIds = {..._payload.filters.applied.rootCompanyPublicIds};
-      _selectedClientIds = {..._payload.filters.applied.clientCompanyPublicIds};
-      _contractStatuses = {..._payload.filters.applied.contractStatuses};
-      _employeeStatuses = {..._payload.filters.applied.employeeStatuses};
-      _includeHistorical = _payload.filters.applied.includeHistorical;
-      _includeIndirect = _payload.filters.applied.includeIndirect;
-      _selectedLaneForDetails = null;
-      _hiddenLanes.clear();
-      _activeOnlyLanes.clear();
+      _applyPayloadDefaults(_payload);
     });
   }
 
@@ -329,6 +376,9 @@ class _RelationalNetworkWorkspaceBodyState
                   periodPresets: _payload.filters.available.periodPresets,
                   selectedPeriodPreset: _periodPreset,
                   showFilters: _showFilters,
+                  sourceLabel: _runtimeData.sourceLabel,
+                  isLive: _runtimeData.isLive,
+                  isLoading: _runtimeData.isLoading,
                   onSearchChanged: () => setState(() {}),
                   onClearSearch: () {
                     setState(() {
@@ -339,6 +389,7 @@ class _RelationalNetworkWorkspaceBodyState
                   onZoomIn: () => _adjustZoom(0.05),
                   onResetViewport: _resetViewport,
                   onPeriodChanged: _setPeriodPreset,
+                  onRefresh: () => _loadNetworkGraph(),
                   onToggleFilters: () {
                     setState(() {
                       _showFilters = !_showFilters;
@@ -395,6 +446,14 @@ class _RelationalNetworkWorkspaceBodyState
                   ),
                   secondChild: const SizedBox.shrink(),
                 ),
+                if (_runtimeData.errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 14, 28, 0),
+                    child: _NetworkRuntimeNotice(
+                      message: _runtimeData.errorMessage!,
+                      onRetry: () => _loadNetworkGraph(resetFilters: true),
+                    ),
+                  ),
                 Expanded(
                   child: wide
                       ? Row(
@@ -881,6 +940,46 @@ class _RelationalNetworkWorkspaceBodyState
   }
 }
 
+class _NetworkRuntimeNotice extends StatelessWidget {
+  const _NetworkRuntimeNotice({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: _amberColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+            ),
+          ),
+          const SizedBox(width: 10),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Tentar novamente'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 List<_NetworkGraphEdge> _bridgeHiddenNodeEdges({
   required List<_NetworkGraphEdge> edges,
   required Set<String> hiddenNodeIds,
@@ -1155,12 +1254,16 @@ class _RelationalNetworkHeader extends StatelessWidget {
     required this.periodPresets,
     required this.selectedPeriodPreset,
     required this.showFilters,
+    required this.sourceLabel,
+    required this.isLive,
+    required this.isLoading,
     required this.onSearchChanged,
     required this.onClearSearch,
     required this.onZoomOut,
     required this.onZoomIn,
     required this.onResetViewport,
     required this.onPeriodChanged,
+    required this.onRefresh,
     required this.onToggleFilters,
   });
 
@@ -1169,12 +1272,16 @@ class _RelationalNetworkHeader extends StatelessWidget {
   final List<String> periodPresets;
   final String selectedPeriodPreset;
   final bool showFilters;
+  final String sourceLabel;
+  final bool isLive;
+  final bool isLoading;
   final VoidCallback onSearchChanged;
   final VoidCallback onClearSearch;
   final VoidCallback onZoomOut;
   final VoidCallback onZoomIn;
   final VoidCallback onResetViewport;
   final ValueChanged<String> onPeriodChanged;
+  final VoidCallback onRefresh;
   final VoidCallback onToggleFilters;
 
   @override
@@ -1224,6 +1331,47 @@ class _RelationalNetworkHeader extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
+                    _RelationalControlCard(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: isLoading ? null : onRefresh,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 15,
+                          ),
+                          child: Row(
+                            children: [
+                              if (isLoading)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.4,
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  isLive
+                                      ? Icons.cloud_done_outlined
+                                      : Icons.storage_outlined,
+                                  color: isLive ? _tealColor : _slateColor,
+                                  size: 22,
+                                ),
+                              const SizedBox(width: 10),
+                              Text(
+                                sourceLabel,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: isLive ? _tealColor : _mutedColor,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 22),
                     _RelationalControlCard(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
