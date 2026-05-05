@@ -31,5 +31,9 @@ de endpoints do backend para modulos operacionais. A autenticacao ainda usa
 - Em build web no mesmo host do Apache, o front usa `/api/v1` automaticamente.
 - Se a API ficar em outro host, buildar com
   `--dart-define=PARIFLOW_API_BASE_URL=https://dominio/api/v1`.
+- Para preview local consumindo a API online, rode `scripts/dev-api-proxy.cjs`
+  e aponte `PARIFLOW_API_BASE_URL` para `http://127.0.0.1:3002/api/v1`.
+- Em `localhost` ou `127.0.0.1`, o app mostra um aviso fixo de preview local no
+  canto superior direito. Esse aviso nao aparece em deploy publico.
 - Conteudo sensivel, anexos e permissao seguem ACL do backend; o front nao
   infere acesso nem exibe metadado protegido sem autorizacao.

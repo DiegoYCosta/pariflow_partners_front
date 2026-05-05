@@ -145,6 +145,120 @@ class PariFlowPartnersApp extends StatelessWidget {
         ),
       ),
       home: const _AuthGate(child: LayoutPreviewPage()),
+      builder: (context, child) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            child ?? const SizedBox.shrink(),
+            if (_shouldShowLocalPreviewBanner) const _LocalPreviewBanner(),
+          ],
+        );
+      },
     );
   }
+}
+
+bool get _shouldShowLocalPreviewBanner {
+  if (!kIsWeb) {
+    return false;
+  }
+
+  final host = Uri.base.host.toLowerCase();
+  return host == 'localhost' || host == '127.0.0.1';
+}
+
+class _LocalPreviewBanner extends StatelessWidget {
+  const _LocalPreviewBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final apiBaseUrl = _defaultApiBaseUrl;
+    final isLocalApi = _isLocalHostUri(apiBaseUrl);
+    final label = isLocalApi
+        ? 'Preview local ativa'
+        : 'Preview local ativa - API online';
+
+    return IgnorePointer(
+      child: SafeArea(
+        child: Align(
+          alignment: Alignment.topRight,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBF5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _lineColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF231C10).withValues(alpha: 0.12),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: _amberColor.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.info_outline_rounded,
+                          size: 15,
+                          color: _amberColor,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              label,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: _inkColor,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Ambiente local. Deploy publico continua normal.',
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(color: _mutedColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _isLocalHostUri(String value) {
+  final uri = Uri.tryParse(value);
+  final host = uri?.host.toLowerCase() ?? '';
+  return host == 'localhost' || host == '127.0.0.1';
 }
