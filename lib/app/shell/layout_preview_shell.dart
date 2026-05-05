@@ -257,12 +257,6 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (_destination != _Destination.home &&
-                                        _destination !=
-                                            _Destination.network) ...[
-                                      _CrmSectionHeader(page: page),
-                                      const SizedBox(height: 24),
-                                    ],
                                     _buildWorkspaceContent(page, width),
                                   ],
                                 ),
