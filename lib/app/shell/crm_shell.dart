@@ -361,7 +361,8 @@ class _CrmSidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Stack(
-            clipBehavior: Clip.none, // Permite que itens saiam da borda se necessário
+            clipBehavior:
+                Clip.none, // Permite que itens saiam da borda se necessário
             children: [
               const _CrmInteractiveBrand(), // O logo fica na camada de baixo
               Positioned(
@@ -488,12 +489,12 @@ class _CrmDashboardContent extends StatelessWidget {
         final cardWidth = cardsPerRow == 1
             ? double.infinity
             : (constraints.maxWidth - (spacing * (cardsPerRow - 1))) /
-            cardsPerRow;
+                  cardsPerRow;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _CrmDashboardHero(),
+            _CrmDashboardHero(onChooseDestination: onChooseDestination),
             const SizedBox(height: 22),
             Wrap(
               spacing: spacing,
@@ -519,14 +520,16 @@ class _CrmDashboardContent extends StatelessWidget {
 }
 
 class _CrmDashboardHero extends StatelessWidget {
-  const _CrmDashboardHero();
+  const _CrmDashboardHero({required this.onChooseDestination});
+
+  final ValueChanged<_ChoiceTarget> onChooseDestination;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final stacked = constraints.maxWidth < 980;
-        final headlineSize = stacked ? 38.0 : 48.0;
+        final headlineSize = stacked ? 36.0 : 44.0;
         final headlineColor = stacked ? _deepTealColor : Colors.white;
         final headlineAccentColor = stacked
             ? const Color(0xFFC8891F)
@@ -540,7 +543,7 @@ class _CrmDashboardHero extends StatelessWidget {
           label: _ShellVariant.crm.label,
           child: Container(
             width: double.infinity,
-            height: stacked ? 520 : 290,
+            height: stacked ? 560 : 290,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
@@ -732,55 +735,58 @@ class _CrmDashboardHero extends StatelessWidget {
                     ),
                   ],
                   Positioned.fill(
-                    child: IgnorePointer(
-                      child: Padding(
-                        padding: EdgeInsets.all(stacked ? 24 : 38),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: stacked
-                                  ? constraints.maxWidth
-                                  : min(constraints.maxWidth * 0.58, 760.0),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                RichText(
-                                  text: TextSpan(
-                                    style: TextStyle(
-                                      color: headlineColor,
-                                      fontSize: headlineSize,
-                                      fontWeight: FontWeight.w500,
-                                      letterSpacing: -1.4,
-                                      height: 0.98,
+                    child: Padding(
+                      padding: EdgeInsets.all(stacked ? 24 : 38),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: stacked
+                                ? constraints.maxWidth
+                                : min(constraints.maxWidth * 0.72, 760.0),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    color: headlineColor,
+                                    fontSize: headlineSize,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: -1.4,
+                                    height: 0.98,
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                      text: 'O que voce gostaria de\n',
                                     ),
-                                    children: [
-                                      const TextSpan(
-                                        text: 'O que voce gostaria de\n',
+                                    TextSpan(
+                                      text: 'consultar hoje?',
+                                      style: TextStyle(
+                                        color: headlineAccentColor,
+                                        fontStyle: FontStyle.italic,
                                       ),
-                                      TextSpan(
-                                        text: 'consultar hoje?',
-                                        style: TextStyle(
-                                          color: headlineAccentColor,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 16),
-                                Container(
-                                  width: 74,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: accentBarColor,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
+                              ),
+                              const SizedBox(height: 16),
+                              Container(
+                                width: 74,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: accentBarColor,
+                                  borderRadius: BorderRadius.circular(999),
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 18),
+                              _CrmHeroSearch(
+                                onChooseDestination: onChooseDestination,
+                                accent: stacked ? _tealColor : _slateColor,
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -796,6 +802,81 @@ class _CrmDashboardHero extends StatelessWidget {
   }
 }
 
+class _CrmHeroSearch extends StatefulWidget {
+  const _CrmHeroSearch({
+    required this.onChooseDestination,
+    required this.accent,
+  });
+
+  final ValueChanged<_ChoiceTarget> onChooseDestination;
+  final Color accent;
+
+  @override
+  State<_CrmHeroSearch> createState() => _CrmHeroSearchState();
+}
+
+class _CrmHeroSearchState extends State<_CrmHeroSearch> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ContextSearchField(
+      controller: _controller,
+      hintText: 'digite sua busca',
+      accent: widget.accent,
+      maxWidth: 520,
+      onSubmitted: (_) => _submit(),
+      onClear: () {
+        _controller.clear();
+        setState(() {});
+      },
+      onSearch: _submit,
+    );
+  }
+
+  void _submit() {
+    final query = _controller.text.trim().toLowerCase();
+    final target = switch (query) {
+      final value
+          when value.contains('contr') ||
+              value.contains('document') ||
+              value.contains('doc') =>
+        _ChoiceTarget.contracts,
+      final value
+          when value.contains('client') ||
+              value.contains('cliente') ||
+              value.contains('carteira') =>
+        _ChoiceTarget.clientCompanies,
+      final value
+          when value.contains('people') ||
+              value.contains('employee') ||
+              value.contains('pessoa') ||
+              value.contains('colaborador') =>
+        _ChoiceTarget.people,
+      final value
+          when value.contains('network') ||
+              value.contains('rede') ||
+              value.contains('visual') =>
+        _ChoiceTarget.network,
+      _ => _ChoiceTarget.companies,
+    };
+
+    widget.onChooseDestination(target);
+  }
+}
+
 class _CrmEntryCard extends StatelessWidget {
   const _CrmEntryCard({required this.choice, required this.onTap});
 
@@ -807,24 +888,24 @@ class _CrmEntryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final copy = switch (choice.target) {
       _ChoiceTarget.companies => (
-      title: 'Companies',
-      subtitle: 'Explore and manage\nyour companies',
+        title: 'Companies',
+        subtitle: 'Explore and manage\nyour companies',
       ),
       _ChoiceTarget.clientCompanies => (
-      title: 'Clients',
-      subtitle: 'Open your managed\nclient portfolio',
+        title: 'Clients',
+        subtitle: 'Open your managed\nclient portfolio',
       ),
       _ChoiceTarget.contracts => (
-      title: 'Contracts',
-      subtitle: 'View and manage\nyour contracts',
+        title: 'Contracts',
+        subtitle: 'View and manage\nyour contracts',
       ),
       _ChoiceTarget.people => (
-      title: 'Employees',
-      subtitle: 'Manage and connect\nwith your team',
+        title: 'Employees',
+        subtitle: 'Manage and connect\nwith your team',
       ),
       _ChoiceTarget.network => (
-      title: 'Visual Network',
-      subtitle: 'Explore your business\nnetwork visually',
+        title: 'Visual Network',
+        subtitle: 'Explore your business\nnetwork visually',
       ),
     };
     return InkWell(
@@ -964,10 +1045,10 @@ class _CrmDashboardQuote extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
-                          color: _deepTealColor,
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w500,
-                        ),
+                              color: _deepTealColor,
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1031,13 +1112,19 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
     // Logo menor e mais discreto
     double logoScale = _isExpanded ? 0.65 : 1.04;
     double logoTop = _isExpanded ? 14.0 : 42.0;
-    double logoLeft = _isExpanded ? 8.0 : 16.0; // Puxado levemente para a esquerda
+    double logoLeft = _isExpanded
+        ? 8.0
+        : 16.0; // Puxado levemente para a esquerda
     double logoOpacity = _isExpanded ? 0.30 : 1.0;
 
     // Texto (PFP.WEBP) com mais destaque e melhor centralizado
-    double textScale = _isExpanded ? 1.42 : 1.12; // Aumentado para mais destaque
+    double textScale = _isExpanded
+        ? 1.42
+        : 1.12; // Aumentado para mais destaque
     double textTop = _isExpanded ? 72.0 : 66.0;
-    double textLeft = _isExpanded ? 32.0 : 96.0; // Ajustado para centralizar o bloco
+    double textLeft = _isExpanded
+        ? 32.0
+        : 96.0; // Ajustado para centralizar o bloco
 
     const animationDuration = Duration(milliseconds: 600);
     const animationCurve = Curves.easeInOutCubic;
@@ -1075,7 +1162,9 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                     center: const Alignment(-0.5, -0.1),
                     radius: _hovered ? 2.0 : 1.0,
                     colors: [
-                      const Color(0xFFFFD700).withValues(alpha: (_hovered || _isExpanded) ? 0.03 : 0.01),
+                      const Color(0xFFFFD700).withValues(
+                        alpha: (_hovered || _isExpanded) ? 0.03 : 0.01,
+                      ),
                       const Color(0xFF2D7872).withValues(alpha: 0.06),
                       Colors.transparent,
                     ],
@@ -1109,11 +1198,17 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                       AnimatedBuilder(
                         animation: _shineController,
                         builder: (context, child) {
-                          final value = Curves.easeInOutSine.transform(_shineController.value);
-                          final visible = _shineController.isAnimating ? sin(value * pi) : 0.0;
+                          final value = Curves.easeInOutSine.transform(
+                            _shineController.value,
+                          );
+                          final visible = _shineController.isAnimating
+                              ? sin(value * pi)
+                              : 0.0;
                           return IgnorePointer(
                             child: Opacity(
-                              opacity: (visible * 0.35).clamp(0.0, 1.0).toDouble(),
+                              opacity: (visible * 0.35)
+                                  .clamp(0.0, 1.0)
+                                  .toDouble(),
                               child: ShaderMask(
                                 blendMode: BlendMode.srcATop,
                                 shaderCallback: (rect) {
@@ -1204,13 +1299,17 @@ class _CrmBrandArtwork extends StatelessWidget {
             opacity: logoOpacity,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                boxShadow: shinePass ? const [] : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: shadowOpacity * 0.7),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                boxShadow: shinePass
+                    ? const []
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: shadowOpacity * 0.7,
+                          ),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
               ),
               child: Image.asset(_crmLogoSymbolAsset, fit: BoxFit.contain),
             ),
@@ -1225,13 +1324,17 @@ class _CrmBrandArtwork extends StatelessWidget {
           height: 58 * textScale,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              boxShadow: shinePass ? const [] : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: shadowOpacity * 0.6),
-                  blurRadius: 14,
-                  offset: const Offset(0, 7),
-                ),
-              ],
+              boxShadow: shinePass
+                  ? const []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: shadowOpacity * 0.6,
+                        ),
+                        blurRadius: 14,
+                        offset: const Offset(0, 7),
+                      ),
+                    ],
             ),
             child: Image.asset(_crmLogoWordmarkAsset, fit: BoxFit.contain),
           ),
@@ -1277,20 +1380,20 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
           decoration: BoxDecoration(
             boxShadow: selected
                 ? [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.08),
-                blurRadius: 24,
-                spreadRadius: 0.5,
-              ),
-            ]
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      blurRadius: 24,
+                      spreadRadius: 0.5,
+                    ),
+                  ]
                 : _hovered
                 ? [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 8),
-              ),
-            ]
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
                 : null,
           ),
           child: InkWell(
@@ -1301,10 +1404,10 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
               decoration: BoxDecoration(
                 gradient: selected
                     ? const LinearGradient(
-                  colors: [Color(0xFF1F4A50), Color(0xFF173F46)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
+                        colors: [Color(0xFF1F4A50), Color(0xFF173F46)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
                     : null,
                 color: selected
                     ? null
@@ -1336,7 +1439,9 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
                           borderRadius: BorderRadius.circular(2),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFE0A64C).withValues(alpha: 0.3),
+                              color: const Color(
+                                0xFFE0A64C,
+                              ).withValues(alpha: 0.3),
                               blurRadius: 4,
                             ),
                           ],

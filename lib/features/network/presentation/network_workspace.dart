@@ -1287,7 +1287,7 @@ class _RelationalNetworkHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 104,
+      height: 148,
       padding: const EdgeInsets.symmetric(horizontal: 28),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -1297,8 +1297,8 @@ class _RelationalNetworkHeader extends StatelessWidget {
         children: [
           const _RelationalNetworkMark(),
           const SizedBox(width: 16),
-          SizedBox(
-            width: 270,
+          Expanded(
+            flex: 4,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1320,11 +1320,24 @@ class _RelationalNetworkHeader extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+                const SizedBox(height: 14),
+                _ContextSearchField(
+                  controller: searchController,
+                  hintText: 'Search companies, contracts, employees...',
+                  accent: _tealColor,
+                  enabled: !isLoading,
+                  maxWidth: 560,
+                  onChanged: (_) => onSearchChanged(),
+                  onSubmitted: (_) => onSearchChanged(),
+                  onClear: onClearSearch,
+                  onSearch: onSearchChanged,
+                ),
               ],
             ),
           ),
           const SizedBox(width: 24),
           Expanded(
+            flex: 5,
             child: Align(
               alignment: Alignment.centerRight,
               child: SingleChildScrollView(
@@ -1400,40 +1413,6 @@ class _RelationalNetworkHeader extends StatelessWidget {
                             onTap: onResetViewport,
                           ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(width: 22),
-                    _RelationalControlCard(
-                      width: 410,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.search_rounded,
-                              color: _slateColor,
-                              size: 25,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: searchController,
-                                onChanged: (_) => onSearchChanged(),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText:
-                                      'Search companies, contracts, employees...',
-                                  isCollapsed: true,
-                                ),
-                              ),
-                            ),
-                            if (searchController.text.isNotEmpty)
-                              IconButton(
-                                onPressed: onClearSearch,
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                          ],
-                        ),
                       ),
                     ),
                     const SizedBox(width: 22),
@@ -1621,15 +1600,13 @@ class _RelationalLegendLinePainter extends CustomPainter {
 }
 
 class _RelationalControlCard extends StatelessWidget {
-  const _RelationalControlCard({required this.child, this.width});
+  const _RelationalControlCard({required this.child});
 
   final Widget child;
-  final double? width;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: width,
       padding: EdgeInsets.zero,
       decoration: BoxDecoration(
         color: Colors.white,

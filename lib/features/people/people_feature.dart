@@ -17,12 +17,20 @@ class _PeopleWorkspace extends StatefulWidget {
 
 class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
   final _PeopleApiRepository _repository = _PeopleApiRepository();
+  late final TextEditingController _searchController;
   _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.mock();
 
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
     _loadPeopleData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPeopleData() async {
@@ -351,21 +359,37 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
   @override
   Widget build(BuildContext context) {
     final data = _runtimeData.data;
-    final safeIndex = min(max(widget.selectedIndex, 0), data.items.length - 1);
-    final selectedItem = data.items[safeIndex];
-    final profile =
-        selectedItem.personProfile ?? _personProfileFor(selectedItem);
-    final visibleAttachments = selectedItem.attachments
-        .where(
-          (attachment) =>
-              attachment.accessPolicy.canViewerRead(widget.viewerProfile),
-        )
-        .toList();
-    final visibleNotes = [...selectedItem.sensitiveNotes]
-      ..retainWhere(
-        (note) => note.accessPolicy.canViewerRead(widget.viewerProfile),
-      )
-      ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+    final visibleItems = _filterPeopleItems(data.items);
+    final fallbackIndex = data.items.isEmpty
+        ? -1
+        : min(max(widget.selectedIndex, 0), data.items.length - 1);
+    final preferredItem = fallbackIndex < 0 ? null : data.items[fallbackIndex];
+    final selectedItem = visibleItems.isEmpty
+        ? null
+        : visibleItems.contains(preferredItem)
+        ? preferredItem
+        : visibleItems.first;
+    final selectedOriginalIndex = selectedItem == null
+        ? null
+        : data.items.indexOf(selectedItem);
+    final profile = selectedItem == null
+        ? null
+        : selectedItem.personProfile ?? _personProfileFor(selectedItem);
+    final visibleAttachments = selectedItem == null
+        ? <_AttachmentRecord>[]
+        : selectedItem.attachments
+              .where(
+                (attachment) =>
+                    attachment.accessPolicy.canViewerRead(widget.viewerProfile),
+              )
+              .toList();
+    final visibleNotes = selectedItem == null
+        ? <_SensitiveNoteTag>[]
+        : ([...selectedItem.sensitiveNotes]
+            ..retainWhere(
+              (note) => note.accessPolicy.canViewerRead(widget.viewerProfile),
+            )
+            ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder)));
     final sensitiveSections = _buildSensitiveSections(visibleNotes);
 
     return Column(
@@ -394,13 +418,27 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                         context,
                       ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
                     ),
+                    const SizedBox(height: 18),
+                    _ContextSearchField(
+                      controller: _searchController,
+                      hintText: data.searchHint,
+                      accent: _tealColor,
+                      enabled: !_runtimeData.isLoading,
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => setState(() {}),
+                      onClear: () {
+                        _searchController.clear();
+                        setState(() {});
+                      },
+                      onSearch: () => setState(() {}),
+                    ),
                   ],
                 ),
               ),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 360),
                 child: DropdownButtonFormField<int>(
-                  initialValue: safeIndex,
+                  initialValue: selectedOriginalIndex,
                   decoration: InputDecoration(
                     labelText: 'Employee record',
                     filled: true,
@@ -415,11 +453,11 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                     ),
                   ),
                   items: [
-                    for (final entry in data.items.indexed)
+                    for (final item in visibleItems)
                       DropdownMenuItem<int>(
-                        value: entry.$1,
+                        value: data.items.indexOf(item),
                         child: Text(
-                          '${entry.$2.title} - ${entry.$2.publicId}',
+                          '${item.title} - ${item.publicId}',
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -443,14 +481,14 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                     label: const Text('Nova pessoa'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: _runtimeData.isLoading
+                    onPressed: _runtimeData.isLoading || selectedItem == null
                         ? null
                         : () => _openEditPersonDialog(selectedItem),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Editar'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: _runtimeData.isLoading
+                    onPressed: _runtimeData.isLoading || selectedItem == null
                         ? null
                         : () => _removePerson(selectedItem),
                     icon: const Icon(Icons.delete_outline_rounded),
@@ -467,24 +505,27 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _Tag(
-                    label: selectedItem.publicId,
-                    icon: Icons.badge_outlined,
-                    color: _slateColor,
-                    background: _slateColor.withValues(alpha: 0.12),
-                  ),
-                  _Tag(
-                    label: profile.statusLabel,
-                    icon: Icons.circle,
-                    color: profile.statusColor,
-                    background: profile.statusColor.withValues(alpha: 0.12),
-                  ),
-                  _Tag(
-                    label: '${profile.employmentLinks.length} employment links',
-                    icon: Icons.link_rounded,
-                    color: _tealColor,
-                    background: _tealColor.withValues(alpha: 0.12),
-                  ),
+                  if (selectedItem != null && profile != null) ...[
+                    _Tag(
+                      label: selectedItem.publicId,
+                      icon: Icons.badge_outlined,
+                      color: _slateColor,
+                      background: _slateColor.withValues(alpha: 0.12),
+                    ),
+                    _Tag(
+                      label: profile.statusLabel,
+                      icon: Icons.circle,
+                      color: profile.statusColor,
+                      background: profile.statusColor.withValues(alpha: 0.12),
+                    ),
+                    _Tag(
+                      label:
+                          '${profile.employmentLinks.length} employment links',
+                      icon: Icons.link_rounded,
+                      color: _tealColor,
+                      background: _tealColor.withValues(alpha: 0.12),
+                    ),
+                  ],
                   _Tag(
                     label: '${visibleNotes.length} sensitive tags visible',
                     icon: widget.viewerProfile.canViewSensitive
@@ -515,86 +556,129 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
             ],
           ),
         ),
-        if (_runtimeData.errorMessage != null) ...[
-          const SizedBox(height: 12),
-          _PeopleRuntimeNotice(
-            message: _runtimeData.errorMessage!,
-            onRetry: _loadPeopleData,
-          ),
-        ],
-        const SizedBox(height: 24),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 1540;
-            final medium = constraints.maxWidth >= 1120;
-            final profilePanel = _PeopleProfilePanel(
-              item: selectedItem,
-              profile: profile,
-            );
-            final linksPanel = _EmploymentLinksPanel(
-              profile: profile,
-              onAddLink: _runtimeData.isLoading
-                  ? null
-                  : () => _openCreateEmploymentLinkDialog(selectedItem),
-            );
-            final sideColumn = _PeopleSideColumn(
-              viewerProfile: widget.viewerProfile,
-              item: selectedItem,
-              profile: profile,
-              sections: sensitiveSections,
-              attachments: visibleAttachments,
-              onAddOccurrence: () => _openCreateOccurrenceDialog(selectedItem),
-              onEditOccurrence: (occurrence) =>
-                  _openEditOccurrenceDialog(selectedItem, occurrence),
-              onRemoveOccurrence: _removeOccurrence,
-              onAddAttachment: () => _openCreateAttachmentDialog(profile),
-              onEditAttachment: _openEditAttachmentDialog,
-              onRemoveAttachment: _removeAttachment,
-            );
-
-            if (wide) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 4, child: profilePanel),
-                  const SizedBox(width: 24),
-                  Expanded(flex: 6, child: linksPanel),
-                  const SizedBox(width: 24),
-                  Expanded(flex: 3, child: sideColumn),
-                ],
+        if (selectedItem == null || profile == null) ...[
+          const SizedBox(height: 24),
+          const _Panel(child: _EntityEmptyState()),
+        ] else ...[
+          if (_runtimeData.errorMessage != null) ...[
+            const SizedBox(height: 12),
+            _PeopleRuntimeNotice(
+              message: _runtimeData.errorMessage!,
+              onRetry: _loadPeopleData,
+            ),
+          ],
+          const SizedBox(height: 24),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 1540;
+              final medium = constraints.maxWidth >= 1120;
+              final profilePanel = _PeopleProfilePanel(
+                item: selectedItem,
+                profile: profile,
               );
-            }
+              final linksPanel = _EmploymentLinksPanel(
+                profile: profile,
+                onAddLink: _runtimeData.isLoading
+                    ? null
+                    : () => _openCreateEmploymentLinkDialog(selectedItem),
+              );
+              final sideColumn = _PeopleSideColumn(
+                viewerProfile: widget.viewerProfile,
+                item: selectedItem,
+                profile: profile,
+                sections: sensitiveSections,
+                attachments: visibleAttachments,
+                onAddOccurrence: () =>
+                    _openCreateOccurrenceDialog(selectedItem),
+                onEditOccurrence: (occurrence) =>
+                    _openEditOccurrenceDialog(selectedItem, occurrence),
+                onRemoveOccurrence: _removeOccurrence,
+                onAddAttachment: () => _openCreateAttachmentDialog(profile),
+                onEditAttachment: _openEditAttachmentDialog,
+                onRemoveAttachment: _removeAttachment,
+              );
 
-            if (medium) {
+              if (wide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 4, child: profilePanel),
+                    const SizedBox(width: 24),
+                    Expanded(flex: 6, child: linksPanel),
+                    const SizedBox(width: 24),
+                    Expanded(flex: 3, child: sideColumn),
+                  ],
+                );
+              }
+
+              if (medium) {
+                return Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 5, child: profilePanel),
+                        const SizedBox(width: 24),
+                        Expanded(flex: 7, child: linksPanel),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    sideColumn,
+                  ],
+                );
+              }
+
               return Column(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 5, child: profilePanel),
-                      const SizedBox(width: 24),
-                      Expanded(flex: 7, child: linksPanel),
-                    ],
-                  ),
+                  profilePanel,
+                  const SizedBox(height: 24),
+                  linksPanel,
                   const SizedBox(height: 24),
                   sideColumn,
                 ],
               );
-            }
-
-            return Column(
-              children: [
-                profilePanel,
-                const SizedBox(height: 24),
-                linksPanel,
-                const SizedBox(height: 24),
-                sideColumn,
-              ],
-            );
-          },
-        ),
+            },
+          ),
+        ],
       ],
     );
+  }
+
+  List<_EntityItem> _filterPeopleItems(List<_EntityItem> items) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return items;
+    }
+
+    return items
+        .where((item) {
+          final profile = item.personProfile;
+          final haystack = [
+            item.publicId,
+            item.title,
+            item.subtitle,
+            item.meta,
+            item.status,
+            profile?.roleTitle,
+            profile?.managerName,
+            profile?.managerRole,
+            profile?.teamLabel,
+            profile?.departmentLabel,
+            profile?.timelineSummary,
+            profile?.crudSnapshot?.email,
+            profile?.crudSnapshot?.cpf,
+            profile?.crudSnapshot?.phone,
+            for (final field
+                in profile?.profileFields ?? const <_PersonInfoField>[])
+              field.value,
+            for (final link
+                in profile?.employmentLinks ?? const <_EmploymentLinkRecord>[])
+              '${link.contractLabel} ${link.contractPublicId} ${link.companyName}',
+          ].whereType<String>().join(' ').toLowerCase();
+
+          return haystack.contains(query);
+        })
+        .toList(growable: false);
   }
 }
 

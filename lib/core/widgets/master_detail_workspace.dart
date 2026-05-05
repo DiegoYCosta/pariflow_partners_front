@@ -386,46 +386,15 @@ class _EntitySearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 760),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _lineColor),
-      ),
-      child: TextField(
-        controller: controller,
-        enabled: enabled,
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => onSubmitSearch?.call(),
-        decoration: InputDecoration(
-          hintText: hintText,
-          border: InputBorder.none,
-          prefixIcon: Icon(Icons.search_rounded, color: accent),
-          suffixIcon: SizedBox(
-            width: 96,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: 'Limpar busca',
-                  onPressed: enabled ? onClearSearch : null,
-                  icon: const Icon(Icons.close_rounded),
-                ),
-                IconButton(
-                  tooltip: 'Buscar',
-                  onPressed: enabled ? onSubmitSearch : null,
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                ),
-              ],
-            ),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 17,
-          ),
-        ),
-      ),
+    return _ContextSearchField(
+      controller: controller,
+      hintText: hintText,
+      accent: accent,
+      enabled: enabled,
+      maxWidth: 620,
+      onSubmitted: (_) => onSubmitSearch?.call(),
+      onClear: onClearSearch,
+      onSearch: onSubmitSearch,
     );
   }
 }
