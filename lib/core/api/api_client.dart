@@ -290,14 +290,10 @@ String get _defaultApiBaseUrl {
       return Uri.base.replace(path: 'api/v1', query: '').toString();
     }
 
-    return 'http://localhost:3000/api/v1';
+    return 'http://127.0.0.1:3002/api/v1';
   }
 
-  if (defaultTargetPlatform == TargetPlatform.android) {
-    return 'http://10.0.2.2:3000/api/v1';
-  }
-
-  return 'http://localhost:3000/api/v1';
+  return 'http://3.18.213.49/api/v1';
 }
 
 String? get _previewFirebaseIdToken {
