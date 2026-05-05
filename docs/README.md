@@ -1,96 +1,48 @@
 # Documentacao do Front
 
-## Objetivo
+Data de referencia: `2026-05-04`.
 
-Esta pasta organiza o estado atual, os contratos e o backlog remanescente do frontend Flutter do PariFlow Partners.
+Esta pasta foi consolidada para manter apenas documentos que ainda orientam
+trabalho ativo. Planos antigos de migracao, componentizacao e backlog inicial
+foram removidos porque descreviam etapas ja executadas ou duplicavam o estado
+atual.
 
-O front ja nao esta em fase puramente conceitual. Parte importante do shell novo, dos modulos mestre, de `People` e do preview relacional ja existe no codigo. Por isso, os documentos daqui devem ser lidos em duas categorias:
+## Ordem de Leitura
 
-- estado atual e decisao operacional;
-- historico, estrategia e backlog de evolucao.
+1. [Estado atual e proximos passos](current-implementation-status.md)
+2. [Guia operacional de ambientes e funcoes](guia-operacional-ambientes-e-funcoes.md)
+3. [Firebase runtime config](firebase-runtime-config.md)
+4. [Integracao com backend](front-backend-integration.md)
+5. [Companies, Clients e Contracts](companies-clients-contracts-layout-plan.md)
+6. [Contrato relacional de Network](relational-graph-contract.md)
+7. [Design system CRM](new-ui-design-system.md)
 
-## Leitura inicial obrigatoria - Não incluídas no commit público
+## Fontes de Verdade
 
-1. [Estado atual de implementacao](current-implementation-status.md)
-2. [Conceito de layout](front-layout-concept.md)
-3. [Integracao com backend](front-backend-integration.md)
-4. [Plano de evolucao de API](api-evolution-plan.md)
-5. [Matriz `as-is -> to-be`](layout-as-is-to-be-matrix.md)
-6. [Worklist remanescente do front](front-migration-code-worklist.md)
+- Dominio de negocio: `../DPPRO_JOTABE/Documentacao`
+- Backend: Swagger em `/api/docs` e codigo em `../pariflow_partners_back`
+- Front real: codigo em `lib/`
+- Deploy e seguranca: docs do backend, principalmente
+  `docs/aws-security-checklist.md`
 
-Os demais documentos continuam validos como apoio arquitetural, estrategia de rollout ou historico da migracao.
+## Estado Atual Resumido
 
-## Fontes de verdade
+| Area | Estado |
+| --- | --- |
+| Shell CRM | ativo |
+| Companies | lista, detalhe e CRUD conectados a API |
+| Clients | lista, detalhe e CRUD conectados a API; detalhe ainda cruza contratos no front |
+| Contracts | CRUD de contratos, tipos, modelos, servicos, postos e documentos |
+| People | CRUD de pessoa, vinculos, ocorrencias e anexos; leitura de tags/anexos por ACL |
+| Network | consome `GET /network/graph`; ainda precisa refinamento visual/performance |
+| Auth | preview usa `dev-token`; producao exige Firebase runtime no front |
+| AWS | homologacao por IP ativa atras de Apache no mesmo host |
 
-1. Produto e dominio: pasta compartilhada `DPPRO_JOTABE`
-2. Backend tecnico: `../../PariFlow Partners - Back/docs/preparacao-backend-e-integracao-front.md`
-3. Contrato em execucao: Swagger do backend em `/api/docs`
-4. Estado real do front: codigo em `lib/`
-5. Consolidacao documental do estado atual: `current-implementation-status.md`
+## Proximos Passos
 
-## Plataformas alvo
-
-- Flutter Web
-- Flutter Android
-
-## Stack real do repositorio x direcao documentada
-
-| Area | Hoje no repo | Direcao documentada | Leitura correta |
-| --- | --- | --- | --- |
-| Runtime | Flutter + Dart 3.11 | mantido | estado real |
-| Design system | Material/tema customizado local | evolucao guiada pelo shell CRM | parcial |
-| Estado | estado local/manual | `flutter_riverpod` continua apenas como direcao | ainda nao implantado |
-| Navegacao | shell e composicao locais | `go_router` continua apenas como direcao | ainda nao implantado |
-| HTTP | ainda nao centralizado no front | `dio` continua apenas como direcao | ainda nao implantado |
-| Serializacao | parse/modelos manuais | `freezed` e `json_serializable` continuam como direcao | ainda nao implantado |
-| Auth no front | ainda sem runtime completo no app Flutter | Firebase + sessao interna continua sendo a trilha alvo | parcialmente documentado, nao operacional no front |
-| Testes | base Flutter padrao | ampliar para widget/integracao depois | inicial |
-
-## Estado atual do shell e dos modulos
-
-- `legacy_shell` e `crm_shell` ja existem.
-- A variante ativa hoje e `crm`.
-- O dashboard CRM ja esta implantado.
-- `Companies`, `Client Companies`, `Contracts`, `People` e `Network` ja possuem features dedicadas.
-- `People` ja trabalha com `Employment Links`, bloco sensivel e anexos.
-- `Network` ja possui leitura em quatro faixas, legenda, periodo, busca e painel lateral, mas ainda opera com payload de preview.
-
-## Estado atual da teia
-
-A referencia visual canonica da teia passa a ser:
-
-- o material de `JOTABE LAYOUT`;
-- o mockup `Relational Network / Business Overview` anexado em `2026-05-02`;
-- o contrato consolidado em `relational-graph-contract.md`;
-- a implementacao intermediaria existente em `lib/features/network/presentation/network_workspace.dart`.
-
-Leitura correta:
-
-- o codigo atual da teia e reaproveitavel e ja embute conceitos corretos de `lanes`, legenda e painel lateral;
-- ele ainda nao deve ser tratado como contrato final;
-- o principal bloqueador remanescente continua sendo o endpoint backend canonico da malha.
-
-## Regras que nao podem quebrar
-
-- O backend continua sendo `API-first`.
-- A interface consome `publicId`, nunca ID interno de banco.
-- Permissoes, visibilidade sensivel e step-up de seguranca sao respeitados, nao inferidos.
-- O front trata o envelope padrao de sucesso e erro em todos os modulos.
-- Web e Android compartilham dominio, modelos e casos de uso; diferencas ficam confinadas a infraestrutura e adaptacao de plataforma.
-- Se o contrato mudar, a documentacao daqui deve ser atualizada no mesmo movimento.
-
-## Regra adicional de anotacoes sensiveis
-
-O produto precisa suportar anotacoes operacionais curtas sobre empresas e colaboradores, mesmo quando essas observacoes fogem do eixo de documentos formais.
-
-Essas anotacoes seguem estas regras:
-
-- a criacao pode acontecer sem login, como envio de tag ou observacao curta;
-- a consulta exige sessao autenticada por se tratar de dado sensivel;
-- cada anotacao entra como tag independente, com cor configuravel e ordem de exibicao editavel;
-- cada tag aceita ate `350` caracteres;
-- o recurso continua sujeito a `CRUD`, auditoria e regras de visibilidade do backend;
-- mesmo no envio anonimo, o contrato precisa carregar `ownerUserPublicId`, grupos permitidos e pessoas especificas permitidas;
-- o front nao pode vazar contagem, existencia, titulo ou resumo de conteudo protegido para quem nao tiver acesso;
-- anexos precisam nascer classificados entre documento formal, anexo sensivel e referencia de apoio;
-- tags sensiveis precisam nascer classificadas entre sinal comportamental, contexto de rotina, contexto pessoal, contexto familiar, habilidade ou risco operacional.
+1. Trocar preview auth por Firebase no front.
+2. Configurar dominio, HTTPS e secrets de producao.
+3. Fechar storage/download protegido e step-up sensivel.
+4. Implementar auditoria e relatorios.
+5. Refinar responsividade Web/Android e remover fallback local quando os dados
+   reais estiverem consistentes.
