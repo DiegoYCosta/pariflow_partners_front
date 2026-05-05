@@ -3,7 +3,7 @@ part of '../../../app/app.dart';
 const _clientCompaniesWorkspaceData = _EntityWorkspaceData(
   title: 'Empresas clientes com contexto proprio',
   subtitle:
-      'Cliente nao fica mais escondido dentro de prestadoras e contratos. A carteira passa a ter leitura propria, com transicoes, multi-prestadora e memoria operacional protegida.',
+      'Gerencie as empresas envolvidas em seu flow.',
   searchHint: 'buscar por nome da carteira, documento ou unidade',
   listHint:
       'O detalhe do cliente precisa cruzar prestadoras, contratos, pessoas impactadas e risco operacional sem obrigar a abrir a teia inteira.',
