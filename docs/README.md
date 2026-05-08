@@ -13,9 +13,11 @@ atual.
 2. [Guia operacional de ambientes e funcoes](guia-operacional-ambientes-e-funcoes.md)
 3. [Firebase runtime config](firebase-runtime-config.md)
 4. [Integracao com backend](front-backend-integration.md)
-5. [Companies, Clients e Contracts](companies-clients-contracts-layout-plan.md)
-6. [Contrato relacional de Network](relational-graph-contract.md)
-7. [Design system CRM](new-ui-design-system.md)
+5. [Fluxo de autenticacao e sessao](auth-session-flow.md)
+6. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
+7. [Companies, Clients e Contracts](companies-clients-contracts-layout-plan.md)
+8. [Contrato relacional de Network](relational-graph-contract.md)
+9. [Design system CRM](new-ui-design-system.md)
 
 ## Fontes de Verdade
 
@@ -34,15 +36,17 @@ atual.
 | Clients | lista, detalhe e CRUD conectados a API; detalhe ainda cruza contratos no front |
 | Contracts | CRUD de contratos, tipos, modelos, servicos, postos e documentos |
 | People | CRUD de pessoa, vinculos, ocorrencias e anexos; leitura de tags/anexos por ACL |
-| Network | consome `GET /network/graph`; ainda precisa refinamento visual/performance |
-| Auth | preview usa `dev-token`; producao exige Firebase runtime no front |
+| Network | consome `GET /network/graph`; ainda precisa refinamento visual, navegacao e performance |
+| Auth | `dev-token` so funciona fora de release e quando ativado por `--dart-define`; release exige Firebase real |
 | AWS | homologacao por IP ativa atras de Apache no mesmo host |
 
 ## Proximos Passos
 
-1. Trocar preview auth por Firebase no front.
-2. Configurar dominio, HTTPS e secrets de producao.
-3. Fechar storage/download protegido e step-up sensivel.
-4. Implementar auditoria e relatorios.
-5. Refinar responsividade Web/Android e remover fallback local quando os dados
+1. Validar login Firebase real ponta a ponta e manter release sem `dev-token`.
+2. Iniciar consolidacao arquitetural pelo `api_client.dart`, `auth_gate.dart`
+   e `network_graph_engine.dart`.
+3. Configurar dominio, HTTPS e secrets de producao.
+4. Fechar storage/download protegido e step-up sensivel.
+5. Implementar auditoria e relatorios.
+6. Refinar responsividade Web/Android e remover fallback local quando os dados
    reais estiverem consistentes.

@@ -299,8 +299,12 @@ String get _defaultApiBaseUrl {
 String? get _previewFirebaseIdToken {
   const enabled = bool.fromEnvironment(
     'PARIFLOW_ENABLE_DEV_TOKEN',
-    defaultValue: true,
+    defaultValue: false,
   );
+
+  if (kReleaseMode) {
+    return null;
+  }
 
   return enabled ? 'dev-token' : null;
 }
