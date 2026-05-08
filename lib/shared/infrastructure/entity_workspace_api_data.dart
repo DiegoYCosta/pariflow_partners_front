@@ -17,10 +17,11 @@ class _EntityWorkspaceApiRepository {
     final companies = _apiMapList(envelope['items']);
 
     if (companies.isEmpty) {
-      return _EntityWorkspaceRuntimeData.mock(
+      return _EntityWorkspaceRuntimeData.empty(
         _companiesWorkspaceData,
-        errorMessage:
-            'API conectada, mas ainda nao ha empresas prestadoras no recorte. Mantive o layout com dados locais.',
+        '/empresas-prestadoras',
+        message:
+            'API conectada, mas ainda nao ha empresas prestadoras no recorte. Nenhum dado mock foi carregado.',
       );
     }
 
@@ -46,7 +47,7 @@ class _EntityWorkspaceApiRepository {
           'API real',
           'publicId',
           'contratos conectados',
-          'fallback local',
+          'sem mock',
         ],
         filters: _companiesWorkspaceData.filters,
         items: items,
@@ -68,10 +69,11 @@ class _EntityWorkspaceApiRepository {
     final clients = _apiMapList(envelope['items']);
 
     if (clients.isEmpty) {
-      return _EntityWorkspaceRuntimeData.mock(
+      return _EntityWorkspaceRuntimeData.empty(
         _clientCompaniesWorkspaceData,
-        errorMessage:
-            'API conectada, mas ainda nao ha clientes no recorte. Mantive o layout com dados locais.',
+        '/clientes',
+        message:
+            'API conectada, mas ainda nao ha clientes no recorte. Nenhum dado mock foi carregado.',
       );
     }
 
@@ -97,7 +99,7 @@ class _EntityWorkspaceApiRepository {
           'API real',
           'clientes',
           'contratos relevantes',
-          'fallback local',
+          'sem mock',
         ],
         filters: _clientCompaniesWorkspaceData.filters,
         items: items,
@@ -119,10 +121,11 @@ class _EntityWorkspaceApiRepository {
     final contracts = _apiMapList(envelope['items']);
 
     if (contracts.isEmpty) {
-      return _EntityWorkspaceRuntimeData.mock(
+      return _EntityWorkspaceRuntimeData.empty(
         _contractsWorkspaceData,
-        errorMessage:
-            'API conectada, mas ainda nao ha contratos no recorte. Mantive o layout com dados locais.',
+        '/contratos',
+        message:
+            'API conectada, mas ainda nao ha contratos no recorte. Nenhum dado mock foi carregado.',
       );
     }
 
@@ -343,16 +346,53 @@ class _EntityWorkspaceRuntimeData {
     this.errorMessage,
   });
 
-  factory _EntityWorkspaceRuntimeData.mock(
-    _EntityWorkspaceData data, {
-    String? errorMessage,
-  }) {
+  factory _EntityWorkspaceRuntimeData.initial(_EntityWorkspaceData data) {
     return _EntityWorkspaceRuntimeData(
-      data: data,
-      sourceLabel: errorMessage == null ? 'preview local' : 'fallback local',
+      data: _entityWorkspaceWithoutItems(
+        data,
+        productionHint: 'Aguardando resposta da API real.',
+        integrationFocus: const ['API real', 'sem mock'],
+      ),
+      sourceLabel: 'aguardando API',
       isLive: false,
       isLoading: false,
-      errorMessage: errorMessage,
+    );
+  }
+
+  factory _EntityWorkspaceRuntimeData.empty(
+    _EntityWorkspaceData data,
+    String endpointLabel, {
+    required String message,
+  }) {
+    return _EntityWorkspaceRuntimeData(
+      data: _entityWorkspaceWithoutItems(
+        data,
+        productionHint:
+            'A API respondeu sem registros para este recorte. A tela nao carrega dados mock em execucao real.',
+        integrationFocus: const ['API real', 'sem registros', 'sem mock'],
+      ),
+      sourceLabel: 'API real | $endpointLabel',
+      isLive: true,
+      isLoading: false,
+      errorMessage: message,
+    );
+  }
+
+  factory _EntityWorkspaceRuntimeData.unavailable(
+    _EntityWorkspaceData data, {
+    required String message,
+  }) {
+    return _EntityWorkspaceRuntimeData(
+      data: _entityWorkspaceWithoutItems(
+        data,
+        productionHint:
+            'A API nao respondeu para este modulo. A tela foi mantida sem dados locais para evitar confusao com a base real.',
+        integrationFocus: const ['API indisponivel', 'sem mock'],
+      ),
+      sourceLabel: 'API indisponivel',
+      isLive: false,
+      isLoading: false,
+      errorMessage: message,
     );
   }
 
@@ -760,9 +800,27 @@ _AttachmentRecord _contractDocumentFromApi(Map<String, dynamic> document) {
 
 String _entityWorkspaceRuntimeErrorMessage(Object error, String moduleLabel) {
   if (error is ApiException) {
-    return 'API indisponivel para $moduleLabel (${error.code}). Mantive o preview local sem quebrar a pagina.';
+    return 'API indisponivel para $moduleLabel (${error.code}). Nenhum dado mock foi carregado.';
   }
-  return 'Nao foi possivel sincronizar $moduleLabel com a API. Mantive o preview local.';
+  return 'Nao foi possivel sincronizar $moduleLabel com a API. Nenhum dado mock foi carregado.';
+}
+
+_EntityWorkspaceData _entityWorkspaceWithoutItems(
+  _EntityWorkspaceData data, {
+  required String productionHint,
+  required List<String> integrationFocus,
+}) {
+  return _EntityWorkspaceData(
+    title: data.title,
+    subtitle: data.subtitle,
+    searchHint: data.searchHint,
+    listHint: data.listHint,
+    productionHint: productionHint,
+    integrationFocus: integrationFocus,
+    filters: data.filters,
+    items: const [],
+    accent: data.accent,
+  );
 }
 
 String _entityStatusLabel(String status) {

@@ -19,7 +19,7 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
   final _EntityWorkspaceApiRepository _repository =
       _EntityWorkspaceApiRepository();
   final TextEditingController _searchController = TextEditingController();
-  _EntityWorkspaceRuntimeData _runtimeData = _EntityWorkspaceRuntimeData.mock(
+  _EntityWorkspaceRuntimeData _runtimeData = _EntityWorkspaceRuntimeData.initial(
     _contractsWorkspaceData,
   );
   List<_EntitySelectOption> _contractTypes = const [];
@@ -61,9 +61,9 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
         return;
       }
       setState(() {
-        _runtimeData = _EntityWorkspaceRuntimeData.mock(
+        _runtimeData = _EntityWorkspaceRuntimeData.unavailable(
           _contractsWorkspaceData,
-          errorMessage: _entityWorkspaceRuntimeErrorMessage(error, 'Contracts'),
+          message: _entityWorkspaceRuntimeErrorMessage(error, 'Contracts'),
         );
       });
     }

@@ -20,9 +20,8 @@ class _ClientCompaniesWorkspaceState extends State<_ClientCompaniesWorkspace> {
   final _EntityWorkspaceApiRepository _repository =
       _EntityWorkspaceApiRepository();
   final TextEditingController _searchController = TextEditingController();
-  _EntityWorkspaceRuntimeData _runtimeData = _EntityWorkspaceRuntimeData.mock(
-    _clientCompaniesWorkspaceData,
-  );
+  _EntityWorkspaceRuntimeData _runtimeData =
+      _EntityWorkspaceRuntimeData.initial(_clientCompaniesWorkspaceData);
 
   @override
   void initState() {
@@ -56,9 +55,9 @@ class _ClientCompaniesWorkspaceState extends State<_ClientCompaniesWorkspace> {
         return;
       }
       setState(() {
-        _runtimeData = _EntityWorkspaceRuntimeData.mock(
+        _runtimeData = _EntityWorkspaceRuntimeData.unavailable(
           _clientCompaniesWorkspaceData,
-          errorMessage: _entityWorkspaceRuntimeErrorMessage(error, 'Clients'),
+          message: _entityWorkspaceRuntimeErrorMessage(error, 'Clients'),
         );
       });
     }

@@ -46,13 +46,32 @@ class _NetworkRuntimeData {
     this.errorMessage,
   });
 
-  factory _NetworkRuntimeData.mock({String? errorMessage}) {
-    return _NetworkRuntimeData(
-      payload: _networkGraphContractPreview,
-      sourceLabel: errorMessage == null ? 'preview local' : 'fallback local',
+  factory _NetworkRuntimeData.initial() {
+    return const _NetworkRuntimeData(
+      payload: _emptyNetworkGraphPayload,
+      sourceLabel: 'aguardando API',
       isLive: false,
       isLoading: false,
-      errorMessage: errorMessage,
+    );
+  }
+
+  factory _NetworkRuntimeData.empty({required String message}) {
+    return _NetworkRuntimeData(
+      payload: _emptyNetworkGraphPayload,
+      sourceLabel: 'API real | /network/graph',
+      isLive: true,
+      isLoading: false,
+      errorMessage: message,
+    );
+  }
+
+  factory _NetworkRuntimeData.unavailable({required String message}) {
+    return _NetworkRuntimeData(
+      payload: _emptyNetworkGraphPayload,
+      sourceLabel: 'API indisponivel',
+      isLive: false,
+      isLoading: false,
+      errorMessage: message,
     );
   }
 
@@ -99,7 +118,49 @@ String? _networkQueryList(Iterable<String> values) {
 
 String _networkRuntimeErrorMessage(Object error) {
   if (error is ApiException) {
-    return 'API indisponivel para Network (${error.code}). Mantive o preview local.';
+    return 'API indisponivel para Network (${error.code}). Nenhum dado mock foi carregado.';
   }
-  return 'Nao foi possivel sincronizar Network com a API. Mantive o preview local.';
+  return 'Nao foi possivel sincronizar Network com a API. Nenhum dado mock foi carregado.';
 }
+
+const _emptyNetworkGraphPayload = _NetworkGraphPayload(
+  period: _NetworkGraphPeriod(preset: '1y', from: '', to: ''),
+  lanes: [
+    _NetworkGraphLane.rootCompany,
+    _NetworkGraphLane.clientCompany,
+    _NetworkGraphLane.contract,
+    _NetworkGraphLane.position,
+    _NetworkGraphLane.employee,
+  ],
+  nodes: [],
+  edges: [],
+  filters: _NetworkGraphFilters(
+    search: '',
+    applied: _NetworkGraphAppliedFilters(
+      periodPreset: '1y',
+      rootCompanyPublicIds: [],
+      clientCompanyPublicIds: [],
+      contractStatuses: [],
+      employeeStatuses: [],
+      includeHistorical: true,
+      includeIndirect: true,
+    ),
+    available: _NetworkGraphAvailableFilters(
+      periodPresets: ['6m', '1y', 'all'],
+      rootCompanies: [],
+      clientCompanies: [],
+      contractStatuses: ['ACTIVE', 'EXPIRED', 'SUSPENDED'],
+      employeeStatuses: ['ACTIVE', 'DISMISSED', 'HISTORICAL'],
+      relationshipStates: ['active', 'historical', 'indirect'],
+    ),
+  ),
+  legend: _NetworkGraphLegend(
+    relationshipStates: [
+      _NetworkGraphLegendEntry(value: 'active', label: 'Ativo'),
+      _NetworkGraphLegendEntry(value: 'historical', label: 'Historico'),
+      _NetworkGraphLegendEntry(value: 'indirect', label: 'Indireto'),
+    ],
+  ),
+  focus: _NetworkGraphFocus(),
+  meta: _NetworkGraphMeta(traceId: ''),
+);

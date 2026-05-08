@@ -79,9 +79,10 @@ class _PeopleApiRepository {
     final people = _apiMapList(peopleEnvelope['items']);
 
     if (people.isEmpty) {
-      return _PeopleRuntimeData.mock(
-        errorMessage:
-            'API conectada, mas ainda nao ha pessoas no banco local. Mantive o mock para preservar a leitura da tela.',
+      return _PeopleRuntimeData.empty(
+        session,
+        message:
+            'API conectada, mas ainda nao ha pessoas no recorte. Nenhum dado mock foi carregado.',
       );
     }
 
@@ -97,13 +98,8 @@ class _PeopleApiRepository {
         listHint:
             'A lista usa publicId e envelope padrao da API para abrir a ficha operacional.',
         productionHint:
-            'Corte vertical ativo: sessao local controlada, pessoas, vinculos, ocorrencias, tags e anexos lidos do backend com fallback local.',
-        integrationFocus: [
-          'API real',
-          'publicId',
-          'ACL no backend',
-          'fallback seguro',
-        ],
+            'Corte vertical ativo: pessoas, vinculos, ocorrencias, tags e anexos lidos do backend sem fallback de dados locais.',
+        integrationFocus: ['API real', 'publicId', 'ACL no backend', 'sem mock'],
         filters: [
           'pessoas',
           'vinculos',
@@ -175,13 +171,50 @@ class _PeopleRuntimeData {
     this.errorMessage,
   });
 
-  factory _PeopleRuntimeData.mock({String? errorMessage}) {
+  factory _PeopleRuntimeData.initial() {
     return _PeopleRuntimeData(
-      data: _peopleWorkspaceData,
-      sourceLabel: errorMessage == null ? 'mock local' : 'mock fallback',
+      data: _entityWorkspaceWithoutItems(
+        _peopleWorkspaceData,
+        productionHint: 'Aguardando resposta da API real de People.',
+        integrationFocus: const ['API real', 'sem mock'],
+      ),
+      sourceLabel: 'aguardando API',
       isLive: false,
       isLoading: false,
-      errorMessage: errorMessage,
+    );
+  }
+
+  factory _PeopleRuntimeData.empty(
+    SessionSnapshot session, {
+    required String message,
+  }) {
+    return _PeopleRuntimeData(
+      data: _entityWorkspaceWithoutItems(
+        _peopleWorkspaceData,
+        productionHint:
+            'A API de People respondeu sem registros para este recorte. A tela nao carrega dados mock em execucao real.',
+        integrationFocus: const ['API real', 'sem registros', 'sem mock'],
+      ),
+      sourceLabel: 'API real | ${_peopleSessionLabel(session)}',
+      isLive: true,
+      isLoading: false,
+      session: session,
+      errorMessage: message,
+    );
+  }
+
+  factory _PeopleRuntimeData.unavailable({required String message}) {
+    return _PeopleRuntimeData(
+      data: _entityWorkspaceWithoutItems(
+        _peopleWorkspaceData,
+        productionHint:
+            'A API de People nao respondeu. A tela foi mantida sem dados locais para evitar confusao com a base real.',
+        integrationFocus: const ['API indisponivel', 'sem mock'],
+      ),
+      sourceLabel: 'API indisponivel',
+      isLive: false,
+      isLoading: false,
+      errorMessage: message,
     );
   }
 
@@ -189,12 +222,9 @@ class _PeopleRuntimeData {
     _EntityWorkspaceData data,
     SessionSnapshot session,
   ) {
-    final profileLabel = session.profiles.isEmpty
-        ? session.securityContext
-        : session.profiles.join('/');
     return _PeopleRuntimeData(
       data: data,
-      sourceLabel: 'API real | $profileLabel',
+      sourceLabel: 'API real | ${_peopleSessionLabel(session)}',
       isLive: true,
       isLoading: false,
       session: session,
@@ -861,7 +891,13 @@ const _apiReturnedContentAccessPolicy = _ProtectedAccessPolicy(
 
 String _peopleRuntimeErrorMessage(Object error) {
   if (error is ApiException) {
-    return 'API indisponivel para People (${error.code}). Mantive o mock local sem expor dados protegidos.';
+    return 'API indisponivel para People (${error.code}). Nenhum dado mock foi carregado.';
   }
-  return 'Nao foi possivel sincronizar People com a API. Mantive o mock local para evitar regressao visual.';
+  return 'Nao foi possivel sincronizar People com a API. Nenhum dado mock foi carregado.';
+}
+
+String _peopleSessionLabel(SessionSnapshot session) {
+  return session.profiles.isEmpty
+      ? session.securityContext
+      : session.profiles.join('/');
 }

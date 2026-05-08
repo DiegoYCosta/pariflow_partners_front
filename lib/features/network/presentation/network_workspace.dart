@@ -65,16 +65,14 @@ class _NetworkWorkspace extends StatelessWidget {
                   runSpacing: 10,
                   children: [
                     _Tag(
-                      label:
-                          _networkGraphContractPreview.primaryFocusDisplayName,
-                      icon: Icons.center_focus_strong_outlined,
+                      label: 'dados reais exigidos',
+                      icon: Icons.cloud_done_outlined,
                       color: _tealColor,
                       background: _tealColor.withValues(alpha: 0.12),
                     ),
                     _Tag(
-                      label:
-                          '${_networkGraphContractPreview.countNodesInLane(_NetworkGraphLane.employee)} colaboradores no preview',
-                      icon: Icons.badge_outlined,
+                      label: 'sem dados locais',
+                      icon: Icons.block_rounded,
                       color: _slateColor,
                       background: _slateColor.withValues(alpha: 0.12),
                     ),
@@ -147,7 +145,7 @@ class _RelationalNetworkWorkspaceBodyState
   final _NetworkApiRepository _repository = _NetworkApiRepository();
   late final TextEditingController _searchController;
   final TransformationController _canvasController = TransformationController();
-  _NetworkRuntimeData _runtimeData = _NetworkRuntimeData.mock();
+  _NetworkRuntimeData _runtimeData = _NetworkRuntimeData.initial();
   late String _periodPreset;
   late Set<String> _selectedRootIds;
   late Set<String> _selectedClientIds;
@@ -213,8 +211,15 @@ class _RelationalNetworkWorkspaceBodyState
         return;
       }
 
+      final nextRuntimeData = payload.nodes.isEmpty
+          ? _NetworkRuntimeData.empty(
+              message:
+                  'API conectada, mas o grafo nao retornou nos para este recorte. Nenhum dado mock foi carregado.',
+            )
+          : _NetworkRuntimeData.live(payload);
+
       setState(() {
-        _runtimeData = _NetworkRuntimeData.live(payload);
+        _runtimeData = nextRuntimeData;
         if (resetFilters) {
           _searchController.text = payload.filters.search;
           _applyPayloadDefaults(payload);
@@ -226,8 +231,8 @@ class _RelationalNetworkWorkspaceBodyState
       }
 
       setState(() {
-        _runtimeData = _NetworkRuntimeData.mock(
-          errorMessage: _networkRuntimeErrorMessage(error),
+        _runtimeData = _NetworkRuntimeData.unavailable(
+          message: _networkRuntimeErrorMessage(error),
         );
         if (resetFilters) {
           _searchController.text = _payload.filters.search;

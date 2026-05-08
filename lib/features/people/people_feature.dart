@@ -18,7 +18,7 @@ class _PeopleWorkspace extends StatefulWidget {
 class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
   final _PeopleApiRepository _repository = _PeopleApiRepository();
   late final TextEditingController _searchController;
-  _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.mock();
+  _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.initial();
 
   @override
   void initState() {
@@ -51,8 +51,8 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
         return;
       }
       setState(() {
-        _runtimeData = _PeopleRuntimeData.mock(
-          errorMessage: _peopleRuntimeErrorMessage(error),
+        _runtimeData = _PeopleRuntimeData.unavailable(
+          message: _peopleRuntimeErrorMessage(error),
         );
       });
     }

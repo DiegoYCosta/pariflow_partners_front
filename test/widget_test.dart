@@ -19,18 +19,7 @@ void main() {
     );
   });
 
-  testWidgets('renders the initial layout shell', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: LayoutPreviewPage()));
-    await tester.pump(const Duration(milliseconds: 250));
-
-    expect(find.text('Search people, companies...'), findsOneWidget);
-    expect(find.text('Companies'), findsWidgets);
-    expect(find.text('Clients'), findsWidgets);
-    expect(find.text('Contracts'), findsWidgets);
-    expect(find.text('Visual Network'), findsWidgets);
-  });
-
-  testWidgets('keeps the CRM home content inside a desktop viewport', (
+  testWidgets('keeps auth unavailable screen inside a desktop viewport', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -38,17 +27,17 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(const MaterialApp(home: LayoutPreviewPage()));
+    await tester.pumpWidget(const PariFlowPartnersApp());
     await tester.pump(const Duration(milliseconds: 250));
 
-    final quote = find.text(
-      'Clarity drives better decisions. Insight builds stronger partnerships.',
+    final title = find.text('Autenticacao indisponivel');
+    final message = find.text(
+      'Este build exige Firebase configurado para acessar o sistema.',
     );
-    final sidebarProfile = find.text('Diego Costa').first;
 
-    expect(quote, findsOneWidget);
-    expect(tester.getBottomRight(quote).dy, lessThanOrEqualTo(900));
-    expect(sidebarProfile, findsOneWidget);
-    expect(tester.getBottomRight(sidebarProfile).dy, lessThanOrEqualTo(900));
+    expect(title, findsOneWidget);
+    expect(tester.getBottomRight(title).dy, lessThanOrEqualTo(900));
+    expect(message, findsOneWidget);
+    expect(tester.getBottomRight(message).dy, lessThanOrEqualTo(900));
   });
 }

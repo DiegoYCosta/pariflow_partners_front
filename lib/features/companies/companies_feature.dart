@@ -19,7 +19,7 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
   final _EntityWorkspaceApiRepository _repository =
       _EntityWorkspaceApiRepository();
   final TextEditingController _searchController = TextEditingController();
-  _EntityWorkspaceRuntimeData _runtimeData = _EntityWorkspaceRuntimeData.mock(
+  _EntityWorkspaceRuntimeData _runtimeData = _EntityWorkspaceRuntimeData.initial(
     _companiesWorkspaceData,
   );
 
@@ -55,9 +55,9 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
         return;
       }
       setState(() {
-        _runtimeData = _EntityWorkspaceRuntimeData.mock(
+        _runtimeData = _EntityWorkspaceRuntimeData.unavailable(
           _companiesWorkspaceData,
-          errorMessage: _entityWorkspaceRuntimeErrorMessage(error, 'Companies'),
+          message: _entityWorkspaceRuntimeErrorMessage(error, 'Companies'),
         );
       });
     }
@@ -458,7 +458,7 @@ class _CompaniesCommandHeader extends StatelessWidget {
                 color: _tealColor,
               ),
               _CompanyMetricPill(
-                label: isLive ? 'dados da API' : 'preview local',
+                label: isLive ? 'dados da API' : 'sem dados locais',
                 icon: isLive
                     ? Icons.cloud_done_outlined
                     : Icons.storage_outlined,

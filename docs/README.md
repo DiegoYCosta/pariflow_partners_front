@@ -50,5 +50,4 @@ atual.
    [Plano de deploy seguro na AWS](aws-deploy-hardening-plan.md).
 4. Fechar storage/download protegido e step-up sensivel.
 5. Implementar auditoria e relatorios.
-6. Refinar responsividade Web/Android e remover fallback local quando os dados
-   reais estiverem consistentes.
+6. Refinar responsividade Web/Android e manter dados mock fora da execucao real.
