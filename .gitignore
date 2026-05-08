@@ -52,9 +52,14 @@ app.*.map.json
 !.env*.example
 .local/
 firebase-adminsdk-*.json
+*firebase-adminsdk*.json
 service-account*.json
+*service-account*.json
 google-credentials*.json
+*google-credentials*.json
+*credentials*.json
 *.pem
+*.key
 *.p12
 *.pfx
 /docs/AWS e Seguran*/
