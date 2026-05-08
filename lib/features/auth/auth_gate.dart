@@ -1,15 +1,41 @@
-part of '../../app/app.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 
-class _AuthGate extends StatefulWidget {
-  const _AuthGate({required this.child});
+import '../../core/api/api_client.dart';
+import '../../firebase_options.dart';
 
-  final Widget child;
+class AuthGateBrandConfig {
+  const AuthGateBrandConfig({
+    required this.paperColor,
+    required this.mutedColor,
+    required this.tealColor,
+    required this.deepTealColor,
+    required this.bannerWebAsset,
+    required this.bannerMobileAsset,
+    required this.logoSymbolAsset,
+  });
 
-  @override
-  State<_AuthGate> createState() => _AuthGateState();
+  final Color paperColor;
+  final Color mutedColor;
+  final Color tealColor;
+  final Color deepTealColor;
+  final String bannerWebAsset;
+  final String bannerMobileAsset;
+  final String logoSymbolAsset;
 }
 
-class _AuthGateState extends State<_AuthGate> {
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key, required this.child, required this.brand});
+
+  final Widget child;
+  final AuthGateBrandConfig brand;
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
   bool _previewSessionUnlocked = false;
 
   @override
@@ -23,14 +49,14 @@ class _AuthGateState extends State<_AuthGate> {
         return widget.child;
       }
 
-      return const _AuthUnavailableScreen();
+      return _AuthUnavailableScreen(brand: widget.brand);
     }
 
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _AuthLoadingScreen();
+          return _AuthLoadingScreen(brand: widget.brand);
         }
 
         final user = snapshot.data;
@@ -39,6 +65,7 @@ class _AuthGateState extends State<_AuthGate> {
         }
 
         return _FirebaseLoginScreen(
+          brand: widget.brand,
           onPreviewSession: _isPreviewAuthEnabled
               ? () {
                   setState(() {
@@ -53,8 +80,9 @@ class _AuthGateState extends State<_AuthGate> {
 }
 
 class _FirebaseLoginScreen extends StatefulWidget {
-  const _FirebaseLoginScreen({this.onPreviewSession});
+  const _FirebaseLoginScreen({required this.brand, this.onPreviewSession});
 
+  final AuthGateBrandConfig brand;
   final VoidCallback? onPreviewSession;
 
   @override
@@ -67,6 +95,8 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+
+  AuthGateBrandConfig get _brand => widget.brand;
 
   @override
   void dispose() {
@@ -85,7 +115,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
         fit: StackFit.expand,
         children: [
           Image.asset(
-            compact ? _crmBannerMobileAsset : _crmBannerWebAsset,
+            compact ? _brand.bannerMobileAsset : _brand.bannerWebAsset,
             fit: BoxFit.cover,
             alignment: compact ? Alignment.center : Alignment.centerRight,
           ),
@@ -141,7 +171,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.68)),
         boxShadow: [
           BoxShadow(
-            color: _deepTealColor.withValues(alpha: 0.18),
+            color: _brand.deepTealColor.withValues(alpha: 0.18),
             blurRadius: 38,
             offset: const Offset(0, 20),
           ),
@@ -158,7 +188,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
               Row(
                 children: [
                   Image.asset(
-                    _crmLogoSymbolAsset,
+                    _brand.logoSymbolAsset,
                     width: 42,
                     height: 42,
                     fit: BoxFit.contain,
@@ -173,7 +203,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleLarge?.copyWith(
-                            color: _deepTealColor,
+                            color: _brand.deepTealColor,
                             letterSpacing: 0,
                           ),
                         ),
@@ -182,7 +212,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: _mutedColor,
+                            color: _brand.mutedColor,
                           ),
                         ),
                       ],
@@ -261,7 +291,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                     : const Icon(Icons.login_rounded),
                 label: const Text('Entrar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: _tealColor,
+                  backgroundColor: _brand.tealColor,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
@@ -276,7 +306,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                   icon: const Icon(Icons.science_outlined),
                   label: const Text('Entrar em homologacao'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _deepTealColor,
+                    foregroundColor: _brand.deepTealColor,
                     minimumSize: const Size.fromHeight(46),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(6),
@@ -309,7 +339,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: const BorderSide(color: _tealColor, width: 1.4),
+        borderSide: BorderSide(color: _brand.tealColor, width: 1.4),
       ),
     );
   }
@@ -376,24 +406,28 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
 }
 
 class _AuthLoadingScreen extends StatelessWidget {
-  const _AuthLoadingScreen();
+  const _AuthLoadingScreen({required this.brand});
+
+  final AuthGateBrandConfig brand;
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: _paperColor,
-      body: Center(child: CircularProgressIndicator()),
+    return Scaffold(
+      backgroundColor: brand.paperColor,
+      body: const Center(child: CircularProgressIndicator()),
     );
   }
 }
 
 class _AuthUnavailableScreen extends StatelessWidget {
-  const _AuthUnavailableScreen();
+  const _AuthUnavailableScreen({required this.brand});
+
+  final AuthGateBrandConfig brand;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _paperColor,
+      backgroundColor: brand.paperColor,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -402,10 +436,10 @@ class _AuthUnavailableScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.lock_outline_rounded,
                   size: 42,
-                  color: _deepTealColor,
+                  color: brand.deepTealColor,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -419,7 +453,7 @@ class _AuthUnavailableScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: Theme.of(
                     context,
-                  ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                  ).textTheme.bodyMedium?.copyWith(color: brand.mutedColor),
                 ),
               ],
             ),

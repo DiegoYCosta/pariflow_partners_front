@@ -3,12 +3,12 @@ import 'dart:math';
 import 'dart:ui' show ImageFilter;
 import 'dart:ui' as ui;
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/api/api_client.dart';
+import '../features/auth/auth_gate.dart';
 import '../firebase_options.dart';
 import '../widgets/high_tech_light_waves.dart';
 
@@ -22,7 +22,6 @@ part '../shared/models/viewer_access.dart';
 part '../core/widgets/master_detail_workspace.dart';
 part '../core/widgets/entity_crud_actions.dart';
 part '../shared/infrastructure/entity_workspace_api_data.dart';
-part '../features/auth/auth_gate.dart';
 part '../features/companies/companies_feature.dart';
 part '../features/companies/infrastructure/companies_mock_data.dart';
 part '../features/client_companies/client_companies_feature.dart';
@@ -141,7 +140,18 @@ class PariFlowPartnersApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const _AuthGate(child: LayoutPreviewPage()),
+      home: const AuthGate(
+        brand: AuthGateBrandConfig(
+          paperColor: _paperColor,
+          mutedColor: _mutedColor,
+          tealColor: _tealColor,
+          deepTealColor: _deepTealColor,
+          bannerWebAsset: _crmBannerWebAsset,
+          bannerMobileAsset: _crmBannerMobileAsset,
+          logoSymbolAsset: _crmLogoSymbolAsset,
+        ),
+        child: LayoutPreviewPage(),
+      ),
       builder: (context, child) {
         return Stack(
           fit: StackFit.expand,

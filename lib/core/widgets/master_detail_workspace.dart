@@ -407,56 +407,48 @@ class _EntityRuntimeNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final text = Text(
-            message,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
-          );
-          final action = TextButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Tentar novamente'),
-          );
-
-          if (constraints.maxWidth < 640) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.info_outline_rounded,
-                      color: _amberColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(child: text),
-                  ],
-                ),
-                if (onRetry != null) ...[const SizedBox(height: 8), action],
-              ],
-            );
-          }
-
-          return Row(
+    return Align(
+      alignment: Alignment.topRight,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: _Panel(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.info_outline_rounded,
-                color: _amberColor,
-                size: 20,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: _amberColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Expanded(child: text),
-              if (onRetry != null) ...[const SizedBox(width: 10), action],
+              if (onRetry != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Tentar novamente'),
+                  ),
+                ),
+              ],
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }

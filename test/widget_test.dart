@@ -1,12 +1,26 @@
-import 'dart:ui' show Size;
-
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:pariflow_partners/main.dart';
+import 'package:pariflow_partners/app/app.dart';
 
 void main() {
-  testWidgets('renders the initial layout shell', (tester) async {
+  testWidgets('shows auth unavailable screen without Firebase config', (
+    tester,
+  ) async {
     await tester.pumpWidget(const PariFlowPartnersApp());
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('Autenticacao indisponivel'), findsOneWidget);
+    expect(
+      find.text(
+        'Este build exige Firebase configurado para acessar o sistema.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('renders the initial layout shell', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LayoutPreviewPage()));
     await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('Search people, companies...'), findsOneWidget);
@@ -24,7 +38,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(const PariFlowPartnersApp());
+    await tester.pumpWidget(const MaterialApp(home: LayoutPreviewPage()));
     await tester.pump(const Duration(milliseconds: 250));
 
     final quote = find.text(
