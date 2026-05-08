@@ -1212,7 +1212,6 @@ class _CrmInteractiveBrandState extends State<_CrmInteractiveBrand>
                               child: ShaderMask(
                                 blendMode: BlendMode.srcATop,
                                 shaderCallback: (rect) {
-                                  final x = -1.5 + (value * 3.0);
                                   return LinearGradient(
                                     begin: Alignment.centerLeft,
                                     end: Alignment.centerRight,
@@ -1503,39 +1502,6 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CrmMetricCard extends StatelessWidget {
-  const _CrmMetricCard({required this.card});
-
-  final _SummaryCardData card;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Panel(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Tag(
-            label: card.label,
-            leading: _SpriteMoldIcon(mold: card.mold, size: 18),
-            color: card.color,
-            background: card.color.withValues(alpha: 0.12),
-          ),
-          const SizedBox(height: 16),
-          Text(card.value, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-            card.description,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
-          ),
-        ],
       ),
     );
   }

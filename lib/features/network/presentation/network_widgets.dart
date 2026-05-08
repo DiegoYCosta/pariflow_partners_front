@@ -1,89 +1,5 @@
 part of '../../../app/app.dart';
 
-class _NetworkFilterSection extends StatelessWidget {
-  const _NetworkFilterSection({
-    required this.title,
-    required this.subtitle,
-    required this.children,
-  });
-
-  final String title;
-  final String subtitle;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
-        ),
-        const SizedBox(height: 12),
-        Wrap(spacing: 10, runSpacing: 10, children: children),
-      ],
-    );
-  }
-}
-
-class _NetworkRecapBlock extends StatelessWidget {
-  const _NetworkRecapBlock({required this.title, required this.text});
-
-  final String title;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F1E7),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _lineColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            text,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NetworkInsetCard extends StatelessWidget {
-  const _NetworkInsetCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _lineColor),
-      ),
-      child: child,
-    );
-  }
-}
-
 class _NetworkDetailSectionCard extends StatelessWidget {
   const _NetworkDetailSectionCard({required this.title, required this.child});
 
@@ -193,16 +109,6 @@ class _CompactRelationPill extends StatelessWidget {
       ),
     );
   }
-}
-
-Set<String> _toggleValue(Set<String> values, String value) {
-  final next = {...values};
-  if (next.contains(value)) {
-    next.remove(value);
-  } else {
-    next.add(value);
-  }
-  return next;
 }
 
 class _EdgeLegendTag extends StatelessWidget {
@@ -449,4 +355,3 @@ class _CanvasOrientationStep extends StatelessWidget {
     );
   }
 }
-

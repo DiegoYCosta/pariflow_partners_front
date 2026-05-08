@@ -7,9 +7,4 @@ extension on _ShellVariant {
     _ShellVariant.legacy => 'shell legado',
     _ShellVariant.crm => 'crm shell',
   };
-
-  String get rolloutSummary => switch (this) {
-    _ShellVariant.legacy => 'fluxo atual preservado',
-    _ShellVariant.crm => 'preview controlado do novo layout',
-  };
 }

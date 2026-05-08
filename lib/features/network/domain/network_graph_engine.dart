@@ -72,6 +72,7 @@ _NetworkFacetData _networkFacets(List<_GraphNode> structuralNodes) {
   );
 }
 
+// ignore: unused_element
 List<_GraphNode> _visibleGraphNodes(_NetworkFilterState filters) {
   final structuralNodes = _structuralGraphNodes(filters);
   final facets = _networkFacets(structuralNodes);
@@ -95,7 +96,8 @@ List<_GraphNode> _visibleGraphNodes(_NetworkFilterState filters) {
     if (node.kind != _GraphNodeKind.person) {
       return true;
     }
-    if (effectiveSectors.isNotEmpty && !effectiveSectors.contains(node.sector)) {
+    if (effectiveSectors.isNotEmpty &&
+        !effectiveSectors.contains(node.sector)) {
       return false;
     }
     if (effectiveJobTitles.isNotEmpty &&
@@ -333,7 +335,9 @@ List<_GraphNode> _contractsForClient(
   List<_GraphEdge> visibleEdges,
 ) {
   return visibleEdges
-      .where((edge) => edge.type == _GraphEdgeType.scope && edge.from == clientId)
+      .where(
+        (edge) => edge.type == _GraphEdgeType.scope && edge.from == clientId,
+      )
       .map((edge) => nodesById[edge.to])
       .whereType<_GraphNode>()
       .toList()
@@ -418,7 +422,9 @@ List<_GraphConnectionDetail> _connectionDetailsForNode(
       continue;
     }
 
-    final relatedNode = visibleNodes.firstWhere((node) => node.id == relatedNodeId);
+    final relatedNode = visibleNodes.firstWhere(
+      (node) => node.id == relatedNodeId,
+    );
 
     details.add(_GraphConnectionDetail(node: relatedNode, edge: edge));
   }
@@ -457,4 +463,3 @@ IconData _statusIconForNode(_GraphNode node) {
 
   return node.icon;
 }
-

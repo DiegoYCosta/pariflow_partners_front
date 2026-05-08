@@ -1,5 +1,6 @@
 part of '../../../app/app.dart';
 
+// ignore: unused_element
 class _NetworkDetailCard extends StatelessWidget {
   const _NetworkDetailCard({
     required this.node,
@@ -292,4 +293,3 @@ class _NetworkDetailCard extends StatelessWidget {
     );
   }
 }
-

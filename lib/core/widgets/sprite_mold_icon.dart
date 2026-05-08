@@ -2,13 +2,6 @@ part of '../../app/app.dart';
 
 enum _SpriteMoldState { base, selected }
 
-extension on _SpriteMoldState {
-  String get token => switch (this) {
-    _SpriteMoldState.base => 'base',
-    _SpriteMoldState.selected => 'selected',
-  };
-}
-
 enum _SpriteMold {
   home,
   company,
@@ -22,104 +15,19 @@ enum _SpriteMold {
   settings,
 }
 
-extension on _SpriteMold {
-  String get token => switch (this) {
-    _SpriteMold.home => 'home',
-    _SpriteMold.company => 'company',
-    _SpriteMold.document => 'document',
-    _SpriteMold.people => 'people',
-    _SpriteMold.network => 'network',
-    _SpriteMold.analytics => 'analytics',
-    _SpriteMold.calendar => 'calendar',
-    _SpriteMold.notification => 'notification',
-    _SpriteMold.security => 'security',
-    _SpriteMold.settings => 'settings',
-  };
-
-  String command(_SpriteMoldState state) => 'mold.$token.${state.token}';
-}
-
-class _SpriteMoldRef {
-  const _SpriteMoldRef({required this.mold, required this.state});
-
-  final _SpriteMold mold;
-  final _SpriteMoldState state;
-
-  String get command => mold.command(state);
-
-  factory _SpriteMoldRef.parse(String command) {
-    final normalized = command.trim().toLowerCase();
-    final parts = normalized.split('.');
-    if (parts.length != 3 || parts.first != 'mold') {
-      throw FormatException(
-        'Use o formato mold.<nome>.<estado>. Recebido: $command',
-      );
-    }
-
-    return _SpriteMoldRef(
-      mold: _spriteMoldFromToken(parts[1]),
-      state: _spriteMoldStateFromToken(parts[2]),
-    );
-  }
-}
-
-class _SpriteMoldCommands {
-  const _SpriteMoldCommands._();
-
-  static const String home = 'mold.home.base';
-  static const String homeSelected = 'mold.home.selected';
-  static const String company = 'mold.company.base';
-  static const String companySelected = 'mold.company.selected';
-  static const String document = 'mold.document.base';
-  static const String documentSelected = 'mold.document.selected';
-  static const String people = 'mold.people.base';
-  static const String peopleSelected = 'mold.people.selected';
-  static const String network = 'mold.network.base';
-  static const String networkSelected = 'mold.network.selected';
-  static const String analytics = 'mold.analytics.base';
-  static const String analyticsSelected = 'mold.analytics.selected';
-  static const String calendar = 'mold.calendar.base';
-  static const String calendarSelected = 'mold.calendar.selected';
-  static const String notification = 'mold.notification.base';
-  static const String notificationSelected = 'mold.notification.selected';
-  static const String security = 'mold.security.base';
-  static const String securitySelected = 'mold.security.selected';
-  static const String settings = 'mold.settings.base';
-  static const String settingsSelected = 'mold.settings.selected';
-}
-
 class _SpriteMoldIcon extends StatelessWidget {
   const _SpriteMoldIcon({
-    super.key,
     required this.mold,
     this.state = _SpriteMoldState.base,
     this.size = 28,
     this.color,
-    this.fit = BoxFit.cover,
     this.semanticLabel,
   });
-
-  factory _SpriteMoldIcon.fromCommand(
-    String command, {
-    Key? key,
-    double size = 28,
-    String? semanticLabel,
-  }) {
-    final ref = _SpriteMoldRef.parse(command);
-    return _SpriteMoldIcon(
-      key: key,
-      mold: ref.mold,
-      state: ref.state,
-      size: size,
-      semanticLabel: semanticLabel,
-    );
-  }
 
   final _SpriteMold mold;
   final _SpriteMoldState state;
   final double size;
   final Color? color;
-  final BoxFit fit;
   final String? semanticLabel;
 
   @override
@@ -140,7 +48,7 @@ class _SpriteMoldIcon extends StatelessWidget {
             painter: _SpriteMoldPainter(
               image: snapshot.data!,
               sourceRect: rect,
-              fit: fit,
+              fit: BoxFit.cover,
             ),
           );
 
@@ -209,68 +117,6 @@ Future<ui.Image> _decodeSpriteMoldSheet() async {
 }
 
 Future<ui.Image>? _spriteMoldSheetFuture;
-
-_SpriteMold _spriteMoldFromToken(String token) {
-  return switch (token) {
-    'home' || 'inicio' => _SpriteMold.home,
-    'company' ||
-    'companies' ||
-    'empresa' ||
-    'empresas' ||
-    'cliente' ||
-    'clientes' => _SpriteMold.company,
-    'document' ||
-    'documents' ||
-    'doc' ||
-    'contract' ||
-    'contracts' ||
-    'contrato' ||
-    'contratos' => _SpriteMold.document,
-    'people' ||
-    'person' ||
-    'pessoa' ||
-    'pessoas' ||
-    'colaborador' ||
-    'colaboradores' ||
-    'user' ||
-    'users' => _SpriteMold.people,
-    'network' || 'graph' || 'teia' || 'relational' => _SpriteMold.network,
-    'analytics' ||
-    'report' ||
-    'reports' ||
-    'metric' ||
-    'metrics' ||
-    'relatorio' ||
-    'relatorios' => _SpriteMold.analytics,
-    'calendar' || 'agenda' || 'timeline' || 'evento' || 'eventos' =>
-      _SpriteMold.calendar,
-    'notification' ||
-    'notifications' ||
-    'bell' ||
-    'alert' ||
-    'alerts' ||
-    'notificacao' ||
-    'notificacoes' => _SpriteMold.notification,
-    'security' || 'shield' || 'secure' || 'compliance' => _SpriteMold.security,
-    'settings' ||
-    'setting' ||
-    'admin' ||
-    'config' ||
-    'configuracao' ||
-    'configuracoes' => _SpriteMold.settings,
-    _ => throw FormatException('Molde desconhecido: $token'),
-  };
-}
-
-_SpriteMoldState _spriteMoldStateFromToken(String token) {
-  return switch (token) {
-    'base' || 'default' || 'normal' || 'inactive' || 'off' =>
-      _SpriteMoldState.base,
-    'selected' || 'active' || 'on' || 'gold' || 'dourado' =>
-      _SpriteMoldState.selected,
-    _ => throw FormatException('Estado desconhecido: $token'),
-  };
-}
 
 ui.Rect _spriteMoldSourceRect(_SpriteMold mold, _SpriteMoldState state) {
   return _spriteMoldRects[(mold, state)]!;

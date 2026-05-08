@@ -877,10 +877,6 @@ _PersonProfileData _generatedPersonProfile(_EntityItem item) {
       _relationValue(item.relations, 'Prestadora anterior') ??
       'PariFlow Servicos Ltda';
   final previousCompany = _relationValue(item.relations, 'Passagem anterior');
-  final contract =
-      _relationValue(item.relations, 'Contrato atual') ??
-      _relationValue(item.relations, 'Contrato relacionado') ??
-      'Contrato sem rotulo';
   final client =
       _relationValue(item.relations, 'Cliente conectado') ??
       'Cliente nao informado';
