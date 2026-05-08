@@ -15,9 +15,10 @@ atual.
 4. [Integracao com backend](front-backend-integration.md)
 5. [Fluxo de autenticacao e sessao](auth-session-flow.md)
 6. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
-7. [Companies, Clients e Contracts](companies-clients-contracts-layout-plan.md)
-8. [Contrato relacional de Network](relational-graph-contract.md)
-9. [Design system CRM](new-ui-design-system.md)
+7. [Plano futuro de deploy seguro na AWS](aws-deploy-hardening-plan.md)
+8. [Companies, Clients e Contracts](companies-clients-contracts-layout-plan.md)
+9. [Contrato relacional de Network](relational-graph-contract.md)
+10. [Design system CRM](new-ui-design-system.md)
 
 ## Fontes de Verdade
 
@@ -45,7 +46,8 @@ atual.
 1. Validar login Firebase real ponta a ponta e manter release sem `dev-token`.
 2. Iniciar consolidacao arquitetural pelo `api_client.dart`, `auth_gate.dart`
    e `network_graph_engine.dart`.
-3. Configurar dominio, HTTPS e secrets de producao.
+3. Configurar dominio, HTTPS e secrets de producao seguindo
+   [Plano de deploy seguro na AWS](aws-deploy-hardening-plan.md).
 4. Fechar storage/download protegido e step-up sensivel.
 5. Implementar auditoria e relatorios.
 6. Refinar responsividade Web/Android e remover fallback local quando os dados
