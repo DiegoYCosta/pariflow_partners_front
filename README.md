@@ -8,21 +8,17 @@ O projeto ja nao esta em fundacao conceitual. O shell CRM esta ativo e os
 modulos `Companies`, `Clients`, `Contracts`, `People` e `Network` possuem
 features dedicadas.
 
-O front ja possui camada HTTP propria, fallback local controlado e consumo real
-de endpoints do backend para modulos operacionais. O `dev-token` fica limitado a
-execucao fora de release e precisa ser ativado explicitamente por
-`--dart-define`; build release exige Firebase real.
+O front possui camada HTTP propria e consome endpoints reais do backend para os
+modulos operacionais. Dados mock/sample nao entram mais no runtime real nem no
+bundle publicado. O `dev-token` fica limitado a localhost/loopback com opt-in
+explicito; host publico exige Firebase real e Firebase Admin no backend.
 
 ## Documentacao Viva
 
 - [Indice documental](docs/README.md)
-- [Guia operacional de ambientes e funcoes](docs/guia-operacional-ambientes-e-funcoes.md)
-- [Firebase runtime config](docs/firebase-runtime-config.md)
+- [Guia operacional, seguranca e deploy](docs/guia-operacional-ambientes-e-funcoes.md)
 - [Estado atual e proximos passos](docs/current-implementation-status.md)
-- [Integracao com backend](docs/front-backend-integration.md)
-- [Fluxo de autenticacao e sessao](docs/auth-session-flow.md)
 - [Consolidacao arquitetural do front](docs/front-architecture-consolidation.md)
-- [Companies, Clients e Contracts](docs/companies-clients-contracts-layout-plan.md)
 - [Contrato relacional de Network](docs/relational-graph-contract.md)
 - [Design system CRM](docs/new-ui-design-system.md)
 - [Icones e moldes](docs/icones-moldes.md)
@@ -44,3 +40,5 @@ execucao fora de release e precisa ser ativado explicitamente por
   canto superior direito. Esse aviso nao aparece em deploy publico.
 - Conteudo sensivel, anexos e permissao seguem ACL do backend; o front nao
   infere acesso nem exibe metadado protegido sem autorizacao.
+- Quando a API falha ou retorna vazia, a tela deve mostrar estado empty/error
+  sem preencher com mock silencioso.

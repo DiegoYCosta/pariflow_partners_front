@@ -1,53 +1,50 @@
 # Documentacao do Front
 
-Data de referencia: `2026-05-04`.
+Data de referencia: `2026-05-08`.
 
-Esta pasta foi consolidada para manter apenas documentos que ainda orientam
-trabalho ativo. Planos antigos de migracao, componentizacao e backlog inicial
-foram removidos porque descreviam etapas ja executadas ou duplicavam o estado
-atual.
+Esta pasta foi consolidada para reduzir documentos pequenos e duplicados. O
+runbook operacional agora concentra ambiente, Firebase, sessao, integracao com
+backend, deploy AWS e smoke tests.
 
 ## Ordem de Leitura
 
 1. [Estado atual e proximos passos](current-implementation-status.md)
-2. [Guia operacional de ambientes e funcoes](guia-operacional-ambientes-e-funcoes.md)
-3. [Firebase runtime config](firebase-runtime-config.md)
-4. [Integracao com backend](front-backend-integration.md)
-5. [Fluxo de autenticacao e sessao](auth-session-flow.md)
-6. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
-7. [Plano futuro de deploy seguro na AWS](aws-deploy-hardening-plan.md)
-8. [Companies, Clients e Contracts](companies-clients-contracts-layout-plan.md)
-9. [Contrato relacional de Network](relational-graph-contract.md)
-10. [Design system CRM](new-ui-design-system.md)
+2. [Guia operacional, seguranca e deploy](guia-operacional-ambientes-e-funcoes.md)
+3. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
+4. [Contrato relacional de Network](relational-graph-contract.md)
+5. [Design system CRM](new-ui-design-system.md)
+6. [Icones e moldes](icones-moldes.md)
 
 ## Fontes de Verdade
 
-- Dominio de negocio: `../DPPRO_JOTABE/Documentacao`
-- Backend: Swagger em `/api/docs` e codigo em `../pariflow_partners_back`
-- Front real: codigo em `lib/`
-- Deploy e seguranca: docs do backend, principalmente
-  `docs/aws-security-checklist.md`
+- Dominio de negocio: `D:\DEV\flutter\JOTABE\DPPRO_JOTABE\Documentação`
+- Backend: `D:\DEV\flutter\JOTABE\PariFlow Partners - Back`
+- Front real: `lib/`
+- Deploy: `D:\DEV\flutter\JOTABE\deploy_pfp_aws.ps1` e `.sh`
+- Checklist AWS do backend: `../PariFlow Partners - Back/docs/aws-security-checklist.md`
 
 ## Estado Atual Resumido
 
 | Area | Estado |
 | --- | --- |
 | Shell CRM | ativo |
-| Companies | lista, detalhe e CRUD conectados a API |
-| Clients | lista, detalhe e CRUD conectados a API; detalhe ainda cruza contratos no front |
+| Companies | lista, detalhe e CRUD conectados a API real |
+| Clients | lista, detalhe e CRUD conectados a API real; relacoes ainda podem cruzar contratos no front |
 | Contracts | CRUD de contratos, tipos, modelos, servicos, postos e documentos |
 | People | CRUD de pessoa, vinculos, ocorrencias e anexos; leitura de tags/anexos por ACL |
-| Network | consome `GET /network/graph`; ainda precisa refinamento visual, navegacao e performance |
-| Auth | `dev-token` so funciona em localhost com opt-in explicito; host publico exige Firebase real |
-| AWS | homologacao por IP ativa atras de Apache no mesmo host |
+| Network | consome `GET /api/v1/network/graph` |
+| Auth | `dev-token` so funciona em localhost com opt-in; host publico exige Firebase Admin real |
+| Mocks | removidos de `lib/` e fora do bundle publicado |
+| AWS | homologacao por IP ativa, Swagger off, bypass off, seed sample off |
 
-## Proximos Passos
+## Pendencias Reais
 
-1. Validar login Firebase real ponta a ponta e manter release sem `dev-token`.
-2. Iniciar consolidacao arquitetural pelo `api_client.dart`, `auth_gate.dart`
-   e `network_graph_engine.dart`.
-3. Configurar dominio, HTTPS e secrets de producao seguindo
-   [Plano de deploy seguro na AWS](aws-deploy-hardening-plan.md).
-4. Fechar storage/download protegido e step-up sensivel.
-5. Implementar auditoria e relatorios.
-6. Refinar responsividade Web/Android e manter dados mock fora da execucao real.
+1. Configurar dominio e HTTPS.
+2. Configurar Firebase Admin na EC2 e criar usuarios reais.
+3. Rodar smoke de login real ponta a ponta.
+4. Trocar `COOKIE_SECURE=true` quando houver HTTPS.
+5. Fechar storage privado, download rastreavel e step-up sensivel.
+6. Integrar o front ao refresh/logout do backend quando a UX de sessao for
+   fechada.
+7. Fechar sensitive-session/step-up.
+8. Validar CRUDs e Network com dados reais de homologacao.
