@@ -1,14 +1,13 @@
 param(
   [string]$WebPort = "8082",
-  [string]$ProxyPort = "3002",
-  [string]$ProxyTarget = "http://3.18.213.49",
+  [string]$ApiBaseUrl = "http://127.0.0.1:3000/api/v1",
   [string]$EnvFile = ".env.front.preview",
   [switch]$UseDevToken
 )
 
 $ErrorActionPreference = "Stop"
 
-function Test-LocalTarget {
+function Test-LocalApiBaseUrl {
   param([string]$Value)
 
   $uri = [Uri]$Value
@@ -18,8 +17,8 @@ function Test-LocalTarget {
     $hostName -eq "::1"
 }
 
-if ($UseDevToken -and -not (Test-LocalTarget $ProxyTarget)) {
-  throw "UseDevToken so e permitido quando ProxyTarget for localhost/127.0.0.1. Para API online, use Firebase real."
+if ($UseDevToken -and -not (Test-LocalApiBaseUrl $ApiBaseUrl)) {
+  throw "UseDevToken so e permitido com ApiBaseUrl local. Para API online, use Firebase real."
 }
 
 function Read-DartDefines {
@@ -57,31 +56,9 @@ function Read-DartDefines {
   return $defines
 }
 
-$proxyCheck = Get-NetTCPConnection -LocalPort $ProxyPort -ErrorAction SilentlyContinue
-if (-not $proxyCheck) {
-  New-Item -ItemType Directory -Force -Path '.local' | Out-Null
-  $proxyOut = Join-Path (Resolve-Path '.local') "dev-api-proxy-$ProxyPort.out.log"
-  $proxyErr = Join-Path (Resolve-Path '.local') "dev-api-proxy-$ProxyPort.err.log"
-  $env:PARIFLOW_PROXY_TARGET = $ProxyTarget
-  $env:PARIFLOW_PROXY_PORT = $ProxyPort
-  $env:PARIFLOW_PROXY_HOST = '127.0.0.1'
-  $proxyArgs = @('.\scripts\dev-api-proxy.cjs')
-  Start-Process -FilePath 'node.exe' -ArgumentList $proxyArgs -WorkingDirectory (Get-Location) -WindowStyle Hidden -RedirectStandardOutput $proxyOut -RedirectStandardError $proxyErr
-}
-
-for ($i = 0; $i -lt 30; $i++) {
-  Start-Sleep -Seconds 1
-  try {
-    $response = Invoke-WebRequest -Uri "http://127.0.0.1:$ProxyPort/health/ready" -UseBasicParsing -TimeoutSec 3
-    if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
-      break
-    }
-  } catch {}
-}
-
 $devTokenValue = if ($UseDevToken) { "true" } else { "false" }
 $dartDefines = Read-DartDefines -Path $EnvFile
-$dartDefines += "--dart-define=PARIFLOW_API_BASE_URL=http://127.0.0.1:$ProxyPort/api/v1"
+$dartDefines += "--dart-define=PARIFLOW_API_BASE_URL=$ApiBaseUrl"
 $dartDefines += "--dart-define=PARIFLOW_ENABLE_DEV_TOKEN=$devTokenValue"
 $flutterArgs = @(
   "run",

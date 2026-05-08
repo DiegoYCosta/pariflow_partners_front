@@ -17,18 +17,21 @@ Data de referencia: `2026-05-07`.
 `PARIFLOW_ENABLE_DEV_TOKEN` e desligado por padrao. Se o define nao for
 informado, o front nao envia `dev-token`.
 
-Em `kReleaseMode`, o front nunca envia `dev-token`, mesmo se alguem buildar com:
+Em host publico, o front nunca envia `dev-token`, mesmo se alguem buildar com:
 
 ```powershell
 flutter build web --release --dart-define=PARIFLOW_ENABLE_DEV_TOKEN=true
 ```
 
-Uso permitido somente fora de release, para preview local/homologacao:
+Uso permitido somente em ambiente local explicito:
 
 ```powershell
-flutter run `
-  --dart-define=PARIFLOW_ENABLE_DEV_TOKEN=true
+.\scripts\run-web-local.ps1 -UseDevToken
 ```
+
+Esse modo so deve apontar para API local/controlada. Para API online, use login
+Firebase real; `scripts/run-web-online.ps1` desliga `dev-token` por padrao e
+recusa `-UseDevToken` quando o destino nao e localhost.
 
 Build release deve depender de Firebase real:
 

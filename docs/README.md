@@ -38,7 +38,7 @@ atual.
 | Contracts | CRUD de contratos, tipos, modelos, servicos, postos e documentos |
 | People | CRUD de pessoa, vinculos, ocorrencias e anexos; leitura de tags/anexos por ACL |
 | Network | consome `GET /network/graph`; ainda precisa refinamento visual, navegacao e performance |
-| Auth | `dev-token` so funciona fora de release e quando ativado por `--dart-define`; release exige Firebase real |
+| Auth | `dev-token` so funciona em localhost com opt-in explicito; host publico exige Firebase real |
 | AWS | homologacao por IP ativa atras de Apache no mesmo host |
 
 ## Proximos Passos

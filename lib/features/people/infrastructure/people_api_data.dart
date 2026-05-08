@@ -97,7 +97,7 @@ class _PeopleApiRepository {
         listHint:
             'A lista usa publicId e envelope padrao da API para abrir a ficha operacional.',
         productionHint:
-            'Corte vertical ativo: sessao dev-token, pessoas, vinculos, ocorrencias, tags e anexos lidos do backend com fallback local.',
+            'Corte vertical ativo: sessao local controlada, pessoas, vinculos, ocorrencias, tags e anexos lidos do backend com fallback local.',
         integrationFocus: [
           'API real',
           'publicId',

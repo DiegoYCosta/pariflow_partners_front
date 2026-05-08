@@ -42,7 +42,7 @@ class ApiClient {
         statusCode: 0,
         code: 'AUTH_NOT_CONFIGURED',
         message:
-            'Sessao Firebase nao encontrada e o dev-token esta desativado.',
+            'Sessao Firebase nao encontrada e o token local esta desativado.',
       );
     }
 
@@ -311,9 +311,25 @@ String? get previewFirebaseIdToken {
     defaultValue: false,
   );
 
-  if (kReleaseMode) {
+  if (!enabled) {
     return null;
   }
 
-  return enabled ? 'dev-token' : null;
+  if (!kReleaseMode) {
+    return 'dev-token';
+  }
+
+  if (kIsWeb && _isLocalWebHost(Uri.base.host)) {
+    return 'dev-token';
+  }
+
+  return null;
+}
+
+bool _isLocalWebHost(String host) {
+  final normalized = host.toLowerCase();
+  return normalized == 'localhost' ||
+      normalized == '127.0.0.1' ||
+      normalized == '::1' ||
+      normalized == '[::1]';
 }
