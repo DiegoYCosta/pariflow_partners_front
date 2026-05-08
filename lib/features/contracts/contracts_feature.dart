@@ -19,9 +19,8 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
   final _EntityWorkspaceApiRepository _repository =
       _EntityWorkspaceApiRepository();
   final TextEditingController _searchController = TextEditingController();
-  _EntityWorkspaceRuntimeData _runtimeData = _EntityWorkspaceRuntimeData.initial(
-    _contractsWorkspaceData,
-  );
+  _EntityWorkspaceRuntimeData _runtimeData =
+      _EntityWorkspaceRuntimeData.initial(_contractsWorkspaceMeta);
   List<_EntitySelectOption> _contractTypes = const [];
   List<_EntitySelectOption> _contractModels = const [];
   List<_EntitySelectOption> _contractServices = const [];
@@ -62,7 +61,7 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
       }
       setState(() {
         _runtimeData = _EntityWorkspaceRuntimeData.unavailable(
-          _contractsWorkspaceData,
+          _contractsWorkspaceMeta,
           message: _entityWorkspaceRuntimeErrorMessage(error, 'Contracts'),
         );
       });

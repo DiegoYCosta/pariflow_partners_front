@@ -21,16 +21,13 @@ part '../shared/models/sensitive_note_tag.dart';
 part '../shared/models/viewer_access.dart';
 part '../core/widgets/master_detail_workspace.dart';
 part '../core/widgets/entity_crud_actions.dart';
+part '../shared/infrastructure/entity_workspace_runtime_metadata.dart';
 part '../shared/infrastructure/entity_workspace_api_data.dart';
 part '../features/companies/companies_feature.dart';
-part '../features/companies/infrastructure/companies_mock_data.dart';
 part '../features/client_companies/client_companies_feature.dart';
-part '../features/client_companies/infrastructure/client_companies_mock_data.dart';
 part '../features/contracts/contracts_feature.dart';
-part '../features/contracts/infrastructure/contracts_mock_data.dart';
 part '../features/people/people_feature.dart';
 part '../features/people/infrastructure/people_api_data.dart';
-part '../features/people/infrastructure/people_mock_data.dart';
 part 'shell/shell_variant.dart';
 part 'shell/shell_feature_flags.dart';
 part 'shell/legacy_shell.dart';
@@ -38,16 +35,8 @@ part 'shell/crm_shell.dart';
 part 'shell/layout_preview_shell.dart';
 part '../features/home/home_feature.dart';
 part '../features/network/application/network_filter_state.dart';
-part '../features/network/domain/network_entities.dart';
-part '../features/network/domain/network_graph_engine.dart';
 part '../features/network/infrastructure/network_api_data.dart';
-part '../features/network/infrastructure/network_graph_payload_preview.dart';
-part '../features/network/infrastructure/network_mock_graph.dart';
 part '../features/network/presentation/network_workspace.dart';
-part '../features/network/presentation/network_canvas.dart';
-part '../features/network/presentation/network_detail.dart';
-part '../features/network/presentation/network_widgets.dart';
-part '../features/network/presentation/painters/network_link_painter.dart';
 
 const _canvasColor = Color(0xFFF4EFE6);
 const _paperColor = Color(0xFFFFFCF7);
@@ -182,8 +171,8 @@ class _LocalPreviewBanner extends StatelessWidget {
     final apiBaseUrl = defaultApiBaseUrl;
     final isLocalApi = _isLocalHostUri(apiBaseUrl);
     final label = isLocalApi
-        ? 'Preview local ativa'
-        : 'Preview local ativa - API online';
+        ? 'Ambiente local ativo'
+        : 'Ambiente local ativo - API online';
 
     return IgnorePointer(
       child: SafeArea(

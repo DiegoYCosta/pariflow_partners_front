@@ -613,31 +613,29 @@ const _choices = [
 const _summaryCards = [
   _SummaryCardData(
     label: 'Prestadoras monitoradas',
-    value: '6',
-    description: 'Prestadoras simuladas no recorte atual do workspace.',
+    value: '-',
+    description: 'Dados exibidos somente quando a API real responder.',
     mold: _SpriteMold.company,
     color: _tealColor,
   ),
   _SummaryCardData(
     label: 'Clientes em carteira',
-    value: '6',
-    description:
-        'Empresas clientes tratadas como modulo proprio no shell novo.',
+    value: '-',
+    description: 'Dados exibidos somente quando a API real responder.',
     mold: _SpriteMold.company,
     color: _slateColor,
   ),
   _SummaryCardData(
     label: 'Contratos ativos',
-    value: '14',
-    description: 'Contratos ativos distribuidos entre as empresas do mock.',
+    value: '-',
+    description: 'Dados exibidos somente quando a API real responder.',
     mold: _SpriteMold.document,
     color: _amberColor,
   ),
   _SummaryCardData(
     label: 'Funcionarios em foco',
-    value: '68',
-    description:
-        'Pessoas simuladas com mistura de ativos, historico e desligamento recente.',
+    value: '-',
+    description: 'Dados exibidos somente quando a API real responder.',
     mold: _SpriteMold.people,
     color: _roseColor,
   ),

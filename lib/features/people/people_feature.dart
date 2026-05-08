@@ -372,9 +372,7 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
     final selectedOriginalIndex = selectedItem == null
         ? null
         : data.items.indexOf(selectedItem);
-    final profile = selectedItem == null
-        ? null
-        : selectedItem.personProfile ?? _personProfileFor(selectedItem);
+    final profile = selectedItem?.personProfile;
     final visibleAttachments = selectedItem == null
         ? <_AttachmentRecord>[]
         : selectedItem.attachments

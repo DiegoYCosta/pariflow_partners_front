@@ -18,7 +18,7 @@ class _EntityWorkspaceApiRepository {
 
     if (companies.isEmpty) {
       return _EntityWorkspaceRuntimeData.empty(
-        _companiesWorkspaceData,
+        _companiesWorkspaceMeta,
         '/empresas-prestadoras',
         message:
             'API conectada, mas ainda nao ha empresas prestadoras no recorte. Nenhum dado mock foi carregado.',
@@ -35,7 +35,7 @@ class _EntityWorkspaceApiRepository {
 
     return _EntityWorkspaceRuntimeData.live(
       _EntityWorkspaceData(
-        title: _companiesWorkspaceData.title,
+        title: _companiesWorkspaceMeta.title,
         subtitle:
             'Prestadoras carregadas da API, mantendo a leitura de contratos, vinculos, ocorrencias e contexto operacional no workspace atual.',
         searchHint: 'buscar por razao social, fantasia ou documento',
@@ -49,9 +49,9 @@ class _EntityWorkspaceApiRepository {
           'contratos conectados',
           'sem mock',
         ],
-        filters: _companiesWorkspaceData.filters,
+        filters: _companiesWorkspaceMeta.filters,
         items: items,
-        accent: _companiesWorkspaceData.accent,
+        accent: _companiesWorkspaceMeta.accent,
       ),
       session,
       '/empresas-prestadoras',
@@ -70,7 +70,7 @@ class _EntityWorkspaceApiRepository {
 
     if (clients.isEmpty) {
       return _EntityWorkspaceRuntimeData.empty(
-        _clientCompaniesWorkspaceData,
+        _clientCompaniesWorkspaceMeta,
         '/clientes',
         message:
             'API conectada, mas ainda nao ha clientes no recorte. Nenhum dado mock foi carregado.',
@@ -87,7 +87,7 @@ class _EntityWorkspaceApiRepository {
 
     return _EntityWorkspaceRuntimeData.live(
       _EntityWorkspaceData(
-        title: _clientCompaniesWorkspaceData.title,
+        title: _clientCompaniesWorkspaceMeta.title,
         subtitle:
             'Carteira de clientes carregada da API, preservando a separacao entre cliente, prestadora e contrato.',
         searchHint: 'buscar por nome da carteira, documento ou unidade',
@@ -101,9 +101,9 @@ class _EntityWorkspaceApiRepository {
           'contratos relevantes',
           'sem mock',
         ],
-        filters: _clientCompaniesWorkspaceData.filters,
+        filters: _clientCompaniesWorkspaceMeta.filters,
         items: items,
-        accent: _clientCompaniesWorkspaceData.accent,
+        accent: _clientCompaniesWorkspaceMeta.accent,
       ),
       session,
       '/clientes',
@@ -122,7 +122,7 @@ class _EntityWorkspaceApiRepository {
 
     if (contracts.isEmpty) {
       return _EntityWorkspaceRuntimeData.empty(
-        _contractsWorkspaceData,
+        _contractsWorkspaceMeta,
         '/contratos',
         message:
             'API conectada, mas ainda nao ha contratos no recorte. Nenhum dado mock foi carregado.',
@@ -133,7 +133,7 @@ class _EntityWorkspaceApiRepository {
 
     return _EntityWorkspaceRuntimeData.live(
       _EntityWorkspaceData(
-        title: _contractsWorkspaceData.title,
+        title: _contractsWorkspaceMeta.title,
         subtitle:
             'Contratos carregados da API com prestadora e cliente agregados no mesmo payload.',
         searchHint: 'buscar por cliente, prestadora ou publicId',
@@ -142,9 +142,9 @@ class _EntityWorkspaceApiRepository {
         productionHint:
             'Integracao ativa: GET /api/v1/contratos ja entrega cliente e prestadora para o detalhe contextual.',
         integrationFocus: ['API real', 'vigencia', 'cliente', 'prestadora'],
-        filters: _contractsWorkspaceData.filters,
+        filters: _contractsWorkspaceMeta.filters,
         items: items,
-        accent: _contractsWorkspaceData.accent,
+        accent: _contractsWorkspaceMeta.accent,
       ),
       session,
       '/contratos',

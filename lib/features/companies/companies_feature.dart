@@ -19,9 +19,8 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
   final _EntityWorkspaceApiRepository _repository =
       _EntityWorkspaceApiRepository();
   final TextEditingController _searchController = TextEditingController();
-  _EntityWorkspaceRuntimeData _runtimeData = _EntityWorkspaceRuntimeData.initial(
-    _companiesWorkspaceData,
-  );
+  _EntityWorkspaceRuntimeData _runtimeData =
+      _EntityWorkspaceRuntimeData.initial(_companiesWorkspaceMeta);
 
   @override
   void initState() {
@@ -56,7 +55,7 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
       }
       setState(() {
         _runtimeData = _EntityWorkspaceRuntimeData.unavailable(
-          _companiesWorkspaceData,
+          _companiesWorkspaceMeta,
           message: _entityWorkspaceRuntimeErrorMessage(error, 'Companies'),
         );
       });

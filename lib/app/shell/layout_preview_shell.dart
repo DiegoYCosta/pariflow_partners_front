@@ -35,13 +35,13 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   _ViewerAccessProfile _viewerProfile = _diegoViewerProfile;
   _NetworkFilterState _networkFilters = const _NetworkFilterState();
   bool _showAdvancedNetworkFilters = false;
-  String _selectedNetworkNodeId = 'employee_sarah_johnson';
+  String _selectedNetworkNodeId = '';
   String? _hoveredNetworkNodeId;
   final Map<_Destination, int> _selectedItemIndex = {
     _Destination.companies: 0,
     _Destination.clientCompanies: 0,
     _Destination.contracts: 0,
-    _Destination.people: _defaultPeopleWorkspaceIndex,
+    _Destination.people: 0,
   };
 
   @override
@@ -474,28 +474,16 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     });
   }
 
-  void _openEmployeeProfile(String publicId) {
-    final peopleIndex = _peopleWorkspaceData.items.indexWhere(
-      (item) => item.publicId == publicId,
-    );
+  void _openEmployeeProfile(String _) {
     setState(() {
       _destination = _Destination.people;
-      if (peopleIndex >= 0) {
-        _selectedItemIndex[_Destination.people] = peopleIndex;
-      }
+      _selectedItemIndex[_Destination.people] = 0;
     });
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
   }
 }
-
-final int _defaultPeopleWorkspaceIndex = max(
-  0,
-  _peopleWorkspaceData.items.indexWhere(
-    (item) => item.publicId == 'employee_sarah_johnson',
-  ),
-);
 
 class _TopBar extends StatelessWidget {
   const _TopBar({

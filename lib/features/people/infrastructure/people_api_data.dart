@@ -99,7 +99,12 @@ class _PeopleApiRepository {
             'A lista usa publicId e envelope padrao da API para abrir a ficha operacional.',
         productionHint:
             'Corte vertical ativo: pessoas, vinculos, ocorrencias, tags e anexos lidos do backend sem fallback de dados locais.',
-        integrationFocus: ['API real', 'publicId', 'ACL no backend', 'sem mock'],
+        integrationFocus: [
+          'API real',
+          'publicId',
+          'ACL no backend',
+          'sem mock',
+        ],
         filters: [
           'pessoas',
           'vinculos',
@@ -174,7 +179,7 @@ class _PeopleRuntimeData {
   factory _PeopleRuntimeData.initial() {
     return _PeopleRuntimeData(
       data: _entityWorkspaceWithoutItems(
-        _peopleWorkspaceData,
+        _peopleWorkspaceMeta,
         productionHint: 'Aguardando resposta da API real de People.',
         integrationFocus: const ['API real', 'sem mock'],
       ),
@@ -190,7 +195,7 @@ class _PeopleRuntimeData {
   }) {
     return _PeopleRuntimeData(
       data: _entityWorkspaceWithoutItems(
-        _peopleWorkspaceData,
+        _peopleWorkspaceMeta,
         productionHint:
             'A API de People respondeu sem registros para este recorte. A tela nao carrega dados mock em execucao real.',
         integrationFocus: const ['API real', 'sem registros', 'sem mock'],
@@ -206,7 +211,7 @@ class _PeopleRuntimeData {
   factory _PeopleRuntimeData.unavailable({required String message}) {
     return _PeopleRuntimeData(
       data: _entityWorkspaceWithoutItems(
-        _peopleWorkspaceData,
+        _peopleWorkspaceMeta,
         productionHint:
             'A API de People nao respondeu. A tela foi mantida sem dados locais para evitar confusao com a base real.',
         integrationFocus: const ['API indisponivel', 'sem mock'],
@@ -798,6 +803,43 @@ String _apiShortMonthYear(Object? value) {
     return '-';
   }
   return '${_shortMonth(date.month)} ${date.year}';
+}
+
+String _shortMonth(int month) {
+  const labels = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  if (month < 1 || month > labels.length) {
+    return '-';
+  }
+  return labels[month - 1];
+}
+
+String _companyMonogram(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList(growable: false);
+
+  if (parts.isEmpty) {
+    return 'PF';
+  }
+  if (parts.length == 1) {
+    return parts.first.substring(0, min(2, parts.first.length)).toUpperCase();
+  }
+  return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
 }
 
 String _apiLongDate(Object? value) {

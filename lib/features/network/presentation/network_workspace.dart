@@ -45,7 +45,7 @@ class _NetworkWorkspace extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _Tag(
-                  label: 'preview antiga desativada',
+                  label: 'dados locais desativados',
                   icon: Icons.pause_circle_outline_rounded,
                   color: _amberColor,
                   background: _amberColor.withValues(alpha: 0.12),

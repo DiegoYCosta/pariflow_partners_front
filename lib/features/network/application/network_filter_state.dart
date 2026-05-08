@@ -2,10 +2,6 @@ part of '../../../app/app.dart';
 
 enum _DismissedPeriod { sixMonths, oneYear, twoYears, fiveYears, allTime }
 
-enum _NetworkZoomPreset { overview, reading, focus, detail }
-
-enum _NetworkMapControlMode { guided, direct }
-
 extension on _DismissedPeriod {
   String get label => switch (this) {
     _DismissedPeriod.sixMonths => '6 meses',
@@ -29,29 +25,6 @@ extension on _DismissedPeriod {
     _DismissedPeriod.twoYears => 730,
     _DismissedPeriod.fiveYears => 1825,
     _DismissedPeriod.allTime => null,
-  };
-}
-
-extension on _NetworkZoomPreset {
-  String get label => switch (this) {
-    _NetworkZoomPreset.overview => 'geral',
-    _NetworkZoomPreset.reading => 'leitura',
-    _NetworkZoomPreset.focus => 'foco',
-    _NetworkZoomPreset.detail => 'detalhe',
-  };
-
-  double get multiplier => switch (this) {
-    _NetworkZoomPreset.overview => 1,
-    _NetworkZoomPreset.reading => 1.12,
-    _NetworkZoomPreset.focus => 1.32,
-    _NetworkZoomPreset.detail => 1.56,
-  };
-}
-
-extension on _NetworkMapControlMode {
-  String get label => switch (this) {
-    _NetworkMapControlMode.guided => 'mouse guiado',
-    _NetworkMapControlMode.direct => 'explorar com mouse',
   };
 }
 
