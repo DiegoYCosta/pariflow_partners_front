@@ -1,10 +1,10 @@
 part of '../../../app/app.dart';
 
 class _PeopleApiRepository {
-  _PeopleApiRepository({_ApiClient? apiClient})
-    : _apiClient = apiClient ?? _ApiClient();
+  _PeopleApiRepository({ApiClient? apiClient})
+    : _apiClient = apiClient ?? ApiClient();
 
-  final _ApiClient _apiClient;
+  final ApiClient _apiClient;
 
   Future<void> createPerson(Map<String, dynamic> body) async {
     await _apiClient.postMap('pessoas', body: body);
@@ -159,7 +159,7 @@ class _PeopleApiRepository {
     try {
       final data = await _apiClient.getMap(path, query: query);
       return _apiMapList(data['items']);
-    } on _ApiException {
+    } on ApiException {
       return const [];
     }
   }
@@ -187,7 +187,7 @@ class _PeopleRuntimeData {
 
   factory _PeopleRuntimeData.live(
     _EntityWorkspaceData data,
-    _SessionSnapshot session,
+    SessionSnapshot session,
   ) {
     final profileLabel = session.profiles.isEmpty
         ? session.securityContext
@@ -205,7 +205,7 @@ class _PeopleRuntimeData {
   final String sourceLabel;
   final bool isLive;
   final bool isLoading;
-  final _SessionSnapshot? session;
+  final SessionSnapshot? session;
   final String? errorMessage;
 
   _PeopleRuntimeData copyWith({bool? isLoading}) {
@@ -860,7 +860,7 @@ const _apiReturnedContentAccessPolicy = _ProtectedAccessPolicy(
 );
 
 String _peopleRuntimeErrorMessage(Object error) {
-  if (error is _ApiException) {
+  if (error is ApiException) {
     return 'API indisponivel para People (${error.code}). Mantive o mock local sem expor dados protegidos.';
   }
   return 'Nao foi possivel sincronizar People com a API. Mantive o mock local para evitar regressao visual.';

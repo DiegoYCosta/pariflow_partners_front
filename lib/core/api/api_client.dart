@@ -1,29 +1,36 @@
-part of '../../app/app.dart';
+import 'dart:convert';
 
-class _ApiClient {
-  _ApiClient({http.Client? httpClient, String? baseUrl})
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
+import 'package:http/http.dart' as http;
+
+import '../../firebase_options.dart';
+
+class ApiClient {
+  ApiClient({http.Client? httpClient, String? baseUrl})
     : _httpClient = httpClient ?? http.Client(),
       baseUrl = baseUrl ?? _defaultApiBaseUrl;
 
   final http.Client _httpClient;
   final String baseUrl;
   String? _accessToken;
-  _SessionSnapshot? _session;
+  SessionSnapshot? _session;
 
   bool get hasSession => _accessToken != null;
 
-  Future<_SessionSnapshot> ensureDevelopmentSession() async {
+  Future<SessionSnapshot> ensureDevelopmentSession() async {
     if (_session != null && _accessToken != null) {
       return _session!;
     }
 
     final firebaseIdToken = await _currentFirebaseIdToken();
-    final previewToken = _previewFirebaseIdToken;
+    final previewToken = previewFirebaseIdToken;
 
     if (firebaseIdToken != null) {
       try {
         return _exchangeSession(firebaseIdToken);
-      } on _ApiException {
+      } on ApiException {
         if (previewToken == null) {
           rethrow;
         }
@@ -31,7 +38,7 @@ class _ApiClient {
     }
 
     if (previewToken == null) {
-      throw const _ApiException(
+      throw const ApiException(
         statusCode: 0,
         code: 'AUTH_NOT_CONFIGURED',
         message:
@@ -42,13 +49,13 @@ class _ApiClient {
     return _exchangeSession(previewToken);
   }
 
-  Future<_SessionSnapshot> _exchangeSession(String firebaseIdToken) async {
+  Future<SessionSnapshot> _exchangeSession(String firebaseIdToken) async {
     final data = await postMap(
       'auth/session/exchange',
       body: {'firebaseIdToken': firebaseIdToken},
       requiresAuth: false,
     );
-    final session = _SessionSnapshot.fromMap(data);
+    final session = SessionSnapshot.fromMap(data);
     _session = session;
     _accessToken = session.accessToken;
     return session;
@@ -161,7 +168,7 @@ class _ApiClient {
         : jsonDecode(response.body);
 
     if (decoded is! Map) {
-      throw _ApiException(
+      throw ApiException(
         statusCode: response.statusCode,
         code: 'INVALID_RESPONSE',
         message: 'A API retornou um corpo inesperado.',
@@ -184,7 +191,7 @@ class _ApiClient {
     final error = envelope['error'];
     if (error is Map) {
       final errorMap = error.cast<String, dynamic>();
-      throw _ApiException(
+      throw ApiException(
         statusCode: response.statusCode,
         code: '${errorMap['code'] ?? 'API_ERROR'}',
         message: '${errorMap['message'] ?? 'Falha na API.'}',
@@ -192,7 +199,7 @@ class _ApiClient {
       );
     }
 
-    throw _ApiException(
+    throw ApiException(
       statusCode: response.statusCode,
       code: 'HTTP_${response.statusCode}',
       message: 'Falha HTTP ${response.statusCode}.',
@@ -218,8 +225,8 @@ Future<String?> _currentFirebaseIdToken() async {
   }
 }
 
-class _SessionSnapshot {
-  const _SessionSnapshot({
+class SessionSnapshot {
+  const SessionSnapshot({
     required this.accessToken,
     required this.userPublicId,
     required this.userName,
@@ -228,10 +235,10 @@ class _SessionSnapshot {
     required this.audienceGroups,
   });
 
-  factory _SessionSnapshot.fromMap(Map<String, dynamic> map) {
+  factory SessionSnapshot.fromMap(Map<String, dynamic> map) {
     final user = (map['user'] as Map?)?.cast<String, dynamic>() ?? const {};
 
-    return _SessionSnapshot(
+    return SessionSnapshot(
       accessToken: '${map['accessToken'] ?? ''}',
       userPublicId: '${user['publicId'] ?? ''}',
       userName: '${user['nome'] ?? user['name'] ?? user['email'] ?? 'Sessao'}',
@@ -255,8 +262,8 @@ class _SessionSnapshot {
   final List<String> audienceGroups;
 }
 
-class _ApiException implements Exception {
-  const _ApiException({
+class ApiException implements Exception {
+  const ApiException({
     required this.statusCode,
     required this.code,
     required this.message,
@@ -296,7 +303,9 @@ String get _defaultApiBaseUrl {
   return 'http://3.18.213.49/api/v1';
 }
 
-String? get _previewFirebaseIdToken {
+String get defaultApiBaseUrl => _defaultApiBaseUrl;
+
+String? get previewFirebaseIdToken {
   const enabled = bool.fromEnvironment(
     'PARIFLOW_ENABLE_DEV_TOKEN',
     defaultValue: false,

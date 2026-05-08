@@ -1,10 +1,10 @@
 part of '../../../app/app.dart';
 
 class _NetworkApiRepository {
-  _NetworkApiRepository({_ApiClient? apiClient})
-    : _apiClient = apiClient ?? _ApiClient();
+  _NetworkApiRepository({ApiClient? apiClient})
+    : _apiClient = apiClient ?? ApiClient();
 
-  final _ApiClient _apiClient;
+  final ApiClient _apiClient;
 
   Future<_NetworkGraphPayload> loadGraph({
     required String periodPreset,
@@ -98,7 +98,7 @@ String? _networkQueryList(Iterable<String> values) {
 }
 
 String _networkRuntimeErrorMessage(Object error) {
-  if (error is _ApiException) {
+  if (error is ApiException) {
     return 'API indisponivel para Network (${error.code}). Mantive o preview local.';
   }
   return 'Nao foi possivel sincronizar Network com a API. Mantive o preview local.';

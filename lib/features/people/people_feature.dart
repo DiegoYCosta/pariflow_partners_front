@@ -2875,7 +2875,7 @@ String _attachmentClassificationApiValue(
 }
 
 String _peopleMutationErrorMessage(Object error) {
-  if (error is _ApiException) {
+  if (error is ApiException) {
     return 'Falha na API (${error.code}): ${error.message}';
   }
   return 'Nao foi possivel concluir a operacao.';

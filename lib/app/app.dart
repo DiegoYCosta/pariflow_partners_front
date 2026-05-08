@@ -1,20 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
 import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart'
-    show kIsWeb, kReleaseMode;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import '../core/api/api_client.dart';
 import '../firebase_options.dart';
 import '../widgets/high_tech_light_waves.dart';
 
-part '../core/api/api_client.dart';
 part '../core/widgets/primitives.dart';
 part '../core/widgets/sprite_mold_icon.dart';
 part '../shared/models/attachment_record.dart';
@@ -172,7 +169,7 @@ class _LocalPreviewBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final apiBaseUrl = _defaultApiBaseUrl;
+    final apiBaseUrl = defaultApiBaseUrl;
     final isLocalApi = _isLocalHostUri(apiBaseUrl);
     final label = isLocalApi
         ? 'Preview local ativa'

@@ -446,4 +446,4 @@ String _firebaseAuthMessage(FirebaseAuthException error) {
   };
 }
 
-bool get _isPreviewAuthEnabled => _previewFirebaseIdToken != null;
+bool get _isPreviewAuthEnabled => previewFirebaseIdToken != null;

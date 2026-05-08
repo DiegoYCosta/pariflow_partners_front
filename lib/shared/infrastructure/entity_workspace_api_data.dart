@@ -1,10 +1,10 @@
 part of '../../app/app.dart';
 
 class _EntityWorkspaceApiRepository {
-  _EntityWorkspaceApiRepository({_ApiClient? apiClient})
-    : _apiClient = apiClient ?? _ApiClient();
+  _EntityWorkspaceApiRepository({ApiClient? apiClient})
+    : _apiClient = apiClient ?? ApiClient();
 
-  final _ApiClient _apiClient;
+  final ApiClient _apiClient;
 
   Future<_EntityWorkspaceRuntimeData> loadProviderCompanies({
     String search = '',
@@ -327,7 +327,7 @@ class _EntityWorkspaceApiRepository {
     try {
       final data = await _apiClient.getMap(path, query: query);
       return _apiMapList(data['items']);
-    } on _ApiException {
+    } on ApiException {
       return const [];
     }
   }
@@ -358,7 +358,7 @@ class _EntityWorkspaceRuntimeData {
 
   factory _EntityWorkspaceRuntimeData.live(
     _EntityWorkspaceData data,
-    _SessionSnapshot session,
+    SessionSnapshot session,
     String endpointLabel,
   ) {
     return _EntityWorkspaceRuntimeData(
@@ -374,7 +374,7 @@ class _EntityWorkspaceRuntimeData {
   final String sourceLabel;
   final bool isLive;
   final bool isLoading;
-  final _SessionSnapshot? session;
+  final SessionSnapshot? session;
   final String? errorMessage;
 
   _EntityWorkspaceRuntimeData copyWith({bool? isLoading}) {
@@ -759,7 +759,7 @@ _AttachmentRecord _contractDocumentFromApi(Map<String, dynamic> document) {
 }
 
 String _entityWorkspaceRuntimeErrorMessage(Object error, String moduleLabel) {
-  if (error is _ApiException) {
+  if (error is ApiException) {
     return 'API indisponivel para $moduleLabel (${error.code}). Mantive o preview local sem quebrar a pagina.';
   }
   return 'Nao foi possivel sincronizar $moduleLabel com a API. Mantive o preview local.';
