@@ -23,16 +23,29 @@ Em host publico, o front nunca envia `dev-token`, mesmo se alguem buildar com:
 flutter build web --release --dart-define=PARIFLOW_ENABLE_DEV_TOKEN=true
 ```
 
-Uso permitido somente em ambiente local explicito:
+Uso permitido somente em ambiente local explicito. Primeiro suba o backend no
+modo local controlado:
 
 ```powershell
+cd "D:\DEV\flutter\JOTABE\PariFlow Partners - Back"
+npm.cmd run dev:local-token
+```
+
+Esse comando prende o back em loopback, usa o MySQL local isolado do projeto em
+`127.0.0.1:3308`, aplica migrations e habilita `DEV_AUTH_BYPASS=true` somente
+nesse processo.
+
+Depois suba o front apontando para a API local:
+
+```powershell
+cd "D:\DEV\flutter\JOTABE\PariFlow Partners - Front"
 .\scripts\run-web-local.ps1 -UseDevToken
 ```
 
 Esse modo so deve apontar para API local/controlada. Para API online, use login
 Firebase real; os scripts `run-web-online.ps1` e `run-mobile-online.ps1`
 desligam `dev-token` por padrao, e o web online recusa `-UseDevToken` quando o
-destino nao e localhost. No baackend use "npm.cmd run dev:local-token"
+destino nao e localhost.
 
 Build release deve depender de Firebase real:
 
