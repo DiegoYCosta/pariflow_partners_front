@@ -315,18 +315,19 @@ String? get previewFirebaseIdToken {
     return null;
   }
 
-  if (!kReleaseMode) {
+  final apiBaseUri = Uri.tryParse(defaultApiBaseUrl);
+  if (!kReleaseMode && _isLocalHostName(apiBaseUri?.host ?? '')) {
     return 'dev-token';
   }
 
-  if (kIsWeb && _isLocalWebHost(Uri.base.host)) {
+  if (kIsWeb && _isLocalHostName(Uri.base.host)) {
     return 'dev-token';
   }
 
   return null;
 }
 
-bool _isLocalWebHost(String host) {
+bool _isLocalHostName(String host) {
   final normalized = host.toLowerCase();
   return normalized == 'localhost' ||
       normalized == '127.0.0.1' ||

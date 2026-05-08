@@ -30,8 +30,9 @@ Uso permitido somente em ambiente local explicito:
 ```
 
 Esse modo so deve apontar para API local/controlada. Para API online, use login
-Firebase real; `scripts/run-web-online.ps1` desliga `dev-token` por padrao e
-recusa `-UseDevToken` quando o destino nao e localhost.
+Firebase real; os scripts `run-web-online.ps1` e `run-mobile-online.ps1`
+desligam `dev-token` por padrao, e o web online recusa `-UseDevToken` quando o
+destino nao e localhost. No baackend use "npm.cmd run dev:local-token"
 
 Build release deve depender de Firebase real:
 
