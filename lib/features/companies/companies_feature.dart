@@ -267,7 +267,9 @@ class _CompaniesRedesignedWorkspace extends StatelessWidget {
         else
           LayoutBuilder(
             builder: (context, constraints) {
-              final stacked = constraints.maxWidth < 1120;
+              final stacked =
+                  constraints.maxWidth <
+                  _workspaceCompactMasterDetailInlineMinWidth;
               final listPanel = _Panel(
                 padding: const EdgeInsets.all(20),
                 child: _CompaniesDirectoryPanel(
@@ -297,12 +299,17 @@ class _CompaniesRedesignedWorkspace extends StatelessWidget {
                 );
               }
 
+              final directoryWidth = (constraints.maxWidth * 0.34)
+                  .clamp(300.0, 420.0)
+                  .toDouble();
+              final columnGap = constraints.maxWidth < 1120 ? 18.0 : 22.0;
+
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 4, child: listPanel),
-                  const SizedBox(width: 22),
-                  Expanded(flex: 8, child: detailPanel),
+                  SizedBox(width: directoryWidth, child: listPanel),
+                  SizedBox(width: columnGap),
+                  Expanded(child: detailPanel),
                 ],
               );
             },
@@ -548,7 +555,7 @@ class _CompaniesDirectoryPanel extends StatelessWidget {
                   Text('Prestadoras', style: theme.textTheme.titleLarge),
                   const SizedBox(height: 6),
                   Text(
-                    'Selecione uma empresa para manter o detalhe aberto ao lado.',
+                    'Selecione uma empresa para atualizar o detalhe do workspace.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: _mutedColor,
                     ),
@@ -920,7 +927,11 @@ class _CompanyInfoGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final spacing = 12.0;
-        final columns = constraints.maxWidth < 620 ? 1 : 3;
+        final columns = constraints.maxWidth >= 720
+            ? 3
+            : constraints.maxWidth >= 430
+            ? 2
+            : 1;
         final width =
             (constraints.maxWidth - (spacing * (columns - 1))) / columns;
 

@@ -115,7 +115,7 @@ class _EntityWorkspace extends StatelessWidget {
                     return titleBlock;
                   }
 
-                  if (constraints.maxWidth < 980) {
+                  if (constraints.maxWidth < _workspaceHeaderInlineMinWidth) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -249,7 +249,8 @@ class _EntityWorkspace extends StatelessWidget {
         const SizedBox(height: 24),
         LayoutBuilder(
           builder: (context, constraints) {
-            final stacked = constraints.maxWidth < 1120;
+            final stacked =
+                constraints.maxWidth < _workspaceMasterDetailInlineMinWidth;
             if (selectedItem == null) {
               return const _Panel(child: _EntityEmptyState());
             }
@@ -275,11 +276,15 @@ class _EntityWorkspace extends StatelessWidget {
               );
             }
 
+            final listWidth = (constraints.maxWidth * 0.48)
+                .clamp(360.0, 620.0)
+                .toDouble();
+
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 6,
+                SizedBox(
+                  width: listWidth,
                   child: _Panel(
                     child: _EntityListCard(
                       data: data,
@@ -288,9 +293,8 @@ class _EntityWorkspace extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 24),
+                const SizedBox(width: 22),
                 Expanded(
-                  flex: 5,
                   child: _Panel(
                     child: _EntityDetailCard(
                       item: selectedItem,
