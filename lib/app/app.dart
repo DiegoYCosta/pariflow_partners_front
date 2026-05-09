@@ -6,8 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart'
-    show kIsWeb, kReleaseMode;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -70,6 +69,9 @@ const _crmLogoSymbolAsset = 'assets/images/logo_transparent.webp';
 const _crmLogoWordmarkAsset = 'assets/images/PFP.webp';
 const _crmLogoBackdropAsset = 'assets/images/background-logo.webp';
 const _spriteMoldSheetAsset = 'assets/images/Icones.webp';
+const double _workspaceHeaderInlineMinWidth = 980;
+const double _workspaceMasterDetailInlineMinWidth = 980;
+const double _workspaceCompactMasterDetailInlineMinWidth = 840;
 
 Future<void> initializePariFlowFirebase() async {
   if (!DefaultFirebaseOptions.isConfiguredForCurrentPlatform ||
