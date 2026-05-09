@@ -13,6 +13,23 @@ modulos operacionais. Dados mock/sample nao entram mais no runtime real nem no
 bundle publicado. O `dev-token` fica limitado a localhost/loopback com opt-in
 explicito; host publico exige Firebase real e Firebase Admin no backend.
 
+## Relatorios (WIP)
+
+A Central de Relatorios esta em desenvolvimento. A UI ja organiza o catalogo por
+familias estrategicas, gerenciais, controles, compliance/risco, logs/auditoria e
+automacao, com subrelatorios e filtros configuraveis como periodo, publico,
+status, empresa e responsavel.
+
+O filtro `Publico` ja indica a hierarquia do usuario atual, destaca o perfil
+dele e bloqueia selecoes acima da permissao disponivel, exibindo uma mensagem
+curta quando o acesso exige liberacao de admin. Essa protecao visual nao
+substitui a ACL do backend; a liberacao final de dados sensiveis deve continuar
+validada pela API.
+
+Ainda faltam a persistencia de modelos de relatorio, execucao com dados reais,
+exportacao, auditoria das execucoes e alinhamento final das permissoes
+granulares com backend e banco.
+
 ## Documentacao Viva
 
 - [Indice documental](docs/README.md)

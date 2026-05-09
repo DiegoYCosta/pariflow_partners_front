@@ -1,20 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
 import 'dart:ui' as ui;
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart'
-    show kIsWeb, kReleaseMode;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import '../core/api/api_client.dart';
+import '../features/auth/auth_gate.dart';
 import '../firebase_options.dart';
 import '../widgets/high_tech_light_waves.dart';
 
-part '../core/api/api_client.dart';
 part '../core/widgets/primitives.dart';
 part '../core/widgets/sprite_mold_icon.dart';
 part '../shared/models/attachment_record.dart';
@@ -24,17 +21,13 @@ part '../shared/models/sensitive_note_tag.dart';
 part '../shared/models/viewer_access.dart';
 part '../core/widgets/master_detail_workspace.dart';
 part '../core/widgets/entity_crud_actions.dart';
+part '../shared/infrastructure/entity_workspace_runtime_metadata.dart';
 part '../shared/infrastructure/entity_workspace_api_data.dart';
-part '../features/auth/auth_gate.dart';
 part '../features/companies/companies_feature.dart';
-part '../features/companies/infrastructure/companies_mock_data.dart';
 part '../features/client_companies/client_companies_feature.dart';
-part '../features/client_companies/infrastructure/client_companies_mock_data.dart';
 part '../features/contracts/contracts_feature.dart';
-part '../features/contracts/infrastructure/contracts_mock_data.dart';
 part '../features/people/people_feature.dart';
 part '../features/people/infrastructure/people_api_data.dart';
-part '../features/people/infrastructure/people_mock_data.dart';
 part 'shell/shell_variant.dart';
 part 'shell/shell_feature_flags.dart';
 part 'shell/legacy_shell.dart';
@@ -42,16 +35,8 @@ part 'shell/crm_shell.dart';
 part 'shell/layout_preview_shell.dart';
 part '../features/home/home_feature.dart';
 part '../features/network/application/network_filter_state.dart';
-part '../features/network/domain/network_entities.dart';
-part '../features/network/domain/network_graph_engine.dart';
 part '../features/network/infrastructure/network_api_data.dart';
-part '../features/network/infrastructure/network_graph_payload_preview.dart';
-part '../features/network/infrastructure/network_mock_graph.dart';
 part '../features/network/presentation/network_workspace.dart';
-part '../features/network/presentation/network_canvas.dart';
-part '../features/network/presentation/network_detail.dart';
-part '../features/network/presentation/network_widgets.dart';
-part '../features/network/presentation/painters/network_link_painter.dart';
 
 const _canvasColor = Color(0xFFF4EFE6);
 const _paperColor = Color(0xFFFFFCF7);
@@ -70,6 +55,9 @@ const _crmLogoSymbolAsset = 'assets/images/logo_transparent.webp';
 const _crmLogoWordmarkAsset = 'assets/images/PFP.webp';
 const _crmLogoBackdropAsset = 'assets/images/background-logo.webp';
 const _spriteMoldSheetAsset = 'assets/images/Icones.webp';
+const double _workspaceHeaderInlineMinWidth = 980;
+const double _workspaceMasterDetailInlineMinWidth = 980;
+const double _workspaceCompactMasterDetailInlineMinWidth = 840;
 
 Future<void> initializePariFlowFirebase() async {
   if (previewFirebaseIdToken != null) {
@@ -148,7 +136,18 @@ class PariFlowPartnersApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const _AuthGate(child: LayoutPreviewPage()),
+      home: const AuthGate(
+        brand: AuthGateBrandConfig(
+          paperColor: _paperColor,
+          mutedColor: _mutedColor,
+          tealColor: _tealColor,
+          deepTealColor: _deepTealColor,
+          bannerWebAsset: _crmBannerWebAsset,
+          bannerMobileAsset: _crmBannerMobileAsset,
+          logoSymbolAsset: _crmLogoSymbolAsset,
+        ),
+        child: LayoutPreviewPage(),
+      ),
       builder: (context, child) {
         return Stack(
           fit: StackFit.expand,
@@ -176,11 +175,11 @@ class _LocalPreviewBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final apiBaseUrl = _defaultApiBaseUrl;
+    final apiBaseUrl = defaultApiBaseUrl;
     final isLocalApi = _isLocalHostUri(apiBaseUrl);
     final label = isLocalApi
-        ? 'Preview local ativa'
-        : 'Preview local ativa - API online';
+        ? 'Ambiente local ativo'
+        : 'Ambiente local ativo - API online';
 
     return IgnorePointer(
       child: SafeArea(

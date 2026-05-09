@@ -75,12 +75,13 @@ class _CrmTopBar extends StatelessWidget {
                   tooltip: 'Relatorios',
                   onPressed: () => showDialog<void>(
                     context: context,
-                    builder: (context) => const _CrmReportsCenterDialog(),
+                    builder: (context) =>
+                        _CrmReportsCenterDialog(viewerProfile: viewerProfile),
                   ),
                 ),
               ] else ...[
                 const SizedBox(width: 8),
-                const _CrmReportsCommandMenu(),
+                _CrmReportsCommandMenu(viewerProfile: viewerProfile),
               ],
               const Spacer(),
               const _CrmHeaderIconButton(
@@ -138,7 +139,75 @@ class _CrmHeaderSearchBox extends StatelessWidget {
   }
 }
 
-enum _CrmReportFamily { management, audit, status, automation }
+enum _CrmReportFamily {
+  strategic,
+  management,
+  controls,
+  compliance,
+  audit,
+  automation,
+}
+
+class _CrmReportFamilyMeta {
+  const _CrmReportFamilyMeta({
+    required this.family,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+
+  final _CrmReportFamily family;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+}
+
+const List<_CrmReportFamilyMeta> _crmReportFamilies = [
+  _CrmReportFamilyMeta(
+    family: _CrmReportFamily.strategic,
+    title: 'Estrategicos',
+    subtitle: 'Diretoria, tendencia, risco e leitura executiva.',
+    icon: Icons.insights_outlined,
+    color: Color(0xFF2A5F86),
+  ),
+  _CrmReportFamilyMeta(
+    family: _CrmReportFamily.management,
+    title: 'Gerenciais',
+    subtitle: 'Pessoas, contratos, carteira e operacao corrente.',
+    icon: Icons.dashboard_customize_outlined,
+    color: _tealColor,
+  ),
+  _CrmReportFamilyMeta(
+    family: _CrmReportFamily.controls,
+    title: 'Controles',
+    subtitle: 'Pendencias, SLA, documentos e evidencias.',
+    icon: Icons.fact_check_outlined,
+    color: _slateColor,
+  ),
+  _CrmReportFamilyMeta(
+    family: _CrmReportFamily.compliance,
+    title: 'Compliance e risco',
+    subtitle: 'Excecoes, acessos sensiveis e criticidade.',
+    icon: Icons.gpp_maybe_outlined,
+    color: _roseColor,
+  ),
+  _CrmReportFamilyMeta(
+    family: _CrmReportFamily.audit,
+    title: 'Logs e auditoria',
+    subtitle: 'Trilha de alteracoes, exclusoes e parametros.',
+    icon: Icons.manage_history_outlined,
+    color: _amberColor,
+  ),
+  _CrmReportFamilyMeta(
+    family: _CrmReportFamily.automation,
+    title: 'Automacao',
+    subtitle: 'Recorrencia, destinatarios e pacotes periodicos.',
+    icon: Icons.event_repeat_outlined,
+    color: Color(0xFF6D5DA8),
+  ),
+];
 
 class _CrmReportTemplate {
   const _CrmReportTemplate({
@@ -159,6 +228,38 @@ class _CrmReportTemplate {
 }
 
 const List<_CrmReportTemplate> _crmReportTemplates = [
+  _CrmReportTemplate(
+    id: 'strategic_executive_map',
+    title: 'Mapa executivo',
+    description: 'Indicadores de carteira, pessoas, contratos e risco.',
+    icon: Icons.map_outlined,
+    family: _CrmReportFamily.strategic,
+    filters: ['Diretoria', 'Periodo', 'Carteira', 'Risco', 'Comparativo'],
+  ),
+  _CrmReportTemplate(
+    id: 'strategic_trends',
+    title: 'Tendencias operacionais',
+    description: 'Evolucao de headcount, admissioes, contratos e demanda.',
+    icon: Icons.trending_up_rounded,
+    family: _CrmReportFamily.strategic,
+    filters: ['Periodo', 'Empresa', 'Modulo', 'Indicador', 'Projecao'],
+  ),
+  _CrmReportTemplate(
+    id: 'strategic_network_risk',
+    title: 'Risco da malha',
+    description: 'Concentracao por cliente, posicoes criticas e dependencias.',
+    icon: Icons.hub_outlined,
+    family: _CrmReportFamily.strategic,
+    filters: ['Grupo', 'Cliente', 'Contrato', 'Criticidade', 'Status'],
+  ),
+  _CrmReportTemplate(
+    id: 'strategic_board_pack',
+    title: 'Board pack',
+    description: 'Pacote premium para reunioes executivas e conselhos.',
+    icon: Icons.workspace_premium_outlined,
+    family: _CrmReportFamily.strategic,
+    filters: ['Periodo', 'Publico', 'Resumo', 'Anexos', 'Formato'],
+  ),
   _CrmReportTemplate(
     id: 'management_employees',
     title: 'Quadro de funcionarios',
@@ -181,15 +282,79 @@ const List<_CrmReportTemplate> _crmReportTemplates = [
     description: 'Contratados entre datas, origem e etapa admissional.',
     icon: Icons.how_to_reg_outlined,
     family: _CrmReportFamily.management,
-    filters: ['Data inicial', 'Data final', 'Empresa', 'Cargo', 'Etapa'],
+    filters: ['Periodo', 'Empresa', 'Cargo', 'Etapa', 'Origem'],
   ),
   _CrmReportTemplate(
-    id: 'management_executive',
-    title: 'Pacote executivo',
-    description: 'Resumo gerencial com indicadores e recortes principais.',
-    icon: Icons.dashboard_customize_outlined,
+    id: 'management_departments',
+    title: 'People analytics',
+    description: 'Distribuicao por departamento, senioridade e cargo.',
+    icon: Icons.groups_2_outlined,
     family: _CrmReportFamily.management,
-    filters: ['Modulo', 'Periodo', 'Unidade', 'Comparativo', 'Formato'],
+    filters: ['Departamento', 'Cargo', 'Empresa', 'Status', 'Tempo'],
+  ),
+  _CrmReportTemplate(
+    id: 'controls_documents',
+    title: 'Pendencias documentais',
+    description: 'Documentos ausentes, vencidos ou aguardando revisao.',
+    icon: Icons.assignment_late_outlined,
+    family: _CrmReportFamily.controls,
+    filters: ['Documento', 'Vencimento', 'Pessoa', 'Empresa', 'Severidade'],
+  ),
+  _CrmReportTemplate(
+    id: 'controls_sla',
+    title: 'SLA de rotinas',
+    description: 'Prazos de admissao, revisao, anexos e movimentacoes.',
+    icon: Icons.timer_outlined,
+    family: _CrmReportFamily.controls,
+    filters: ['Rotina', 'Prazo', 'Responsavel', 'Equipe', 'Status'],
+  ),
+  _CrmReportTemplate(
+    id: 'controls_movements',
+    title: 'Movimentacoes',
+    description: 'Transferencias, desligamentos, admissoes e aprovacoes.',
+    icon: Icons.swap_horiz_rounded,
+    family: _CrmReportFamily.controls,
+    filters: ['Tipo', 'Periodo', 'Origem', 'Destino', 'Responsavel'],
+  ),
+  _CrmReportTemplate(
+    id: 'controls_evidence',
+    title: 'Anexos e evidencias',
+    description: 'Arquivos, comprovantes, links e status de revisao.',
+    icon: Icons.attach_file_rounded,
+    family: _CrmReportFamily.controls,
+    filters: ['Modulo', 'Tipo', 'Pessoa', 'Contrato', 'Revisao'],
+  ),
+  _CrmReportTemplate(
+    id: 'compliance_alerts',
+    title: 'Alertas e compliance',
+    description: 'Sinais de atencao por regra, perfil e criticidade.',
+    icon: Icons.warning_amber_rounded,
+    family: _CrmReportFamily.compliance,
+    filters: ['Regra', 'Criticidade', 'Modulo', 'Periodo', 'Responsavel'],
+  ),
+  _CrmReportTemplate(
+    id: 'compliance_sensitive_access',
+    title: 'Acessos sensiveis',
+    description: 'Consultas, downloads e sessoes privilegiadas.',
+    icon: Icons.lock_person_outlined,
+    family: _CrmReportFamily.compliance,
+    filters: ['Usuario', 'Perfil', 'Recurso', 'Periodo', 'Resultado'],
+  ),
+  _CrmReportTemplate(
+    id: 'compliance_expirations',
+    title: 'Vencimentos criticos',
+    description: 'Contratos, documentos e obrigacoes perto do limite.',
+    icon: Icons.event_busy_outlined,
+    family: _CrmReportFamily.compliance,
+    filters: ['Tipo', 'Janela', 'Cliente', 'Contrato', 'Severidade'],
+  ),
+  _CrmReportTemplate(
+    id: 'compliance_exceptions',
+    title: 'Excecoes operacionais',
+    description: 'Itens fora da regra, justificativas e recorrencia.',
+    icon: Icons.report_problem_outlined,
+    family: _CrmReportFamily.compliance,
+    filters: ['Regra', 'Justificativa', 'Modulo', 'Periodo', 'Dono'],
   ),
   _CrmReportTemplate(
     id: 'audit_changes',
@@ -224,41 +389,17 @@ const List<_CrmReportTemplate> _crmReportTemplates = [
     filters: ['Parametro', 'Usuario', 'Perfil', 'Periodo', 'Impacto'],
   ),
   _CrmReportTemplate(
-    id: 'status_people',
-    title: 'Status de colaboradores',
-    description: 'Ativos, pendentes, admissional, afastados e historicos.',
-    icon: Icons.fact_check_outlined,
-    family: _CrmReportFamily.status,
-    filters: ['Status', 'Empresa', 'Departamento', 'Cargo', 'Tempo'],
-  ),
-  _CrmReportTemplate(
-    id: 'status_contracts',
-    title: 'Status de contratos',
-    description: 'Contratos ativos, encerrados, vencendo e com pendencias.',
-    icon: Icons.rule_folder_outlined,
-    family: _CrmReportFamily.status,
-    filters: ['Status', 'Cliente', 'Vencimento', 'Responsavel', 'Risco'],
-  ),
-  _CrmReportTemplate(
-    id: 'status_documents',
-    title: 'Pendencias documentais',
-    description: 'Documentos ausentes, vencidos ou aguardando revisao.',
-    icon: Icons.assignment_late_outlined,
-    family: _CrmReportFamily.status,
-    filters: ['Documento', 'Vencimento', 'Pessoa', 'Empresa', 'Severidade'],
-  ),
-  _CrmReportTemplate(
-    id: 'status_compliance',
-    title: 'Alertas e compliance',
-    description: 'Sinais de atencao por regra, perfil e criticidade.',
-    icon: Icons.warning_amber_rounded,
-    family: _CrmReportFamily.status,
-    filters: ['Regra', 'Criticidade', 'Modulo', 'Periodo', 'Responsavel'],
+    id: 'audit_sessions',
+    title: 'Seguranca de sessoes',
+    description: 'Logins, refresh, expiracoes, falhas e encerramentos.',
+    icon: Icons.verified_user_outlined,
+    family: _CrmReportFamily.audit,
+    filters: ['Usuario', 'Origem', 'Periodo', 'Evento', 'Dispositivo'],
   ),
   _CrmReportTemplate(
     id: 'automation_management',
-    title: 'Programar gerencial',
-    description: 'Modelo visual para recorrencia de relatorios executivos.',
+    title: 'Fechamento executivo',
+    description: 'Recorrencia do board pack e pacote de diretoria.',
     icon: Icons.event_repeat_outlined,
     family: _CrmReportFamily.automation,
     filters: ['Relatorio base', 'Frequencia', 'Destinatarios', 'Formato'],
@@ -280,17 +421,19 @@ const List<_CrmReportTemplate> _crmReportTemplates = [
     filters: ['Status', 'Periodicidade', 'Equipe', 'Canal'],
   ),
   _CrmReportTemplate(
-    id: 'automation_monthly',
-    title: 'Fechamento mensal',
-    description: 'Modelo visual para pacote mensal de indicadores.',
-    icon: Icons.calendar_view_month_outlined,
+    id: 'automation_controls',
+    title: 'Trilha de controles',
+    description: 'Envio recorrente de pendencias, SLA e evidencias.',
+    icon: Icons.playlist_add_check_circle_outlined,
     family: _CrmReportFamily.automation,
-    filters: ['Mes', 'Comparativo', 'Diretoria', 'Formato'],
+    filters: ['Controle', 'Frequencia', 'Dono', 'Escalonamento'],
   ),
 ];
 
 class _CrmReportsCommandMenu extends StatelessWidget {
-  const _CrmReportsCommandMenu();
+  const _CrmReportsCommandMenu({required this.viewerProfile});
+
+  final _ViewerAccessProfile viewerProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -313,13 +456,16 @@ class _CrmReportsCommandMenu extends StatelessWidget {
   Future<void> _openReportsCenter(BuildContext context) {
     return showDialog<void>(
       context: context,
-      builder: (context) => const _CrmReportsCenterDialog(),
+      builder: (context) =>
+          _CrmReportsCenterDialog(viewerProfile: viewerProfile),
     );
   }
 }
 
 class _CrmReportsCenterDialog extends StatefulWidget {
-  const _CrmReportsCenterDialog();
+  const _CrmReportsCenterDialog({required this.viewerProfile});
+
+  final _ViewerAccessProfile viewerProfile;
 
   @override
   State<_CrmReportsCenterDialog> createState() =>
@@ -330,6 +476,7 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
   late _CrmReportTemplate _selected;
   final Set<String> _requiredFilters = {'Empresa', 'Periodo'};
   final Set<String> _optionalFilters = {'Status'};
+  final Map<String, String> _filterValues = {};
   String _frequency = 'Semanal';
   String _delivery = 'Painel';
 
@@ -337,6 +484,7 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
   void initState() {
     super.initState();
     _selected = _crmReportTemplates.first;
+    _syncFilterDefaults(_selected);
   }
 
   @override
@@ -381,12 +529,15 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
             );
             final designer = _CrmReportDesignerPanel(
               template: _selected,
+              viewerProfile: widget.viewerProfile,
               requiredFilters: _requiredFilters,
               optionalFilters: _optionalFilters,
               frequency: _frequency,
               delivery: _delivery,
+              filterValues: _filterValues,
               onToggleRequired: _toggleRequiredFilter,
               onToggleOptional: _toggleOptionalFilter,
+              onFilterValueChanged: _updateFilterValue,
               onFrequencyChanged: (value) {
                 setState(() {
                   _frequency = value;
@@ -445,6 +596,9 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
     _optionalFilters
       ..clear()
       ..addAll(template.filters.skip(2).take(1));
+    _filterValues
+      ..clear()
+      ..addAll(_defaultReportFilterValues(template));
     _frequency = template.family == _CrmReportFamily.automation
         ? 'Semanal'
         : 'Manual';
@@ -461,6 +615,7 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
       }
       _optionalFilters.remove(filter);
       _requiredFilters.add(filter);
+      _ensureFilterDraft(filter);
     });
   }
 
@@ -472,7 +627,20 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
       }
       _requiredFilters.remove(filter);
       _optionalFilters.add(filter);
+      _ensureFilterDraft(filter);
     });
+  }
+
+  void _updateFilterValue(String key, String value) {
+    setState(() {
+      _filterValues[key] = value;
+    });
+  }
+
+  void _ensureFilterDraft(String filter) {
+    for (final entry in _defaultValuesForReportFilter(filter).entries) {
+      _filterValues.putIfAbsent(entry.key, () => entry.value);
+    }
   }
 }
 
@@ -486,53 +654,18 @@ class _CrmReportsCatalog extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = [
-          _CrmReportCategoryColumn(
-            title: 'Gerenciais',
-            icon: Icons.dashboard_customize_outlined,
-            templates: _templatesFor(_CrmReportFamily.management),
-            selected: selected,
-            onSelected: onSelected,
-          ),
-          _CrmReportCategoryColumn(
-            title: 'Logs e auditoria',
-            icon: Icons.manage_history_outlined,
-            templates: _templatesFor(_CrmReportFamily.audit),
-            selected: selected,
-            onSelected: onSelected,
-          ),
-          _CrmReportCategoryColumn(
-            title: 'Status',
-            icon: Icons.fact_check_outlined,
-            templates: _templatesFor(_CrmReportFamily.status),
-            selected: selected,
-            onSelected: onSelected,
-          ),
-          _CrmReportCategoryColumn(
-            title: 'Automacao',
-            icon: Icons.event_repeat_outlined,
-            templates: _templatesFor(_CrmReportFamily.automation),
-            selected: selected,
-            onSelected: onSelected,
-          ),
-        ];
-
-        if (constraints.maxWidth < 720) {
-          return ListView.separated(
-            itemCount: columns.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) => columns[index],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var index = 0; index < columns.length; index++) ...[
-              Expanded(child: columns[index]),
-              if (index < columns.length - 1) const SizedBox(width: 10),
-            ],
-          ],
+        return ListView.separated(
+          itemCount: _crmReportFamilies.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final family = _crmReportFamilies[index];
+            return _CrmReportCategoryColumn(
+              meta: family,
+              templates: _templatesFor(family.family),
+              selected: selected,
+              onSelected: onSelected,
+            );
+          },
         );
       },
     );
@@ -548,15 +681,13 @@ List<_CrmReportTemplate> _templatesFor(_CrmReportFamily family) {
 
 class _CrmReportCategoryColumn extends StatelessWidget {
   const _CrmReportCategoryColumn({
-    required this.title,
-    required this.icon,
+    required this.meta,
     required this.templates,
     required this.selected,
     required this.onSelected,
   });
 
-  final String title;
-  final IconData icon;
+  final _CrmReportFamilyMeta meta;
   final List<_CrmReportTemplate> templates;
   final _CrmReportTemplate selected;
   final ValueChanged<_CrmReportTemplate> onSelected;
@@ -574,38 +705,102 @@ class _CrmReportCategoryColumn extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: _deepTealColor, size: 18),
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: meta.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(meta.icon, color: meta.color, size: 18),
+              ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: _deepTealColor,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      meta.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: _deepTealColor,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      meta.subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: _mutedColor,
+                        height: 1.25,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
+              _CrmReportCountBadge(count: templates.length, color: meta.color),
             ],
           ),
           const SizedBox(height: 12),
-          Expanded(
-            child: ListView.separated(
-              itemCount: templates.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final template = templates[index];
-                return _CrmReportTemplateTile(
-                  template: template,
-                  selected: selected.id == template.id,
-                  onTap: () => onSelected(template),
-                );
-              },
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final twoColumns = constraints.maxWidth >= 560;
+              final tileWidth = twoColumns
+                  ? ((constraints.maxWidth - 10) / 2).floorToDouble()
+                  : constraints.maxWidth;
+
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final template in templates)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _CrmReportTemplateTile(
+                        template: template,
+                        selected: selected.id == template.id,
+                        onTap: () => onSelected(template),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CrmReportCountBadge extends StatelessWidget {
+  const _CrmReportCountBadge({required this.count, required this.color});
+
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
+      ),
+      child: Text(
+        '$count',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -684,23 +879,29 @@ class _CrmReportTemplateTile extends StatelessWidget {
 class _CrmReportDesignerPanel extends StatelessWidget {
   const _CrmReportDesignerPanel({
     required this.template,
+    required this.viewerProfile,
     required this.requiredFilters,
     required this.optionalFilters,
     required this.frequency,
     required this.delivery,
+    required this.filterValues,
     required this.onToggleRequired,
     required this.onToggleOptional,
+    required this.onFilterValueChanged,
     required this.onFrequencyChanged,
     required this.onDeliveryChanged,
   });
 
   final _CrmReportTemplate template;
+  final _ViewerAccessProfile viewerProfile;
   final Set<String> requiredFilters;
   final Set<String> optionalFilters;
   final String frequency;
   final String delivery;
+  final Map<String, String> filterValues;
   final ValueChanged<String> onToggleRequired;
   final ValueChanged<String> onToggleOptional;
+  final void Function(String key, String value) onFilterValueChanged;
   final ValueChanged<String> onFrequencyChanged;
   final ValueChanged<String> onDeliveryChanged;
 
@@ -779,6 +980,19 @@ class _CrmReportDesignerPanel extends StatelessWidget {
             onSelected: onToggleOptional,
           ),
           const SizedBox(height: 16),
+          Text(
+            'Parametros configuraveis',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          _CrmReportFilterConfigurator(
+            template: template,
+            viewerProfile: viewerProfile,
+            activeFilters: {...requiredFilters, ...optionalFilters},
+            values: filterValues,
+            onChanged: onFilterValueChanged,
+          ),
+          const SizedBox(height: 16),
           Text('Saida', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           Wrap(
@@ -846,6 +1060,498 @@ class _CrmReportDesignerPanel extends StatelessWidget {
   }
 }
 
+enum _CrmReportFilterKind { period, options, search }
+
+class _CrmReportFilterConfigurator extends StatelessWidget {
+  const _CrmReportFilterConfigurator({
+    required this.template,
+    required this.viewerProfile,
+    required this.activeFilters,
+    required this.values,
+    required this.onChanged,
+  });
+
+  final _CrmReportTemplate template;
+  final _ViewerAccessProfile viewerProfile;
+  final Set<String> activeFilters;
+  final Map<String, String> values;
+  final void Function(String key, String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final orderedFilters = [
+      for (final filter in template.filters)
+        if (activeFilters.contains(filter)) filter,
+    ];
+
+    if (orderedFilters.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAF9),
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: const Color(0xFFE5EAE8)),
+        ),
+        child: Text(
+          'Selecione filtros obrigatorios ou opcionais para configurar os parametros do relatorio.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: _mutedColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _CrmReportMethodNote(),
+        const SizedBox(height: 10),
+        for (var index = 0; index < orderedFilters.length; index++) ...[
+          _CrmReportFilterConfigCard(
+            filter: orderedFilters[index],
+            viewerProfile: viewerProfile,
+            values: values,
+            onChanged: onChanged,
+          ),
+          if (index < orderedFilters.length - 1) const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _CrmReportMethodNote extends StatelessWidget {
+  const _CrmReportMethodNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _tealColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: _tealColor.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.manage_search_outlined, color: _tealColor, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Modelo de pesquisa: escopo, periodo, status, recortes e saida. Os relatorios seguem a mesma logica de busca estruturada.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _deepTealColor,
+                height: 1.28,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportFilterConfigCard extends StatelessWidget {
+  const _CrmReportFilterConfigCard({
+    required this.filter,
+    required this.viewerProfile,
+    required this.values,
+    required this.onChanged,
+  });
+
+  final String filter;
+  final _ViewerAccessProfile viewerProfile;
+  final Map<String, String> values;
+  final void Function(String key, String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = _kindForReportFilter(filter);
+    final accent = _colorForReportFilter(kind);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: const Color(0xFFE5EAE8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_iconForReportFilter(kind), color: accent, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  filter,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                _kindLabelForReportFilter(kind),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          switch (kind) {
+            _CrmReportFilterKind.period => _CrmReportPeriodFields(
+              filter: filter,
+              values: values,
+              onChanged: onChanged,
+            ),
+            _CrmReportFilterKind.options => _CrmReportOptionSelector(
+              filter: filter,
+              viewerProfile: viewerProfile,
+              values: values,
+              onChanged: onChanged,
+            ),
+            _CrmReportFilterKind.search => _CrmReportSearchField(
+              filter: filter,
+              values: values,
+              onChanged: onChanged,
+            ),
+          },
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportPeriodFields extends StatelessWidget {
+  const _CrmReportPeriodFields({
+    required this.filter,
+    required this.values,
+    required this.onChanged,
+  });
+
+  final String filter;
+  final Map<String, String> values;
+  final void Function(String key, String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final startKey = _reportFilterKey(filter, 'inicio');
+    final endKey = _reportFilterKey(filter, 'fim');
+
+    return Row(
+      children: [
+        Expanded(
+          child: _CrmReportTextInput(
+            keyName: startKey,
+            label: 'De',
+            hint: 'DD/MM/AAAA',
+            value: values[startKey],
+            onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _CrmReportTextInput(
+            keyName: endKey,
+            label: 'Ate',
+            hint: 'DD/MM/AAAA',
+            value: values[endKey],
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CrmReportOptionSelector extends StatefulWidget {
+  const _CrmReportOptionSelector({
+    required this.filter,
+    required this.viewerProfile,
+    required this.values,
+    required this.onChanged,
+  });
+
+  final String filter;
+  final _ViewerAccessProfile viewerProfile;
+  final Map<String, String> values;
+  final void Function(String key, String value) onChanged;
+
+  @override
+  State<_CrmReportOptionSelector> createState() =>
+      _CrmReportOptionSelectorState();
+}
+
+class _CrmReportOptionSelectorState extends State<_CrmReportOptionSelector> {
+  String? _accessError;
+
+  @override
+  Widget build(BuildContext context) {
+    final keyName = _reportFilterKey(widget.filter, 'valor');
+    final options = _optionsForReportFilter(widget.filter);
+    final selected = widget.values[keyName] ?? options.first;
+    final audienceFilter = _isReportAudienceFilter(widget.filter);
+    final currentAudience = _viewerReportAudienceLabel(widget.viewerProfile);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (audienceFilter) ...[
+          _CrmReportAudienceHierarchyNote(viewerProfile: widget.viewerProfile),
+          const SizedBox(height: 8),
+        ],
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in options)
+              _CrmReportAudienceAwareChip(
+                label: option,
+                selected: selected == option,
+                current: audienceFilter && option == currentAudience,
+                blocked:
+                    audienceFilter &&
+                    !_canViewerSelectReportAudience(
+                      widget.viewerProfile,
+                      option,
+                    ),
+                onSelected: () {
+                  if (audienceFilter &&
+                      !_canViewerSelectReportAudience(
+                        widget.viewerProfile,
+                        option,
+                      )) {
+                    setState(() {
+                      _accessError = _reportAudienceDeniedMessage(
+                        widget.viewerProfile,
+                        option,
+                      );
+                    });
+                    return;
+                  }
+
+                  setState(() {
+                    _accessError = null;
+                  });
+                  widget.onChanged(keyName, option);
+                },
+              ),
+          ],
+        ),
+        if (_accessError != null) ...[
+          const SizedBox(height: 8),
+          _CrmReportAccessError(message: _accessError!),
+        ],
+      ],
+    );
+  }
+}
+
+class _CrmReportAudienceHierarchyNote extends StatelessWidget {
+  const _CrmReportAudienceHierarchyNote({required this.viewerProfile});
+
+  final _ViewerAccessProfile viewerProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final audience = _viewerReportAudienceLabel(viewerProfile);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: viewerProfile.color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: viewerProfile.color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(viewerProfile.icon, color: viewerProfile.color, size: 17),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Perfil atual: $audience. Publicos acima exigem liberacao de admin.',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _inkColor,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportAudienceAwareChip extends StatelessWidget {
+  const _CrmReportAudienceAwareChip({
+    required this.label,
+    required this.selected,
+    required this.current,
+    required this.blocked,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final bool current;
+  final bool blocked;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = blocked
+        ? _mutedColor
+        : current
+        ? _tealColor
+        : _deepTealColor;
+    return ChoiceChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (blocked) ...[
+            Icon(Icons.lock_outline_rounded, size: 14, color: color),
+            const SizedBox(width: 5),
+          ] else if (current) ...[
+            Icon(Icons.person_pin_circle_outlined, size: 14, color: color),
+            const SizedBox(width: 5),
+          ],
+          Text(label),
+        ],
+      ),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      selectedColor: current
+          ? _tealColor.withValues(alpha: 0.20)
+          : _tealColor.withValues(alpha: 0.14),
+      backgroundColor: blocked ? const Color(0xFFF3F5F4) : null,
+      side: BorderSide(
+        color: current
+            ? _tealColor.withValues(alpha: 0.65)
+            : blocked
+            ? const Color(0xFFD8DEDB)
+            : const Color(0xFFC8D4CF),
+      ),
+      labelStyle: TextStyle(
+        color: blocked ? _mutedColor : _inkColor,
+        fontWeight: current ? FontWeight.w900 : FontWeight.w700,
+      ),
+    );
+  }
+}
+
+class _CrmReportAccessError extends StatelessWidget {
+  const _CrmReportAccessError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: _roseColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: _roseColor.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded, color: _roseColor, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _roseColor,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportSearchField extends StatelessWidget {
+  const _CrmReportSearchField({
+    required this.filter,
+    required this.values,
+    required this.onChanged,
+  });
+
+  final String filter;
+  final Map<String, String> values;
+  final void Function(String key, String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final keyName = _reportFilterKey(filter, 'valor');
+    return _CrmReportTextInput(
+      keyName: keyName,
+      label: filter,
+      hint: _hintForReportFilter(filter),
+      value: values[keyName],
+      icon: Icons.manage_search_outlined,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _CrmReportTextInput extends StatelessWidget {
+  const _CrmReportTextInput({
+    required this.keyName,
+    required this.label,
+    required this.hint,
+    required this.value,
+    required this.onChanged,
+    this.icon,
+  });
+
+  final String keyName;
+  final String label;
+  final String hint;
+  final String? value;
+  final IconData? icon;
+  final void Function(String key, String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      key: ValueKey(keyName),
+      initialValue: value ?? '',
+      onChanged: (text) => onChanged(keyName, text),
+      decoration: InputDecoration(
+        isDense: true,
+        labelText: label,
+        hintText: hint,
+        prefixIcon: icon == null ? null : Icon(icon, size: 18),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(7)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 11,
+        ),
+      ),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: _inkColor,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
 class _CrmReportFilterWrap extends StatelessWidget {
   const _CrmReportFilterWrap({
     required this.filters,
@@ -881,6 +1587,255 @@ class _CrmReportFilterWrap extends StatelessWidget {
       ],
     );
   }
+}
+
+Map<String, String> _defaultReportFilterValues(_CrmReportTemplate template) {
+  final values = <String, String>{};
+  for (final filter in template.filters.take(3)) {
+    values.addAll(_defaultValuesForReportFilter(filter));
+  }
+  return values;
+}
+
+Map<String, String> _defaultValuesForReportFilter(String filter) {
+  return switch (_kindForReportFilter(filter)) {
+    _CrmReportFilterKind.period => {
+      _reportFilterKey(filter, 'inicio'): '',
+      _reportFilterKey(filter, 'fim'): '',
+    },
+    _CrmReportFilterKind.options => {
+      _reportFilterKey(filter, 'valor'): _optionsForReportFilter(filter).first,
+    },
+    _CrmReportFilterKind.search => {_reportFilterKey(filter, 'valor'): ''},
+  };
+}
+
+String _reportFilterKey(String filter, String slot) {
+  return '$filter::$slot';
+}
+
+_CrmReportFilterKind _kindForReportFilter(String filter) {
+  final normalized = filter.toLowerCase();
+  if (_matchesAny(normalized, const [
+    'periodo',
+    'vigencia',
+    'vencimento',
+    'prazo',
+    'janela',
+    'tempo',
+  ])) {
+    return _CrmReportFilterKind.period;
+  }
+
+  if (_matchesAny(normalized, const [
+    'status',
+    'criticidade',
+    'severidade',
+    'risco',
+    'impacto',
+    'resultado',
+    'formato',
+    'publico',
+    'resumo',
+    'comparativo',
+    'projecao',
+    'etapa',
+    'evento',
+    'periodicidade',
+    'frequencia',
+    'canal',
+    'escalonamento',
+    'revisao',
+    'tipo',
+    'indicador',
+    'modulo',
+    'perfil',
+    'retencao',
+  ])) {
+    return _CrmReportFilterKind.options;
+  }
+
+  return _CrmReportFilterKind.search;
+}
+
+bool _matchesAny(String value, List<String> needles) {
+  return needles.any(value.contains);
+}
+
+bool _isReportAudienceFilter(String filter) {
+  return filter.toLowerCase().contains('publico');
+}
+
+String _viewerReportAudienceLabel(_ViewerAccessProfile viewer) {
+  if (viewer.groups.contains(_CollaboratorAudienceGroup.board)) {
+    return 'Diretoria';
+  }
+  if (viewer.groups.contains(_CollaboratorAudienceGroup.supervision)) {
+    return 'Gestores';
+  }
+  if (viewer.groups.contains(_CollaboratorAudienceGroup.auxiliary)) {
+    return 'Operacao';
+  }
+  return 'Publico';
+}
+
+int _viewerReportAudienceRank(_ViewerAccessProfile viewer) {
+  return _reportAudienceRank(_viewerReportAudienceLabel(viewer));
+}
+
+int _reportAudienceRank(String audience) {
+  return switch (audience.toLowerCase()) {
+    'diretoria' => 50,
+    'compliance' => 40,
+    'gestores' => 30,
+    'rh' => 20,
+    'operacao' || 'auxiliares' => 10,
+    _ => 0,
+  };
+}
+
+bool _canViewerSelectReportAudience(
+  _ViewerAccessProfile viewer,
+  String audience,
+) {
+  if (!viewer.isAuthenticated) {
+    return _reportAudienceRank(audience) == 0;
+  }
+  return _reportAudienceRank(audience) <= _viewerReportAudienceRank(viewer);
+}
+
+String _reportAudienceDeniedMessage(
+  _ViewerAccessProfile viewer,
+  String audience,
+) {
+  final current = _viewerReportAudienceLabel(viewer);
+  return 'Seu perfil ($current) nao permite selecionar $audience. Solicite liberacao ao admin para relatorios acima da sua hierarquia.';
+}
+
+List<String> _optionsForReportFilter(String filter) {
+  final normalized = filter.toLowerCase();
+  if (normalized.contains('publico')) {
+    return const ['Diretoria', 'Compliance', 'Gestores', 'RH', 'Operacao'];
+  }
+  if (normalized.contains('status')) {
+    return const [
+      'Todos',
+      'Ativo',
+      'Pendente',
+      'Admissional',
+      'Afastado',
+      'Historico',
+      'Encerrado',
+    ];
+  }
+  if (_matchesAny(normalized, const ['criticidade', 'severidade', 'risco'])) {
+    return const ['Todos', 'Baixo', 'Medio', 'Alto', 'Critico'];
+  }
+  if (normalized.contains('impacto')) {
+    return const ['Todos', 'Baixo', 'Medio', 'Alto'];
+  }
+  if (normalized.contains('resultado')) {
+    return const ['Todos', 'Permitido', 'Negado', 'Falha'];
+  }
+  if (normalized.contains('formato')) {
+    return const ['Painel', 'PDF', 'Planilha', 'Email'];
+  }
+  if (normalized.contains('publico')) {
+    return const ['Diretoria', 'Gestores', 'RH', 'Compliance'];
+  }
+  if (normalized.contains('resumo')) {
+    return const ['Executivo', 'Sintetico', 'Detalhado'];
+  }
+  if (normalized.contains('comparativo')) {
+    return const [
+      'Sem comparativo',
+      'Mes anterior',
+      'Trimestre anterior',
+      'Ano anterior',
+    ];
+  }
+  if (normalized.contains('projecao')) {
+    return const ['30 dias', '60 dias', '90 dias'];
+  }
+  if (normalized.contains('etapa')) {
+    return const ['Todas', 'Triagem', 'Documentacao', 'Aprovacao', 'Concluida'];
+  }
+  if (normalized.contains('evento')) {
+    return const ['Todos', 'Login', 'Alteracao', 'Download', 'Exclusao'];
+  }
+  if (_matchesAny(normalized, const ['frequencia', 'periodicidade'])) {
+    return const ['Diario', 'Semanal', 'Quinzenal', 'Mensal'];
+  }
+  if (normalized.contains('canal')) {
+    return const ['Painel', 'Email', 'Teams', 'Exportacao'];
+  }
+  if (normalized.contains('escalonamento')) {
+    return const ['Sem escalonamento', 'Gestor', 'Diretoria', 'Compliance'];
+  }
+  if (normalized.contains('revisao')) {
+    return const ['Todos', 'Aguardando', 'Aprovado', 'Reprovado'];
+  }
+  if (normalized.contains('modulo')) {
+    return const ['Todos', 'Pessoas', 'Empresas', 'Contratos', 'Network'];
+  }
+  if (normalized.contains('perfil')) {
+    return const ['Todos', 'Admin', 'Gestor', 'Operacao', 'Leitura'];
+  }
+  if (normalized.contains('retencao')) {
+    return const ['30 dias', '90 dias', '180 dias', '1 ano'];
+  }
+  if (normalized.contains('indicador')) {
+    return const ['Headcount', 'Contratos', 'SLA', 'Risco'];
+  }
+  if (normalized.contains('tipo')) {
+    return const ['Todos', 'Admissao', 'Movimentacao', 'Desligamento', 'Anexo'];
+  }
+
+  return const ['Todos', 'Inclui', 'Exclui'];
+}
+
+String _hintForReportFilter(String filter) {
+  final normalized = filter.toLowerCase();
+  if (_matchesAny(normalized, const ['empresa', 'grupo', 'cliente'])) {
+    return 'Buscar por nome, CNPJ ou carteira';
+  }
+  if (_matchesAny(normalized, const ['pessoa', 'usuario', 'responsavel'])) {
+    return 'Buscar por nome, email ou identificador';
+  }
+  if (_matchesAny(normalized, const ['contrato', 'documento', 'anexo'])) {
+    return 'Buscar por codigo, titulo ou vinculo';
+  }
+  if (_matchesAny(normalized, const ['cargo', 'departamento', 'equipe'])) {
+    return 'Buscar por area, cargo ou equipe';
+  }
+  if (_matchesAny(normalized, const ['regra', 'recurso', 'parametro'])) {
+    return 'Buscar regra, recurso ou parametro';
+  }
+  return 'Digite para filtrar este recorte';
+}
+
+IconData _iconForReportFilter(_CrmReportFilterKind kind) {
+  return switch (kind) {
+    _CrmReportFilterKind.period => Icons.date_range_outlined,
+    _CrmReportFilterKind.options => Icons.tune_outlined,
+    _CrmReportFilterKind.search => Icons.manage_search_outlined,
+  };
+}
+
+Color _colorForReportFilter(_CrmReportFilterKind kind) {
+  return switch (kind) {
+    _CrmReportFilterKind.period => _tealColor,
+    _CrmReportFilterKind.options => _amberColor,
+    _CrmReportFilterKind.search => _slateColor,
+  };
+}
+
+String _kindLabelForReportFilter(_CrmReportFilterKind kind) {
+  return switch (kind) {
+    _CrmReportFilterKind.period => 'intervalo',
+    _CrmReportFilterKind.options => 'opcoes',
+    _CrmReportFilterKind.search => 'busca',
+  };
 }
 
 class _CrmAutomationPreviewLine extends StatelessWidget {
@@ -940,9 +1895,11 @@ class _CrmAutomationPreviewLine extends StatelessWidget {
 
 String _familyLabel(_CrmReportFamily family) {
   return switch (family) {
+    _CrmReportFamily.strategic => 'Relatorios estrategicos',
     _CrmReportFamily.management => 'Relatorios gerenciais',
+    _CrmReportFamily.controls => 'Relatorios de controles',
+    _CrmReportFamily.compliance => 'Compliance e risco',
     _CrmReportFamily.audit => 'Logs e auditoria',
-    _CrmReportFamily.status => 'Relatorios de status',
     _CrmReportFamily.automation => 'Automacao visual',
   };
 }
