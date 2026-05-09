@@ -70,4 +70,9 @@ $flutterArgs = @(
   $WebPort
 ) + $dartDefines
 
+Write-Host "PariFlow front local: http://127.0.0.1:$WebPort"
+Write-Host "PariFlow API: $ApiBaseUrl"
+Write-Host "Dev token local: $devTokenValue"
+Write-Host "Use o endereco acima; portas abertas pelo Run do Android Studio/VS Code podem ficar sem os dart-defines."
+
 flutter @flutterArgs

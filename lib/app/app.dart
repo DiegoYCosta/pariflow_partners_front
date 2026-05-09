@@ -72,6 +72,10 @@ const _crmLogoBackdropAsset = 'assets/images/background-logo.webp';
 const _spriteMoldSheetAsset = 'assets/images/Icones.webp';
 
 Future<void> initializePariFlowFirebase() async {
+  if (previewFirebaseIdToken != null) {
+    return;
+  }
+
   if (!DefaultFirebaseOptions.isConfiguredForCurrentPlatform ||
       Firebase.apps.isNotEmpty) {
     return;
