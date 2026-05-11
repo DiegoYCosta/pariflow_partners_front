@@ -38,6 +38,7 @@ class _ReportExecutionResult {
     required this.status,
     required this.generatedAt,
     required this.requestedBy,
+    required this.metadata,
     required this.delivery,
     required this.frequency,
     required this.metrics,
@@ -55,6 +56,11 @@ class _ReportExecutionResult {
       status: _apiText(map['status'], fallback: 'planned'),
       generatedAt: _apiText(map['generatedAt']),
       requestedBy: _apiText(map['requestedBy']),
+      metadata: _ReportMetadata.fromMap(
+        _apiMap(map['metadata']),
+        fallbackGeneratedAt: _apiText(map['generatedAt']),
+        fallbackRequestedBy: _apiText(map['requestedBy']),
+      ),
       delivery: _apiText(map['delivery'], fallback: 'Painel'),
       frequency: _apiText(map['frequency'], fallback: 'Manual'),
       metrics: [
@@ -79,6 +85,7 @@ class _ReportExecutionResult {
   final String status;
   final String generatedAt;
   final String requestedBy;
+  final _ReportMetadata metadata;
   final String delivery;
   final String frequency;
   final List<_ReportMetric> metrics;
@@ -89,6 +96,92 @@ class _ReportExecutionResult {
 
   bool get isReady => status.toLowerCase() == 'ready';
   bool get hasRows => rows.isNotEmpty && columns.isNotEmpty;
+}
+
+class _ReportMetadata {
+  const _ReportMetadata({
+    required this.generatedAt,
+    required this.generatedAtLabel,
+    required this.generatedByName,
+    required this.generatedByPublicId,
+    required this.generatedByEmail,
+    required this.linkedCompanyName,
+    required this.linkedCompanyPublicId,
+    required this.linkedCompanyType,
+    required this.permissionLevel,
+    required this.permissionProfiles,
+  });
+
+  factory _ReportMetadata.fromMap(
+    Map<String, dynamic> map, {
+    required String fallbackGeneratedAt,
+    required String fallbackRequestedBy,
+  }) {
+    final generatedBy = _apiMap(map['generatedBy']);
+    final linkedCompany = _apiMap(map['linkedCompany']);
+    final permission = _apiMap(map['permission']);
+    final profiles = permission['profiles'];
+
+    return _ReportMetadata(
+      generatedAt: _apiText(map['generatedAt'], fallback: fallbackGeneratedAt),
+      generatedAtLabel: _reportGeneratedAtLabel(
+        _apiText(map['generatedAt'], fallback: fallbackGeneratedAt),
+      ),
+      generatedByName: _apiText(
+        generatedBy['name'],
+        fallback: fallbackRequestedBy.isEmpty ? 'Usuario' : fallbackRequestedBy,
+      ),
+      generatedByPublicId: _apiText(generatedBy['publicId']),
+      generatedByEmail: _apiText(generatedBy['email']),
+      linkedCompanyName: _apiText(linkedCompany['name']),
+      linkedCompanyPublicId: _apiText(linkedCompany['publicId']),
+      linkedCompanyType: _apiText(linkedCompany['type']),
+      permissionLevel: _apiText(permission['level'], fallback: 'Autenticado'),
+      permissionProfiles: [
+        if (profiles is List)
+          for (final profile in profiles)
+            if (_apiText(profile).isNotEmpty) _apiText(profile),
+      ],
+    );
+  }
+
+  final String generatedAt;
+  final String generatedAtLabel;
+  final String generatedByName;
+  final String generatedByPublicId;
+  final String generatedByEmail;
+  final String linkedCompanyName;
+  final String linkedCompanyPublicId;
+  final String linkedCompanyType;
+  final String permissionLevel;
+  final List<String> permissionProfiles;
+
+  bool get hasLinkedCompany =>
+      linkedCompanyName.isNotEmpty || linkedCompanyPublicId.isNotEmpty;
+
+  String get generatedByLabel {
+    if (generatedByPublicId.isEmpty) {
+      return generatedByName;
+    }
+    return '$generatedByName ($generatedByPublicId)';
+  }
+
+  String get linkedCompanyLabel {
+    if (!hasLinkedCompany) {
+      return 'Empresa nao vinculada';
+    }
+    if (linkedCompanyPublicId.isEmpty) {
+      return linkedCompanyName;
+    }
+    return '$linkedCompanyName ($linkedCompanyPublicId)';
+  }
+
+  String get permissionLabel {
+    final profileText = permissionProfiles.take(2).join(', ');
+    return profileText.isEmpty
+        ? permissionLevel
+        : '$permissionLevel - $profileText';
+  }
 }
 
 class _ReportMetric {
@@ -117,4 +210,17 @@ class _ReportColumn {
 
   final String keyName;
   final String label;
+}
+
+String _reportGeneratedAtLabel(String value) {
+  final parsed = DateTime.tryParse(value)?.toLocal();
+  if (parsed == null) {
+    return value.isEmpty ? 'Gerado agora' : value;
+  }
+  final day = parsed.day.toString().padLeft(2, '0');
+  final month = parsed.month.toString().padLeft(2, '0');
+  final hour = parsed.hour.toString().padLeft(2, '0');
+  final minute = parsed.minute.toString().padLeft(2, '0');
+  final second = parsed.second.toString().padLeft(2, '0');
+  return '$day/$month/${parsed.year} $hour:$minute:$second';
 }

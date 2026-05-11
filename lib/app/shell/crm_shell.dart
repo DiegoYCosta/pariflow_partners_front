@@ -334,6 +334,20 @@ const List<_CrmReportTemplate> _crmReportTemplates = [
     filters: ['Rotina', 'Prazo', 'Responsavel', 'Equipe', 'Status'],
   ),
   _CrmReportTemplate(
+    id: 'controls_calendar',
+    title: 'Compromissos e lembretes',
+    description: 'Agenda por periodo, incluindo finais de semana e feriados.',
+    icon: Icons.event_note_outlined,
+    family: _CrmReportFamily.controls,
+    filters: [
+      'Periodo',
+      'Tipo de agenda',
+      'Status da agenda',
+      'Empresa',
+      'Vinculo',
+    ],
+  ),
+  _CrmReportTemplate(
     id: 'controls_movements',
     title: 'Movimentacoes',
     description: 'Transferencias, desligamentos, admissoes e aprovacoes.',
@@ -1513,6 +1527,10 @@ class _CrmReportExecutionPanel extends StatelessWidget {
               ),
             ],
           ),
+          if (result != null) ...[
+            const SizedBox(height: 6),
+            _CrmReportMetadataStrip(metadata: result.metadata),
+          ],
           if (errorMessage != null) ...[
             const SizedBox(height: 8),
             _CrmReportExecutionNotice(
@@ -1587,6 +1605,97 @@ class _CrmReportExecutionPanel extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _CrmReportMetadataStrip extends StatelessWidget {
+  const _CrmReportMetadataStrip({required this.metadata});
+
+  final _ReportMetadata metadata;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 390),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _CrmReportMetadataLine(
+              icon: Icons.schedule_outlined,
+              text: 'Gerado em ${metadata.generatedAtLabel}',
+              style: textTheme.labelMedium?.copyWith(
+                color: _inkColor,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 3),
+            _CrmReportMetadataLine(
+              icon: Icons.person_outline_rounded,
+              text: 'Usuario ${metadata.generatedByLabel}',
+              style: textTheme.labelSmall?.copyWith(
+                color: _mutedColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            _CrmReportMetadataLine(
+              icon: Icons.business_outlined,
+              text: metadata.linkedCompanyLabel,
+              style: textTheme.labelSmall?.copyWith(
+                color: _mutedColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            _CrmReportMetadataLine(
+              icon: Icons.admin_panel_settings_outlined,
+              text: metadata.permissionLabel,
+              style: textTheme.labelSmall?.copyWith(
+                color: _mutedColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmReportMetadataLine extends StatelessWidget {
+  const _CrmReportMetadataLine({
+    required this.icon,
+    required this.text,
+    required this.style,
+  });
+
+  final IconData icon;
+  final String text;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: _mutedColor),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: style,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2398,6 +2507,12 @@ List<String> _optionsForReportFilter(String filter) {
   final normalized = filter.toLowerCase();
   if (normalized.contains('publico')) {
     return const ['Diretoria', 'Compliance', 'Gestores', 'RH', 'Operacao'];
+  }
+  if (normalized.contains('agenda') && normalized.contains('tipo')) {
+    return const ['Todos', 'Lembrete', 'Compromisso'];
+  }
+  if (normalized.contains('agenda') && normalized.contains('status')) {
+    return const ['Todos', 'Agendado', 'Concluido', 'Cancelado', 'Perdido'];
   }
   if (normalized.contains('status')) {
     return const [
