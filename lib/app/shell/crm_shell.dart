@@ -58,17 +58,11 @@ class _CrmTopBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              if (tight)
+              if (tight) ...[
                 _CrmHeaderIconButton(
                   icon: Icons.search_rounded,
                   tooltip: 'Buscar',
-                )
-              else
-                SizedBox(
-                  width: searchWidth,
-                  child: const _CrmHeaderSearchBox(),
                 ),
-              if (tight) ...[
                 const SizedBox(width: 4),
                 _CrmHeaderIconButton(
                   icon: Icons.summarize_outlined,
@@ -79,11 +73,18 @@ class _CrmTopBar extends StatelessWidget {
                         _CrmReportsCenterDialog(viewerProfile: viewerProfile),
                   ),
                 ),
+                const Spacer(),
               ] else ...[
+                SizedBox(
+                  width: searchWidth,
+                  child: const _CrmHeaderSearchBox(),
+                ),
                 const SizedBox(width: 8),
-                _CrmReportsCommandMenu(viewerProfile: viewerProfile),
+                Expanded(
+                  child: _CrmReportsCommandMenu(viewerProfile: viewerProfile),
+                ),
+                const SizedBox(width: 8),
               ],
-              const Spacer(),
               const _CrmHeaderIconButton(
                 icon: Icons.notifications_none_rounded,
                 tooltip: 'Notificacoes',
@@ -167,44 +168,44 @@ class _CrmReportFamilyMeta {
 const List<_CrmReportFamilyMeta> _crmReportFamilies = [
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.strategic,
-    title: 'Estrategicos',
-    subtitle: 'Diretoria, tendencia, risco e leitura executiva.',
-    icon: Icons.insights_outlined,
-    color: Color(0xFF2A5F86),
-  ),
-  _CrmReportFamilyMeta(
-    family: _CrmReportFamily.management,
-    title: 'Gerenciais',
-    subtitle: 'Pessoas, contratos, carteira e operacao corrente.',
-    icon: Icons.dashboard_customize_outlined,
-    color: _tealColor,
+    title: 'Operacionais',
+    subtitle: 'Consultas, tendencias e leitura executiva.',
+    icon: Icons.grid_view_rounded,
+    color: _slateColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.controls,
     title: 'Controles',
     subtitle: 'Pendencias, SLA, documentos e evidencias.',
-    icon: Icons.fact_check_outlined,
+    icon: Icons.gpp_good_outlined,
     color: _slateColor,
   ),
   _CrmReportFamilyMeta(
+    family: _CrmReportFamily.management,
+    title: 'Gerenciais',
+    subtitle: 'Pessoas, contratos, carteira e operacao corrente.',
+    icon: Icons.groups_2_outlined,
+    color: Color(0xFF2563A8),
+  ),
+  _CrmReportFamilyMeta(
     family: _CrmReportFamily.compliance,
-    title: 'Compliance e risco',
+    title: 'Compliance',
     subtitle: 'Excecoes, acessos sensiveis e criticidade.',
-    icon: Icons.gpp_maybe_outlined,
+    icon: Icons.verified_user_outlined,
     color: _roseColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.audit,
-    title: 'Logs e auditoria',
+    title: 'Logs/Auditoria',
     subtitle: 'Trilha de alteracoes, exclusoes e parametros.',
-    icon: Icons.manage_history_outlined,
+    icon: Icons.receipt_long_outlined,
     color: _amberColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.automation,
-    title: 'Automacao',
+    title: 'Automacoes',
     subtitle: 'Recorrencia, destinatarios e pacotes periodicos.',
-    icon: Icons.event_repeat_outlined,
+    icon: Icons.smart_toy_outlined,
     color: Color(0xFF6D5DA8),
   ),
 ];
@@ -262,35 +263,59 @@ const List<_CrmReportTemplate> _crmReportTemplates = [
   ),
   _CrmReportTemplate(
     id: 'management_employees',
-    title: 'Quadro de funcionarios',
-    description: 'Ativos, admissional, desligados e alocacao por empresa.',
+    title: 'Quadro ativo',
+    description: 'Colaboradores ativos, admissional e alocacao por empresa.',
     icon: Icons.badge_outlined,
     family: _CrmReportFamily.management,
     filters: ['Empresa', 'Status', 'Cargo', 'Departamento', 'Periodo'],
   ),
   _CrmReportTemplate(
-    id: 'management_contracts',
-    title: 'Contratos por empresa',
-    description: 'Contratos, posicoes, clientes vinculados e vigencia.',
-    icon: Icons.description_outlined,
-    family: _CrmReportFamily.management,
-    filters: ['Grupo', 'Cliente', 'Status', 'Vigencia', 'Responsavel'],
-  ),
-  _CrmReportTemplate(
     id: 'management_hires',
-    title: 'Admissoes por periodo',
+    title: 'Admissoes',
     description: 'Contratados entre datas, origem e etapa admissional.',
     icon: Icons.how_to_reg_outlined,
     family: _CrmReportFamily.management,
     filters: ['Periodo', 'Empresa', 'Cargo', 'Etapa', 'Origem'],
   ),
   _CrmReportTemplate(
+    id: 'management_dismissals',
+    title: 'Desligados',
+    description: 'Historico de desligamentos, motivos e responsaveis.',
+    icon: Icons.person_off_outlined,
+    family: _CrmReportFamily.management,
+    filters: ['Periodo', 'Empresa', 'Motivo', 'Cargo', 'Responsavel'],
+  ),
+  _CrmReportTemplate(
+    id: 'management_movements',
+    title: 'Movimentacoes',
+    description: 'Transferencias, promocoes, desligamentos e aprovacoes.',
+    icon: Icons.swap_horiz_rounded,
+    family: _CrmReportFamily.management,
+    filters: ['Tipo', 'Periodo', 'Origem', 'Destino', 'Responsavel'],
+  ),
+  _CrmReportTemplate(
     id: 'management_departments',
-    title: 'People analytics',
+    title: 'Distribuicao',
     description: 'Distribuicao por departamento, senioridade e cargo.',
     icon: Icons.groups_2_outlined,
     family: _CrmReportFamily.management,
     filters: ['Departamento', 'Cargo', 'Empresa', 'Status', 'Tempo'],
+  ),
+  _CrmReportTemplate(
+    id: 'management_indicators',
+    title: 'Indicadores',
+    description: 'Headcount, contratacoes, carteira e comparativos.',
+    icon: Icons.query_stats_rounded,
+    family: _CrmReportFamily.management,
+    filters: ['Periodo', 'Empresa', 'Indicador', 'Comparativo', 'Publico'],
+  ),
+  _CrmReportTemplate(
+    id: 'management_contracts',
+    title: 'Relatorios gerenciais',
+    description: 'Contratos, posicoes, clientes vinculados e vigencia.',
+    icon: Icons.description_outlined,
+    family: _CrmReportFamily.management,
+    filters: ['Grupo', 'Cliente', 'Status', 'Vigencia', 'Responsavel'],
   ),
   _CrmReportTemplate(
     id: 'controls_documents',
@@ -438,34 +463,255 @@ class _CrmReportsCommandMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 34,
-      child: TextButton.icon(
-        onPressed: () => _openReportsCenter(context),
-        icon: const Icon(Icons.summarize_outlined, size: 17),
-        label: const Text('Relatorios'),
-        style: TextButton.styleFrom(
-          foregroundColor: _deepTealColor,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+      height: 46,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final family in _orderedCrmReportFamilies)
+              _CrmReportFamilyMenuButton(
+                meta: family,
+                templates: _templatesFor(family.family),
+                highlighted: family.family == _CrmReportFamily.management,
+                onSelected: (template) =>
+                    _openReportSettings(context, template),
+              ),
+          ],
         ),
       ),
     );
   }
 
-  Future<void> _openReportsCenter(BuildContext context) {
+  Future<void> _openReportSettings(
+    BuildContext context,
+    _CrmReportTemplate template,
+  ) {
     return showDialog<void>(
       context: context,
-      builder: (context) =>
-          _CrmReportsCenterDialog(viewerProfile: viewerProfile),
+      builder: (context) => _CrmReportsCenterDialog(
+        viewerProfile: viewerProfile,
+        initialTemplate: template,
+        lockedTemplate: true,
+      ),
+    );
+  }
+}
+
+List<_CrmReportFamilyMeta> get _orderedCrmReportFamilies {
+  const order = [
+    _CrmReportFamily.management,
+    _CrmReportFamily.strategic,
+    _CrmReportFamily.controls,
+    _CrmReportFamily.compliance,
+    _CrmReportFamily.audit,
+    _CrmReportFamily.automation,
+  ];
+  return [
+    for (final family in order)
+      _crmReportFamilies.firstWhere((meta) => meta.family == family),
+  ];
+}
+
+class _CrmReportFamilyMenuButton extends StatelessWidget {
+  const _CrmReportFamilyMenuButton({
+    required this.meta,
+    required this.templates,
+    required this.highlighted,
+    required this.onSelected,
+  });
+
+  final _CrmReportFamilyMeta meta;
+  final List<_CrmReportTemplate> templates;
+  final bool highlighted;
+  final ValueChanged<_CrmReportTemplate> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = highlighted ? meta.color : _inkColor;
+    final background = highlighted
+        ? meta.color.withValues(alpha: 0.10)
+        : Colors.transparent;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: PopupMenuButton<_CrmReportTemplate>(
+        tooltip: meta.title,
+        offset: const Offset(0, 39),
+        constraints: const BoxConstraints(minWidth: 306, maxWidth: 360),
+        onSelected: onSelected,
+        itemBuilder: (context) => [
+          PopupMenuItem<_CrmReportTemplate>(
+            enabled: false,
+            height: 56,
+            child: _CrmReportMenuHeader(meta: meta, count: templates.length),
+          ),
+          const PopupMenuDivider(height: 1),
+          if (templates.isEmpty)
+            const PopupMenuItem<_CrmReportTemplate>(
+              enabled: false,
+              child: Text('Nenhuma opcao disponivel'),
+            )
+          else
+            for (final template in templates)
+              PopupMenuItem<_CrmReportTemplate>(
+                value: template,
+                height: 58,
+                child: _CrmReportMenuItem(
+                  template: template,
+                  color: meta.color,
+                ),
+              ),
+        ],
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(
+              color: highlighted
+                  ? meta.color.withValues(alpha: 0.16)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(meta.icon, color: foreground, size: 20),
+              const SizedBox(width: 9),
+              Text(
+                meta.title,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: foreground,
+                size: 19,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmReportMenuHeader extends StatelessWidget {
+  const _CrmReportMenuHeader({required this.meta, required this.count});
+
+  final _CrmReportFamilyMeta meta;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 318,
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: meta.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Icon(meta.icon, color: meta.color, size: 19),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  meta.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '$count modelos com filtros proprios',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _mutedColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportMenuItem extends StatelessWidget {
+  const _CrmReportMenuItem({required this.template, required this.color});
+
+  final _CrmReportTemplate template;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 318,
+      child: Row(
+        children: [
+          Icon(template.icon, color: color, size: 19),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  template.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  template.description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _mutedColor,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _CrmReportsCenterDialog extends StatefulWidget {
-  const _CrmReportsCenterDialog({required this.viewerProfile});
+  const _CrmReportsCenterDialog({
+    required this.viewerProfile,
+    this.initialTemplate,
+    this.lockedTemplate = false,
+  });
 
   final _ViewerAccessProfile viewerProfile;
+  final _CrmReportTemplate? initialTemplate;
+  final bool lockedTemplate;
 
   @override
   State<_CrmReportsCenterDialog> createState() =>
@@ -483,13 +729,36 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
   @override
   void initState() {
     super.initState();
-    _selected = _crmReportTemplates.first;
+    _selected = widget.initialTemplate ?? _crmReportTemplates.first;
     _syncFilterDefaults(_selected);
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final designer = _CrmReportDesignerPanel(
+      template: _selected,
+      viewerProfile: widget.viewerProfile,
+      requiredFilters: _requiredFilters,
+      optionalFilters: _optionalFilters,
+      frequency: _frequency,
+      delivery: _delivery,
+      filterValues: _filterValues,
+      onToggleRequired: _toggleRequiredFilter,
+      onToggleOptional: _toggleOptionalFilter,
+      onFilterValueChanged: _updateFilterValue,
+      onFrequencyChanged: (value) {
+        setState(() {
+          _frequency = value;
+        });
+      },
+      onDeliveryChanged: (value) {
+        setState(() {
+          _delivery = value;
+        });
+      },
+    );
+
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
       titlePadding: const EdgeInsets.fromLTRB(24, 22, 18, 0),
@@ -497,12 +766,37 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
       actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       title: Row(
         children: [
-          const Icon(Icons.summarize_outlined, color: _tealColor, size: 24),
+          Icon(
+            widget.lockedTemplate ? _selected.icon : Icons.summarize_outlined,
+            color: _tealColor,
+            size: 24,
+          ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'Central de relatorios',
-              style: Theme.of(context).textTheme.titleLarge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.lockedTemplate
+                      ? _selected.title
+                      : 'Central de relatorios',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                if (widget.lockedTemplate) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    _selected.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _mutedColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           IconButton(
@@ -513,62 +807,44 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
         ],
       ),
       content: SizedBox(
-        width: min(size.width * 0.92, 1180),
+        width: widget.lockedTemplate
+            ? min(size.width * 0.76, 680)
+            : min(size.width * 0.92, 1180),
         height: min(size.height * 0.80, 720),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final stacked = constraints.maxWidth < 920;
-            final catalog = _CrmReportsCatalog(
-              selected: _selected,
-              onSelected: (template) {
-                setState(() {
-                  _selected = template;
-                  _syncFilterDefaults(template);
-                });
-              },
-            );
-            final designer = _CrmReportDesignerPanel(
-              template: _selected,
-              viewerProfile: widget.viewerProfile,
-              requiredFilters: _requiredFilters,
-              optionalFilters: _optionalFilters,
-              frequency: _frequency,
-              delivery: _delivery,
-              filterValues: _filterValues,
-              onToggleRequired: _toggleRequiredFilter,
-              onToggleOptional: _toggleOptionalFilter,
-              onFilterValueChanged: _updateFilterValue,
-              onFrequencyChanged: (value) {
-                setState(() {
-                  _frequency = value;
-                });
-              },
-              onDeliveryChanged: (value) {
-                setState(() {
-                  _delivery = value;
-                });
-              },
-            );
+        child: widget.lockedTemplate
+            ? designer
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final stacked = constraints.maxWidth < 920;
+                  final catalog = _CrmReportsCatalog(
+                    selected: _selected,
+                    onSelected: (template) {
+                      setState(() {
+                        _selected = template;
+                        _syncFilterDefaults(template);
+                      });
+                    },
+                  );
 
-            if (stacked) {
-              return Column(
-                children: [
-                  Expanded(flex: 5, child: catalog),
-                  const SizedBox(height: 14),
-                  Expanded(flex: 4, child: designer),
-                ],
-              );
-            }
+                  if (stacked) {
+                    return Column(
+                      children: [
+                        Expanded(flex: 5, child: catalog),
+                        const SizedBox(height: 14),
+                        Expanded(flex: 4, child: designer),
+                      ],
+                    );
+                  }
 
-            return Row(
-              children: [
-                Expanded(flex: 7, child: catalog),
-                const SizedBox(width: 16),
-                Expanded(flex: 4, child: designer),
-              ],
-            );
-          },
-        ),
+                  return Row(
+                    children: [
+                      Expanded(flex: 7, child: catalog),
+                      const SizedBox(width: 16),
+                      Expanded(flex: 4, child: designer),
+                    ],
+                  );
+                },
+              ),
       ),
       actions: [
         TextButton.icon(
@@ -578,12 +854,16 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
             });
           },
           icon: const Icon(Icons.restart_alt_rounded, size: 18),
-          label: const Text('Restaurar modelo'),
+          label: Text(
+            widget.lockedTemplate
+                ? 'Restaurar configuracao'
+                : 'Restaurar modelo',
+          ),
         ),
         FilledButton.icon(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.check_rounded, size: 18),
-          label: const Text('Concluir'),
+          label: Text(widget.lockedTemplate ? 'Aplicar' : 'Concluir'),
         ),
       ],
     );
@@ -655,10 +935,10 @@ class _CrmReportsCatalog extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         return ListView.separated(
-          itemCount: _crmReportFamilies.length,
+          itemCount: _orderedCrmReportFamilies.length,
           separatorBuilder: (context, index) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            final family = _crmReportFamilies[index];
+            final family = _orderedCrmReportFamilies[index];
             return _CrmReportCategoryColumn(
               meta: family,
               templates: _templatesFor(family.family),
