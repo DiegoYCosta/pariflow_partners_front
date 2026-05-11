@@ -1522,7 +1522,7 @@ class _CrmReportExecutionPanel extends StatelessWidget {
             ),
           ] else if (isRunning) ...[
             const SizedBox(height: 8),
-            const LinearProgressIndicator(minHeight: 3),
+            const SizedBox(height: 3, child: LinearProgressIndicator()),
           ] else if (result == null) ...[
             const SizedBox(height: 8),
             _CrmReportExecutionNotice(
@@ -2923,7 +2923,9 @@ class _CrmSidebar extends StatelessWidget {
   }
 }
 
-class _CrmDashboardContent extends StatelessWidget {
+const _dashboardAllFilter = 'Todos';
+
+class _CrmDashboardContent extends StatefulWidget {
   const _CrmDashboardContent({
     required this.viewerProfile,
     required this.onChooseDestination,
@@ -2935,49 +2937,263 @@ class _CrmDashboardContent extends StatelessWidget {
   final double pageWidth;
 
   @override
-  Widget build(BuildContext context) {
-    final dashboardChoices = _choices
-        .where((choice) => choice.target != _ChoiceTarget.clientCompanies)
-        .toList(growable: false);
+  State<_CrmDashboardContent> createState() => _CrmDashboardContentState();
+}
 
+class _CrmDashboardContentState extends State<_CrmDashboardContent> {
+  final _repository = _HomeDashboardApiRepository();
+  late final TextEditingController _searchController;
+  late Future<_HomeDashboardData> _dashboardFuture;
+  Set<String> _contractIds = <String>{};
+  Set<String> _units = <String>{};
+  Set<String> _departments = <String>{};
+  Set<String> _positions = <String>{};
+  Set<String> _regimes = <String>{};
+  _DashboardPeriodSelection _period = const _DashboardPeriodSelection.current();
+  String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    _dashboardFuture = _repository.load(query: _dashboardQuery());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardsPerRow = constraints.maxWidth >= 900
-            ? 4
-            : constraints.maxWidth >= 620
-            ? 2
-            : 1;
-        const spacing = 20.0;
-        final cardWidth = cardsPerRow == 1
-            ? double.infinity
-            : (constraints.maxWidth - (spacing * (cardsPerRow - 1))) /
-                  cardsPerRow;
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _CrmDashboardHero(onChooseDestination: onChooseDestination),
-            const SizedBox(height: 22),
-            Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              children: [
-                for (final choice in dashboardChoices)
-                  SizedBox(
-                    width: cardWidth,
-                    child: _CrmEntryCard(
-                      choice: choice,
-                      onTap: () => onChooseDestination(choice.target),
+            _CrmDashboardHero(onChooseDestination: widget.onChooseDestination),
+            const SizedBox(height: 16),
+            FutureBuilder<_HomeDashboardData>(
+              future: _dashboardFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const _CrmDashboardLoading();
+                }
+
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return _CrmDashboardError(
+                    error: snapshot.error,
+                    onRetry: _reload,
+                  );
+                }
+
+                final data = snapshot.data!;
+                final rows = _filteredRows(data);
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _CrmDashboardFilterBar(
+                      data: data,
+                      selectedContractIds: _effectiveOptionSelection(
+                        _contractIds,
+                        data.filters.contracts.map((option) => option.value),
+                      ),
+                      selectedUnits: _effectiveOptionSelection(
+                        _units,
+                        data.filters.units,
+                      ),
+                      selectedDepartments: _effectiveOptionSelection(
+                        _departments,
+                        data.filters.departments,
+                      ),
+                      selectedPositions: _effectiveOptionSelection(
+                        _positions,
+                        data.filters.positions,
+                      ),
+                      selectedRegimes: _effectiveOptionSelection(
+                        _regimes,
+                        data.filters.regimes,
+                      ),
+                      period: _period,
+                      onContractsChanged: (values) =>
+                          _applyDashboardFilters(contractIds: values),
+                      onUnitsChanged: (values) =>
+                          _applyDashboardFilters(units: values),
+                      onDepartmentsChanged: (values) =>
+                          _applyDashboardFilters(departments: values),
+                      onPositionsChanged: (values) =>
+                          _applyDashboardFilters(positions: values),
+                      onRegimesChanged: (values) =>
+                          _applyDashboardFilters(regimes: values),
+                      onPeriodChanged: (period) =>
+                          _applyDashboardFilters(period: period),
+                      onCustomPeriod: _openCustomPeriodPicker,
                     ),
-                  ),
-              ],
+                    const SizedBox(height: 18),
+                    _CrmDashboardMetricGrid(
+                      data: data,
+                      onChooseDestination: widget.onChooseDestination,
+                    ),
+                    const SizedBox(height: 18),
+                    _CrmActiveEmployeesPanel(
+                      rows: rows,
+                      totalRows: data.rows.length,
+                      searchController: _searchController,
+                      onSearchChanged: (value) =>
+                          setState(() => _search = value.trim()),
+                      onClearSearch: () {
+                        _searchController.clear();
+                        setState(() => _search = '');
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 18),
-            const _CrmDashboardQuote(),
           ],
         );
       },
     );
+  }
+
+  void _reload() {
+    setState(() {
+      _dashboardFuture = _repository.load(query: _dashboardQuery());
+    });
+  }
+
+  _HomeDashboardQuery _dashboardQuery() {
+    return _HomeDashboardQuery(
+      contractIds: _contractIds,
+      units: _units,
+      departments: _departments,
+      positions: _positions,
+      regimes: _regimes,
+      period: _period,
+    );
+  }
+
+  void _applyDashboardFilters({
+    Set<String>? contractIds,
+    Set<String>? units,
+    Set<String>? departments,
+    Set<String>? positions,
+    Set<String>? regimes,
+    _DashboardPeriodSelection? period,
+  }) {
+    setState(() {
+      if (contractIds != null) {
+        _contractIds = contractIds;
+      }
+      if (units != null) {
+        _units = units;
+      }
+      if (departments != null) {
+        _departments = departments;
+      }
+      if (positions != null) {
+        _positions = positions;
+      }
+      if (regimes != null) {
+        _regimes = regimes;
+      }
+      if (period != null) {
+        _period = period;
+      }
+      _dashboardFuture = _repository.load(query: _dashboardQuery());
+    });
+  }
+
+  Future<void> _openCustomPeriodPicker() async {
+    final today = DateTime.now();
+    final normalizedToday = DateTime(today.year, today.month, today.day);
+    final initialRange = DateTimeRange(
+      start:
+          _period.start ?? normalizedToday.subtract(const Duration(days: 30)),
+      end: _period.end ?? normalizedToday,
+    );
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: normalizedToday,
+      initialDateRange: initialRange,
+      helpText: 'Personalizar periodo',
+      cancelText: 'Cancelar',
+      confirmText: 'Aplicar',
+      saveText: 'Aplicar',
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    _applyDashboardFilters(
+      period: _DashboardPeriodSelection.custom(picked.start, picked.end),
+    );
+  }
+
+  Set<String> _effectiveOptionSelection(
+    Set<String> selected,
+    Iterable<String> options,
+  ) {
+    final validOptions = options.toSet();
+    return selected.where(validOptions.contains).toSet().cast<String>();
+  }
+
+  List<_HomeDashboardEmployeeRow> _filteredRows(_HomeDashboardData data) {
+    final contractIds = _effectiveOptionSelection(
+      _contractIds,
+      data.filters.contracts.map((option) => option.value),
+    );
+    final units = _effectiveOptionSelection(_units, data.filters.units);
+    final departments = _effectiveOptionSelection(
+      _departments,
+      data.filters.departments,
+    );
+    final positions = _effectiveOptionSelection(
+      _positions,
+      data.filters.positions,
+    );
+    final regimes = _effectiveOptionSelection(_regimes, data.filters.regimes);
+    final query = _search.toLowerCase();
+
+    return data.rows
+        .where((row) {
+          if (contractIds.isNotEmpty &&
+              !contractIds.contains(row.contractPublicId)) {
+            return false;
+          }
+          if (units.isNotEmpty && !units.contains(row.unit)) {
+            return false;
+          }
+          if (departments.isNotEmpty && !departments.contains(row.department)) {
+            return false;
+          }
+          if (positions.isNotEmpty && !positions.contains(row.position)) {
+            return false;
+          }
+          if (regimes.isNotEmpty && !regimes.contains(row.regime)) {
+            return false;
+          }
+          if (query.isEmpty) {
+            return true;
+          }
+
+          final searchable = [
+            row.employeeName,
+            row.email,
+            row.registration,
+            row.contractLabel,
+            row.position,
+            row.department,
+            row.unit,
+            row.regime,
+          ].join(' ').toLowerCase();
+          return searchable.contains(query);
+        })
+        .toList(growable: false);
   }
 }
 
@@ -2991,7 +3207,7 @@ class _CrmDashboardHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final stacked = constraints.maxWidth < 980;
-        final headlineSize = stacked ? 36.0 : 44.0;
+        final headlineSize = stacked ? 34.0 : 32.0;
         final headlineColor = stacked ? _deepTealColor : Colors.white;
         final headlineAccentColor = stacked
             ? const Color(0xFFC8891F)
@@ -3005,9 +3221,9 @@ class _CrmDashboardHero extends StatelessWidget {
           label: _ShellVariant.crm.label,
           child: Container(
             width: double.infinity,
-            height: stacked ? 560 : 290,
+            height: stacked ? 360 : 220,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
                   color: _deepTealColor.withValues(alpha: 0.16),
@@ -3017,7 +3233,7 @@ class _CrmDashboardHero extends StatelessWidget {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               child: Stack(
                 children: [
                   if (stacked) ...[
@@ -3081,7 +3297,7 @@ class _CrmDashboardHero extends StatelessWidget {
                       right: -6,
                       bottom: 8,
                       width: mobileFeatureWidth,
-                      height: 280,
+                      height: 190,
                       child: IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
@@ -3179,8 +3395,8 @@ class _CrmDashboardHero extends StatelessWidget {
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: -8,
-                      height: 118,
+                      bottom: -18,
+                      height: 96,
                       child: Opacity(
                         opacity: 0.92,
                         child: HighTechLightWaves(
@@ -3198,7 +3414,7 @@ class _CrmDashboardHero extends StatelessWidget {
                   ],
                   Positioned.fill(
                     child: Padding(
-                      padding: EdgeInsets.all(stacked ? 24 : 38),
+                      padding: EdgeInsets.all(stacked ? 24 : 36),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: ConstrainedBox(
@@ -3217,7 +3433,7 @@ class _CrmDashboardHero extends StatelessWidget {
                                     color: headlineColor,
                                     fontSize: headlineSize,
                                     fontWeight: FontWeight.w500,
-                                    letterSpacing: -1.4,
+                                    letterSpacing: 0,
                                     height: 0.98,
                                   ),
                                   children: [
@@ -3339,199 +3555,1438 @@ class _CrmHeroSearchState extends State<_CrmHeroSearch> {
   }
 }
 
-class _CrmEntryCard extends StatelessWidget {
-  const _CrmEntryCard({required this.choice, required this.onTap});
+class _CrmDashboardFilterBar extends StatelessWidget {
+  const _CrmDashboardFilterBar({
+    required this.data,
+    required this.selectedContractIds,
+    required this.selectedUnits,
+    required this.selectedDepartments,
+    required this.selectedPositions,
+    required this.selectedRegimes,
+    required this.period,
+    required this.onContractsChanged,
+    required this.onUnitsChanged,
+    required this.onDepartmentsChanged,
+    required this.onPositionsChanged,
+    required this.onRegimesChanged,
+    required this.onPeriodChanged,
+    required this.onCustomPeriod,
+  });
 
-  final _ChoiceCardData choice;
-  final VoidCallback onTap;
+  final _HomeDashboardData data;
+  final Set<String> selectedContractIds;
+  final Set<String> selectedUnits;
+  final Set<String> selectedDepartments;
+  final Set<String> selectedPositions;
+  final Set<String> selectedRegimes;
+  final _DashboardPeriodSelection period;
+  final ValueChanged<Set<String>> onContractsChanged;
+  final ValueChanged<Set<String>> onUnitsChanged;
+  final ValueChanged<Set<String>> onDepartmentsChanged;
+  final ValueChanged<Set<String>> onPositionsChanged;
+  final ValueChanged<Set<String>> onRegimesChanged;
+  final ValueChanged<_DashboardPeriodSelection> onPeriodChanged;
+  final VoidCallback onCustomPeriod;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final copy = switch (choice.target) {
-      _ChoiceTarget.companies => (
-        title: 'Companies',
-        subtitle: 'Explore and manage\nyour companies',
+    return _Panel(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final columns = compact
+              ? 1
+              : constraints.maxWidth >= 1320
+              ? 6
+              : 3;
+          final itemWidth = compact
+              ? constraints.maxWidth
+              : (constraints.maxWidth - 12 * (columns - 1)) / columns;
+
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(
+                width: itemWidth,
+                child: _CrmDashboardMultiSelectTile(
+                  label: 'Contratos',
+                  selectedLabel: _dashboardSelectionLabel(
+                    selectedContractIds,
+                    data.filters.contracts,
+                  ),
+                  options: data.filters.contracts,
+                  selectedValues: selectedContractIds,
+                  icon: Icons.description_outlined,
+                  onChanged: onContractsChanged,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _CrmDashboardMultiSelectTile(
+                  label: 'Unidade',
+                  selectedLabel: _dashboardStringSelectionLabel(
+                    selectedUnits,
+                    data.filters.units,
+                  ),
+                  options: _dashboardChoicesFromStrings(data.filters.units),
+                  selectedValues: selectedUnits,
+                  icon: Icons.apartment_rounded,
+                  onChanged: onUnitsChanged,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _CrmDashboardMultiSelectTile(
+                  label: 'Departamento',
+                  selectedLabel: _dashboardStringSelectionLabel(
+                    selectedDepartments,
+                    data.filters.departments,
+                  ),
+                  options: _dashboardChoicesFromStrings(
+                    data.filters.departments,
+                  ),
+                  selectedValues: selectedDepartments,
+                  icon: Icons.account_tree_outlined,
+                  onChanged: onDepartmentsChanged,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _CrmDashboardMultiSelectTile(
+                  label: 'Cargo',
+                  selectedLabel: _dashboardStringSelectionLabel(
+                    selectedPositions,
+                    data.filters.positions,
+                  ),
+                  options: _dashboardChoicesFromStrings(data.filters.positions),
+                  selectedValues: selectedPositions,
+                  icon: Icons.work_outline_rounded,
+                  onChanged: onPositionsChanged,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _CrmDashboardMultiSelectTile(
+                  label: 'Regime',
+                  selectedLabel: _dashboardStringSelectionLabel(
+                    selectedRegimes,
+                    data.filters.regimes,
+                  ),
+                  options: _dashboardChoicesFromStrings(data.filters.regimes),
+                  selectedValues: selectedRegimes,
+                  icon: Icons.badge_outlined,
+                  onChanged: onRegimesChanged,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _CrmDashboardDateTile(
+                  baseDate: data.baseDate,
+                  period: period,
+                  responsePeriod: data.period,
+                  onSelected: onPeriodChanged,
+                  onCustomPeriod: onCustomPeriod,
+                ),
+              ),
+            ],
+          );
+        },
       ),
-      _ChoiceTarget.clientCompanies => (
-        title: 'Clients',
-        subtitle: 'Open your managed\nclient portfolio',
-      ),
-      _ChoiceTarget.contracts => (
-        title: 'Contracts',
-        subtitle: 'View and manage\nyour contracts',
-      ),
-      _ChoiceTarget.people => (
-        title: 'Employees',
-        subtitle: 'Manage and connect\nwith your team',
-      ),
-      _ChoiceTarget.network => (
-        title: 'Visual Network',
-        subtitle: 'Explore your business\nnetwork visually',
-      ),
-    };
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(26),
-      child: Ink(
-        padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: const Color(0xFFE8ECEB)),
-          boxShadow: [
-            BoxShadow(
-              color: _deepTealColor.withValues(alpha: 0.07),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
+    );
+  }
+}
+
+class _CrmDashboardMultiSelectTile extends StatefulWidget {
+  const _CrmDashboardMultiSelectTile({
+    required this.label,
+    required this.selectedLabel,
+    required this.options,
+    required this.selectedValues,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String selectedLabel;
+  final List<_HomeDashboardFilterOption> options;
+  final Set<String> selectedValues;
+  final IconData icon;
+  final ValueChanged<Set<String>> onChanged;
+
+  @override
+  State<_CrmDashboardMultiSelectTile> createState() =>
+      _CrmDashboardMultiSelectTileState();
+}
+
+class _CrmDashboardMultiSelectTileState
+    extends State<_CrmDashboardMultiSelectTile> {
+  final MenuController _menuController = MenuController();
+  late Set<String> _pendingValues;
+
+  @override
+  void initState() {
+    super.initState();
+    _pendingValues = {...widget.selectedValues};
+  }
+
+  @override
+  void didUpdateWidget(covariant _CrmDashboardMultiSelectTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_menuController.isOpen) {
+      _pendingValues = {...widget.selectedValues};
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final menuWidth = max(300.0, constraints.maxWidth);
+
+        return MenuAnchor(
+          controller: _menuController,
+          alignmentOffset: const Offset(0, 8),
+          onOpen: () {
+            setState(() {
+              _pendingValues = {...widget.selectedValues};
+            });
+          },
+          onClose: _commitPendingValues,
+          menuChildren: [
+            _CrmDashboardMultiSelectMenu(
+              width: menuWidth,
+              title: widget.label,
+              options: widget.options,
+              selectedValues: _pendingValues,
+              onChanged: (values) {
+                setState(() {
+                  _pendingValues = values;
+                });
+              },
             ),
           ],
+          builder: (context, controller, child) {
+            return _CrmDashboardFilterShell(
+              label: widget.label,
+              value: widget.selectedLabel,
+              icon: widget.icon,
+              trailing: Icon(
+                controller.isOpen
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                size: 20,
+              ),
+              onTap: () {
+                if (controller.isOpen) {
+                  controller.close();
+                } else {
+                  controller.open();
+                }
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _commitPendingValues() {
+    final optionValues = widget.options.map((option) => option.value).toSet();
+    final normalizedValues =
+        optionValues.isNotEmpty &&
+            optionValues.difference(_pendingValues).isEmpty
+        ? <String>{}
+        : _pendingValues;
+
+    if (!_dashboardSetEquals(normalizedValues, widget.selectedValues)) {
+      widget.onChanged({...normalizedValues});
+    }
+  }
+}
+
+class _CrmDashboardMultiSelectMenu extends StatelessWidget {
+  const _CrmDashboardMultiSelectMenu({
+    required this.width,
+    required this.title,
+    required this.options,
+    required this.selectedValues,
+    required this.onChanged,
+  });
+
+  final double width;
+  final String title;
+  final List<_HomeDashboardFilterOption> options;
+  final Set<String> selectedValues;
+  final ValueChanged<Set<String>> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final optionValues = options.map((option) => option.value).toSet();
+    final allSelected =
+        selectedValues.isEmpty ||
+        (optionValues.isNotEmpty &&
+            optionValues.difference(selectedValues).isEmpty);
+
+    return Container(
+      width: width,
+      constraints: const BoxConstraints(maxHeight: 360),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E7E5)),
+        boxShadow: [
+          BoxShadow(
+            color: _inkColor.withValues(alpha: 0.10),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: options.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Nenhuma opcao disponivel no recorte atual.'),
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _inkColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                CheckboxListTile(
+                  value: allSelected,
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Selecionar todos'),
+                  onChanged: (_) => onChanged(<String>{}),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    children: [
+                      for (final option in options)
+                        CheckboxListTile(
+                          value:
+                              allSelected ||
+                              selectedValues.contains(option.value),
+                          dense: true,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(
+                            option.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onChanged: (checked) {
+                            final nextValues = allSelected
+                                ? {...optionValues}
+                                : {...selectedValues};
+                            if (checked == true) {
+                              nextValues.add(option.value);
+                            } else {
+                              nextValues.remove(option.value);
+                            }
+                            onChanged(nextValues);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _CrmDashboardDateTile extends StatelessWidget {
+  const _CrmDashboardDateTile({
+    required this.baseDate,
+    required this.period,
+    required this.responsePeriod,
+    required this.onSelected,
+    required this.onCustomPeriod,
+  });
+
+  final String baseDate;
+  final _DashboardPeriodSelection period;
+  final _HomeDashboardPeriod responsePeriod;
+  final ValueChanged<_DashboardPeriodSelection> onSelected;
+  final VoidCallback onCustomPeriod;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = period.isCurrent
+        ? 'Estatisticas atuais'
+        : responsePeriod.label;
+
+    return PopupMenuButton<String>(
+      tooltip: 'Data base',
+      offset: const Offset(0, 58),
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 320),
+      onSelected: (value) {
+        if (value == 'custom') {
+          onCustomPeriod();
+          return;
+        }
+        onSelected(_DashboardPeriodSelection.preset(value));
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem<String>(value: 'current', child: Text('Atual')),
+        PopupMenuDivider(height: 1),
+        PopupMenuItem<String>(value: 'last30', child: Text('Ultimos 30 dias')),
+        PopupMenuItem<String>(value: 'last45', child: Text('Ultimos 45 dias')),
+        PopupMenuItem<String>(value: 'last90', child: Text('Ultimos 90 dias')),
+        PopupMenuItem<String>(value: 'last6m', child: Text('Ultimos 6 meses')),
+        PopupMenuItem<String>(value: 'last1y', child: Text('Ultimo ano')),
+        PopupMenuDivider(height: 1),
+        PopupMenuItem<String>(
+          value: 'custom',
+          child: Text('Personalizar periodo...'),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 104,
-              height: 104,
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  colors: [
-                    choice.color.withValues(alpha: 0.18),
-                    choice.color.withValues(alpha: 0.07),
-                    Colors.white,
+      ],
+      child: _CrmDashboardFilterShell(
+        label: 'Data base',
+        value: '$value - ${_apiLongDate(baseDate)}',
+        icon: Icons.calendar_today_outlined,
+        trailing: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+      ),
+    );
+  }
+}
+
+class _CrmDashboardFilterShell extends StatelessWidget {
+  const _CrmDashboardFilterShell({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.trailing,
+    this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 72,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E7E5)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: _mutedColor, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _mutedColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _inkColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                      ),
+                    ),
                   ],
                 ),
-                shape: BoxShape.circle,
               ),
-              child: Center(
-                child: _SpriteMoldIcon(
-                  mold: choice.mold,
-                  state: _spriteStateForChoiceTarget(choice.target),
-                  color: _spriteTintForChoiceTarget(
-                    choice.target,
-                    choice.color,
-                  ),
-                  size: 58,
-                  semanticLabel: copy.title,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              copy.title,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 23,
-                color: _deepTealColor,
-                fontWeight: FontWeight.w500,
-                letterSpacing: -1.1,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              copy.subtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: _mutedColor,
-                fontSize: 14,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              width: 50,
-              height: 50,
-              decoration: const BoxDecoration(
-                color: _amberColor,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_forward_rounded,
-                color: Colors.white,
-              ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              trailing,
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _CrmDashboardQuote extends StatelessWidget {
-  const _CrmDashboardQuote();
+bool _dashboardSetEquals(Set<String> left, Set<String> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+
+  return left.difference(right).isEmpty;
+}
+
+List<_HomeDashboardFilterOption> _dashboardChoicesFromStrings(
+  List<String> values,
+) {
+  return [
+    for (final value in values)
+      _HomeDashboardFilterOption(value: value, label: value),
+  ];
+}
+
+String _dashboardSelectionLabel(
+  Set<String> selectedValues,
+  List<_HomeDashboardFilterOption> options,
+) {
+  if (selectedValues.isEmpty || selectedValues.length == options.length) {
+    return _dashboardAllFilter;
+  }
+
+  if (selectedValues.length == 1) {
+    final selected = selectedValues.first;
+    return options
+        .firstWhere(
+          (option) => option.value == selected,
+          orElse: () =>
+              _HomeDashboardFilterOption(value: selected, label: selected),
+        )
+        .label;
+  }
+
+  return '${selectedValues.length} selecionados';
+}
+
+String _dashboardStringSelectionLabel(
+  Set<String> selectedValues,
+  List<String> options,
+) {
+  return _dashboardSelectionLabel(
+    selectedValues,
+    _dashboardChoicesFromStrings(options),
+  );
+}
+
+class _CrmDashboardMetricGrid extends StatelessWidget {
+  const _CrmDashboardMetricGrid({
+    required this.data,
+    required this.onChooseDestination,
+  });
+
+  final _HomeDashboardData data;
+  final ValueChanged<_ChoiceTarget> onChooseDestination;
 
   @override
   Widget build(BuildContext context) {
+    final metrics = data.metrics;
+    final cards = [
+      _CrmMetricCardData(
+        title: 'Colaboradores ativos',
+        value: metrics.activeEmployees,
+        detail: '${metrics.providerCompanies} prestadoras ativas',
+        icon: Icons.groups_2_outlined,
+        color: const Color(0xFF2563A8),
+        target: _ChoiceTarget.people,
+      ),
+      _CrmMetricCardData(
+        title: 'Novos (${data.period.shortLabel})',
+        value: metrics.newEmployees30Days,
+        detail: '+${metrics.newEmployees30Days} no recorte',
+        icon: Icons.person_add_alt_1_outlined,
+        color: _tealColor,
+        target: _ChoiceTarget.people,
+      ),
+      _CrmMetricCardData(
+        title: 'Pendentes',
+        value: metrics.pendingLinks,
+        detail: 'Acoes necessarias',
+        icon: Icons.hourglass_top_rounded,
+        color: const Color(0xFFD79A16),
+        target: _ChoiceTarget.people,
+      ),
+      _CrmMetricCardData(
+        title: 'Em risco',
+        value: metrics.riskItems,
+        detail: '${metrics.activeContracts} contratos ativos',
+        icon: Icons.gpp_maybe_outlined,
+        color: _roseColor,
+        target: _ChoiceTarget.network,
+      ),
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 860) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 40),
-            child: Text(
-              '" Clarity drives better decisions. Insight builds stronger partnerships. "',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: _deepTealColor,
-                fontStyle: FontStyle.italic,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          );
-        }
+        final cardsPerRow = constraints.maxWidth >= 1180
+            ? 4
+            : constraints.maxWidth >= 760
+            ? 2
+            : 1;
+        const spacing = 16.0;
+        final width = cardsPerRow == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - spacing * (cardsPerRow - 1)) /
+                  cardsPerRow;
 
-        return Padding(
-          padding: const EdgeInsets.only(top: 40),
-          child: Row(
-            children: [
-              const Expanded(child: Divider(indent: 120)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      '"',
-                      style: TextStyle(
-                        color: _amberColor,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: min(constraints.maxWidth * 0.56, 560.0),
-                      ),
-                      child: Text(
-                        'Clarity drives better decisions. Insight builds stronger partnerships.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: _deepTealColor,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      '"',
-                      style: TextStyle(
-                        color: _amberColor,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final card in cards)
+              SizedBox(
+                width: width,
+                child: _CrmDashboardMetricCard(
+                  card: card,
+                  onTap: () => onChooseDestination(card.target),
                 ),
               ),
-              const Expanded(child: Divider(endIndent: 120)),
-            ],
-          ),
+          ],
         );
       },
     );
   }
+}
+
+class _CrmMetricCardData {
+  const _CrmMetricCardData({
+    required this.title,
+    required this.value,
+    required this.detail,
+    required this.icon,
+    required this.color,
+    required this.target,
+  });
+
+  final String title;
+  final int value;
+  final String detail;
+  final IconData icon;
+  final Color color;
+  final _ChoiceTarget target;
+}
+
+class _CrmDashboardMetricCard extends StatelessWidget {
+  const _CrmDashboardMetricCard({required this.card, required this.onTap});
+
+  final _CrmMetricCardData card;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Ink(
+        height: 154,
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE7ECEA)),
+          boxShadow: [
+            BoxShadow(
+              color: _inkColor.withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final showSparkline = constraints.maxWidth >= 420;
+
+            return Row(
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        card.color.withValues(alpha: 0.22),
+                        card.color.withValues(alpha: 0.08),
+                        Colors.white,
+                      ],
+                    ),
+                  ),
+                  child: Icon(card.icon, color: card.color, size: 32),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        card.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _inkColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${card.value}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        card.detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: card.color,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (showSparkline)
+                  SizedBox(
+                    width: 78,
+                    height: 54,
+                    child: _CrmMetricSparkline(color: card.color),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmMetricSparkline extends StatelessWidget {
+  const _CrmMetricSparkline({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(painter: _CrmMetricSparklinePainter(color));
+  }
+}
+
+class _CrmMetricSparklinePainter extends CustomPainter {
+  const _CrmMetricSparklinePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    final points = [
+      const Offset(0.04, 0.80),
+      const Offset(0.20, 0.54),
+      const Offset(0.36, 0.64),
+      const Offset(0.52, 0.32),
+      const Offset(0.70, 0.42),
+      const Offset(0.88, 0.18),
+      const Offset(0.98, 0.24),
+    ];
+
+    for (var i = 0; i < points.length; i++) {
+      final point = Offset(
+        points[i].dx * size.width,
+        points[i].dy * size.height,
+      );
+      if (i == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrmMetricSparklinePainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
+class _CrmActiveEmployeesPanel extends StatelessWidget {
+  const _CrmActiveEmployeesPanel({
+    required this.rows,
+    required this.totalRows,
+    required this.searchController,
+    required this.onSearchChanged,
+    required this.onClearSearch,
+  });
+
+  final List<_HomeDashboardEmployeeRow> rows;
+  final int totalRows;
+  final TextEditingController searchController;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onClearSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 760;
+                final title = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Colaboradores ativos',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${rows.length} exibidos de $totalRows no recorte atual',
+                      style: const TextStyle(color: _mutedColor, fontSize: 13),
+                    ),
+                  ],
+                );
+                final search = _ContextSearchField(
+                  controller: searchController,
+                  hintText: 'Buscar colaborador',
+                  accent: _slateColor,
+                  maxWidth: compact ? double.infinity : 320,
+                  onChanged: onSearchChanged,
+                  onSubmitted: onSearchChanged,
+                  onClear: onClearSearch,
+                  onSearch: () => onSearchChanged(searchController.text),
+                );
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [title, const SizedBox(height: 14), search],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: title),
+                    search,
+                    const SizedBox(width: 12),
+                    _CrmSmallToolbarButton(
+                      icon: Icons.view_column_outlined,
+                      label: 'Colunas',
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.more_vert_rounded, color: _mutedColor),
+                  ],
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE7ECEA)),
+          _CrmEmployeeTable(rows: rows),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmSmallToolbarButton extends StatelessWidget {
+  const _CrmSmallToolbarButton({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E7E5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: _inkColor),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: _inkColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmEmployeeTable extends StatelessWidget {
+  const _CrmEmployeeTable({required this.rows});
+
+  final List<_HomeDashboardEmployeeRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    if (rows.isEmpty) {
+      return const _CrmEmptyEmployeeRows();
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 1120;
+
+        if (compact) {
+          return Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: [
+                for (final row in rows) _CrmEmployeeCompactCard(row: row),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            const _CrmEmployeeHeaderRow(),
+            for (final row in rows) _CrmEmployeeDataRow(row: row),
+            _CrmEmployeePagination(totalRows: rows.length),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CrmEmployeeHeaderRow extends StatelessWidget {
+  const _CrmEmployeeHeaderRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      color: const Color(0xFFF8FAFA),
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      child: const Row(
+        children: [
+          _CrmTableHeaderCell(label: 'Colaborador', flex: 3),
+          _CrmTableHeaderCell(label: 'Matricula', flex: 2),
+          _CrmTableHeaderCell(label: 'Cargo', flex: 2),
+          _CrmTableHeaderCell(label: 'Departamento', flex: 2),
+          _CrmTableHeaderCell(label: 'Unidade', flex: 2),
+          _CrmTableHeaderCell(label: 'Admissao', flex: 1),
+          _CrmTableHeaderCell(label: 'Regime', flex: 1),
+          _CrmTableHeaderCell(label: 'Situacao', flex: 1),
+          SizedBox(width: 28),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmTableHeaderCell extends StatelessWidget {
+  const _CrmTableHeaderCell({required this.label, required this.flex});
+
+  final String label;
+  final int flex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: _inkColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmEmployeeDataRow extends StatelessWidget {
+  const _CrmEmployeeDataRow({required this.row});
+
+  final _HomeDashboardEmployeeRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 66),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE7ECEA))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Row(
+              children: [
+                _CrmEmployeeAvatar(row: row),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        row.employeeName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _inkColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        row.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _mutedColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _CrmTableTextCell(text: row.registration, flex: 2),
+          _CrmTableTextCell(text: row.position, flex: 2),
+          _CrmTableTextCell(text: row.department, flex: 2),
+          _CrmTableTextCell(text: row.unit, flex: 2),
+          _CrmTableTextCell(text: _apiLongDate(row.admissionDate), flex: 1),
+          _CrmTableTextCell(text: row.regime, flex: 1),
+          Expanded(flex: 1, child: _CrmStatusPill(row: row)),
+          const SizedBox(width: 28, child: Icon(Icons.more_vert_rounded)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmTableTextCell extends StatelessWidget {
+  const _CrmTableTextCell({required this.text, required this.flex});
+
+  final String text;
+  final int flex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: _inkColor, fontSize: 13),
+      ),
+    );
+  }
+}
+
+class _CrmEmployeeAvatar extends StatelessWidget {
+  const _CrmEmployeeAvatar({required this.row});
+
+  final _HomeDashboardEmployeeRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _avatarColors(row.employeeName);
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: colors.background,
+      child: Text(
+        row.employeeInitials,
+        maxLines: 1,
+        overflow: TextOverflow.clip,
+        style: TextStyle(
+          color: colors.foreground,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmStatusPill extends StatelessWidget {
+  const _CrmStatusPill({required this.row});
+
+  final _HomeDashboardEmployeeRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (row.status.toUpperCase()) {
+      'ACTIVE' => _tealColor,
+      'PENDING' => _amberColor,
+      'SUSPENDED' || 'BLOCKED' || 'DISMISSED' => _roseColor,
+      _ => _slateColor,
+    };
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          row.statusLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmEmployeeCompactCard extends StatelessWidget {
+  const _CrmEmployeeCompactCard({required this.row});
+
+  final _HomeDashboardEmployeeRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE7ECEA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _CrmEmployeeAvatar(row: row),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      row.employeeName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _inkColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      row.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _mutedColor, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              _CrmStatusPill(row: row),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              _CrmCompactMeta(label: 'Cargo', value: row.position),
+              _CrmCompactMeta(label: 'Departamento', value: row.department),
+              _CrmCompactMeta(label: 'Unidade', value: row.unit),
+              _CrmCompactMeta(
+                label: 'Admissao',
+                value: _apiLongDate(row.admissionDate),
+              ),
+              _CrmCompactMeta(label: 'Regime', value: row.regime),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmCompactMeta extends StatelessWidget {
+  const _CrmCompactMeta({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 220),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _mutedColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _inkColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmEmployeePagination extends StatelessWidget {
+  const _CrmEmployeePagination({required this.totalRows});
+
+  final int totalRows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE7ECEA))),
+      ),
+      child: Row(
+        children: [
+          const Text(
+            'Linhas por pagina: 10',
+            style: TextStyle(color: _inkColor),
+          ),
+          const Spacer(),
+          Text(
+            totalRows == 0 ? '0' : '1-$totalRows',
+            style: const TextStyle(color: _mutedColor),
+          ),
+          const SizedBox(width: 18),
+          const Icon(Icons.chevron_left_rounded, color: _mutedColor),
+          const SizedBox(width: 8),
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F1FF),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              '1',
+              style: TextStyle(
+                color: Color(0xFF2563A8),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, color: _mutedColor),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmEmptyEmployeeRows extends StatelessWidget {
+  const _CrmEmptyEmployeeRows();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(28),
+      child: Center(
+        child: Text(
+          'Nenhum colaborador ativo encontrado para os filtros atuais.',
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmDashboardLoading extends StatelessWidget {
+  const _CrmDashboardLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        children: [
+          const SizedBox(height: 3, child: LinearProgressIndicator()),
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth >= 760
+                  ? (constraints.maxWidth - 48) / 4
+                  : constraints.maxWidth;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  for (var index = 0; index < 4; index++)
+                    Container(
+                      width: width,
+                      height: 112,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F5F4),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmDashboardError extends StatelessWidget {
+  const _CrmDashboardError({required this.error, required this.onRetry});
+
+  final Object? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = error is ApiException
+        ? 'API indisponivel para o resumo (${(error! as ApiException).code}).'
+        : 'Nao foi possivel carregar o resumo operacional.';
+
+    return _Panel(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _roseColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.cloud_off_outlined, color: _roseColor),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Resumo operacional nao carregado',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$message Nenhum dado mock foi exibido.',
+                  style: const TextStyle(color: _mutedColor),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Recarregar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+({Color background, Color foreground}) _avatarColors(String seed) {
+  final palette = [
+    (background: const Color(0xFFE8F1FF), foreground: const Color(0xFF2563A8)),
+    (background: const Color(0xFFE6F6EA), foreground: const Color(0xFF2E8B57)),
+    (background: const Color(0xFFF1E6FF), foreground: const Color(0xFF7A3FC7)),
+    (background: const Color(0xFFFFF3D8), foreground: const Color(0xFFC8891F)),
+  ];
+  final index =
+      seed.codeUnits.fold<int>(0, (sum, code) => sum + code) % palette.length;
+  return palette[index];
 }
 
 class _CrmInteractiveBrand extends StatefulWidget {
@@ -3938,6 +5393,7 @@ class _CrmSidebarNavItemState extends State<_CrmSidebarNavItem> {
                             : _SpriteMoldState.base,
                         color: selected ? null : const Color(0xFFDCE9E3),
                         size: 34,
+                        semanticLabel: widget.item.shortLabel,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
