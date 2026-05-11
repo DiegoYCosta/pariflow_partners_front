@@ -171,42 +171,42 @@ const List<_CrmReportFamilyMeta> _crmReportFamilies = [
     title: 'Operacionais',
     subtitle: 'Consultas, tendencias e leitura executiva.',
     icon: Icons.grid_view_rounded,
-    color: _slateColor,
+    color: _tealColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.controls,
     title: 'Controles',
     subtitle: 'Pendencias, SLA, documentos e evidencias.',
     icon: Icons.gpp_good_outlined,
-    color: _slateColor,
+    color: _tealColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.management,
     title: 'Gerenciais',
     subtitle: 'Pessoas, contratos, carteira e operacao corrente.',
     icon: Icons.groups_2_outlined,
-    color: Color(0xFF2563A8),
+    color: _tealColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.compliance,
     title: 'Compliance',
     subtitle: 'Excecoes, acessos sensiveis e criticidade.',
     icon: Icons.verified_user_outlined,
-    color: _roseColor,
+    color: _tealColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.audit,
     title: 'Logs/Auditoria',
     subtitle: 'Trilha de alteracoes, exclusoes e parametros.',
     icon: Icons.receipt_long_outlined,
-    color: _amberColor,
+    color: _tealColor,
   ),
   _CrmReportFamilyMeta(
     family: _CrmReportFamily.automation,
     title: 'Automacoes',
     subtitle: 'Recorrencia, destinatarios e pacotes periodicos.',
     icon: Icons.smart_toy_outlined,
-    color: Color(0xFF6D5DA8),
+    color: _tealColor,
   ),
 ];
 
@@ -476,23 +476,42 @@ class _CrmReportsCommandMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 46,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final family in _orderedCrmReportFamilies)
-              _CrmReportFamilyMenuButton(
-                meta: family,
-                templates: _templatesFor(family.family),
-                highlighted: family.family == _CrmReportFamily.management,
-                onSelected: (template) =>
-                    _openReportSettings(context, template),
-              ),
-          ],
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final families = _orderedCrmReportFamilies;
+        final visibleCount = _visibleReportFamilyCount(
+          constraints.maxWidth,
+          families.length,
+        );
+        final visibleFamilies = families.take(visibleCount);
+        final hiddenFamilies = families
+            .skip(visibleCount)
+            .toList(growable: false);
+
+        return SizedBox(
+          height: 46,
+          child: Row(
+            children: [
+              for (final family in visibleFamilies)
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: _CrmReportFamilyMenuButton(
+                    meta: family,
+                    templates: _templatesFor(family.family),
+                    onSelected: (template) =>
+                        _openReportSettings(context, template),
+                  ),
+                ),
+              if (hiddenFamilies.isNotEmpty)
+                _CrmReportFamilyOverflowButton(
+                  families: hiddenFamilies,
+                  onSelected: (template) =>
+                      _openReportSettings(context, template),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -511,6 +530,19 @@ class _CrmReportsCommandMenu extends StatelessWidget {
   }
 }
 
+int _visibleReportFamilyCount(double width, int total) {
+  final visible = switch (width) {
+    < 230 => 0,
+    < 420 => 1,
+    < 590 => 2,
+    < 760 => 3,
+    < 930 => 4,
+    < 1100 => 5,
+    _ => total,
+  };
+  return visible.clamp(0, total);
+}
+
 List<_CrmReportFamilyMeta> get _orderedCrmReportFamilies {
   const order = [
     _CrmReportFamily.management,
@@ -526,81 +558,169 @@ List<_CrmReportFamilyMeta> get _orderedCrmReportFamilies {
   ];
 }
 
-class _CrmReportFamilyMenuButton extends StatelessWidget {
+class _CrmReportFamilyMenuButton extends StatefulWidget {
   const _CrmReportFamilyMenuButton({
     required this.meta,
     required this.templates,
-    required this.highlighted,
     required this.onSelected,
   });
 
   final _CrmReportFamilyMeta meta;
   final List<_CrmReportTemplate> templates;
-  final bool highlighted;
   final ValueChanged<_CrmReportTemplate> onSelected;
 
   @override
+  State<_CrmReportFamilyMenuButton> createState() =>
+      _CrmReportFamilyMenuButtonState();
+}
+
+class _CrmReportFamilyMenuButtonState
+    extends State<_CrmReportFamilyMenuButton> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final foreground = highlighted ? meta.color : _inkColor;
-    final background = highlighted
-        ? meta.color.withValues(alpha: 0.10)
-        : Colors.transparent;
+    final foreground = _hovered ? Colors.white : _inkColor;
+    final background = _hovered ? _deepTealColor : Colors.transparent;
+    final borderColor = _hovered ? _deepTealColor : Colors.transparent;
 
     return Padding(
       padding: const EdgeInsets.only(right: 4),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: PopupMenuButton<_CrmReportTemplate>(
+          tooltip: widget.meta.title,
+          offset: const Offset(0, 39),
+          constraints: const BoxConstraints(minWidth: 306, maxWidth: 360),
+          onSelected: widget.onSelected,
+          itemBuilder: (context) =>
+              _reportFamilyMenuEntries(widget.meta, widget.templates),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOut,
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 13),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.meta.icon, color: foreground, size: 20),
+                const SizedBox(width: 9),
+                Flexible(
+                  child: Text(
+                    widget.meta.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: foreground,
+                  size: 19,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmReportFamilyOverflowButton extends StatefulWidget {
+  const _CrmReportFamilyOverflowButton({
+    required this.families,
+    required this.onSelected,
+  });
+
+  final List<_CrmReportFamilyMeta> families;
+  final ValueChanged<_CrmReportTemplate> onSelected;
+
+  @override
+  State<_CrmReportFamilyOverflowButton> createState() =>
+      _CrmReportFamilyOverflowButtonState();
+}
+
+class _CrmReportFamilyOverflowButtonState
+    extends State<_CrmReportFamilyOverflowButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = _hovered ? Colors.white : _inkColor;
+    final background = _hovered ? _deepTealColor : Colors.transparent;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: PopupMenuButton<_CrmReportTemplate>(
-        tooltip: meta.title,
+        tooltip: 'Mais relatorios',
         offset: const Offset(0, 39),
         constraints: const BoxConstraints(minWidth: 306, maxWidth: 360),
-        onSelected: onSelected,
+        onSelected: widget.onSelected,
         itemBuilder: (context) => [
-          PopupMenuItem<_CrmReportTemplate>(
-            enabled: false,
-            height: 56,
-            child: _CrmReportMenuHeader(meta: meta, count: templates.length),
-          ),
-          const PopupMenuDivider(height: 1),
-          if (templates.isEmpty)
-            const PopupMenuItem<_CrmReportTemplate>(
+          for (final family in widget.families) ...[
+            PopupMenuItem<_CrmReportTemplate>(
               enabled: false,
-              child: Text('Nenhuma opcao disponivel'),
-            )
-          else
-            for (final template in templates)
-              PopupMenuItem<_CrmReportTemplate>(
-                value: template,
-                height: 58,
-                child: _CrmReportMenuItem(
-                  template: template,
-                  color: meta.color,
-                ),
+              height: 52,
+              child: _CrmReportMenuHeader(
+                meta: family,
+                count: _templatesFor(family.family).length,
               ),
+            ),
+            if (_templatesFor(family.family).isEmpty)
+              const PopupMenuItem<_CrmReportTemplate>(
+                enabled: false,
+                child: Text('Nenhuma opcao disponivel'),
+              )
+            else
+              for (final template in _templatesFor(family.family))
+                PopupMenuItem<_CrmReportTemplate>(
+                  value: template,
+                  height: 54,
+                  child: _CrmReportMenuItem(
+                    template: template,
+                    color: family.color,
+                  ),
+                ),
+            const PopupMenuDivider(height: 1),
+          ],
         ],
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
           height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(5),
             border: Border.all(
-              color: highlighted
-                  ? meta.color.withValues(alpha: 0.16)
-                  : Colors.transparent,
+              color: _hovered ? _deepTealColor : Colors.transparent,
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(meta.icon, color: foreground, size: 20),
-              const SizedBox(width: 9),
+              Icon(Icons.more_horiz_rounded, color: foreground, size: 20),
+              const SizedBox(width: 8),
               Text(
-                meta.title,
+                'Mais',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: foreground,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
               Icon(
                 Icons.keyboard_arrow_down_rounded,
                 color: foreground,
@@ -612,6 +732,32 @@ class _CrmReportFamilyMenuButton extends StatelessWidget {
       ),
     );
   }
+}
+
+List<PopupMenuEntry<_CrmReportTemplate>> _reportFamilyMenuEntries(
+  _CrmReportFamilyMeta meta,
+  List<_CrmReportTemplate> templates,
+) {
+  return [
+    PopupMenuItem<_CrmReportTemplate>(
+      enabled: false,
+      height: 56,
+      child: _CrmReportMenuHeader(meta: meta, count: templates.length),
+    ),
+    const PopupMenuDivider(height: 1),
+    if (templates.isEmpty)
+      const PopupMenuItem<_CrmReportTemplate>(
+        enabled: false,
+        child: Text('Nenhuma opcao disponivel'),
+      )
+    else
+      for (final template in templates)
+        PopupMenuItem<_CrmReportTemplate>(
+          value: template,
+          height: 58,
+          child: _CrmReportMenuItem(template: template, color: meta.color),
+        ),
+  ];
 }
 
 class _CrmReportMenuHeader extends StatelessWidget {
