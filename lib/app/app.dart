@@ -28,6 +28,7 @@ part '../features/client_companies/client_companies_feature.dart';
 part '../features/contracts/contracts_feature.dart';
 part '../features/people/people_feature.dart';
 part '../features/people/infrastructure/people_api_data.dart';
+part '../features/reports/reports_api_data.dart';
 part 'shell/shell_variant.dart';
 part 'shell/shell_feature_flags.dart';
 part 'shell/legacy_shell.dart';

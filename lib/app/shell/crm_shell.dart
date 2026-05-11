@@ -719,10 +719,14 @@ class _CrmReportsCenterDialog extends StatefulWidget {
 }
 
 class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
+  final _reportsRepository = _ReportsApiRepository();
   late _CrmReportTemplate _selected;
   final Set<String> _requiredFilters = {'Empresa', 'Periodo'};
   final Set<String> _optionalFilters = {'Status'};
   final Map<String, String> _filterValues = {};
+  _ReportExecutionResult? _execution;
+  bool _isRunningReport = false;
+  String? _reportError;
   String _frequency = 'Semanal';
   String _delivery = 'Painel';
 
@@ -757,6 +761,11 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
           _delivery = value;
         });
       },
+      execution: _execution,
+      isRunning: _isRunningReport,
+      errorMessage: _reportError,
+      onRun: _executeSelectedReport,
+      onCopyCsv: _execution?.csv.isNotEmpty == true ? _copyCurrentCsv : null,
     );
 
     return AlertDialog(
@@ -848,11 +857,13 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
       ),
       actions: [
         TextButton.icon(
-          onPressed: () {
-            setState(() {
-              _syncFilterDefaults(_selected);
-            });
-          },
+          onPressed: _isRunningReport
+              ? null
+              : () {
+                  setState(() {
+                    _syncFilterDefaults(_selected);
+                  });
+                },
           icon: const Icon(Icons.restart_alt_rounded, size: 18),
           label: Text(
             widget.lockedTemplate
@@ -860,10 +871,28 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
                 : 'Restaurar modelo',
           ),
         ),
+        if (_execution?.csv.isNotEmpty == true)
+          TextButton.icon(
+            onPressed: _isRunningReport ? null : _copyCurrentCsv,
+            icon: const Icon(Icons.table_view_outlined, size: 18),
+            label: const Text('Copiar CSV'),
+          ),
         FilledButton.icon(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.check_rounded, size: 18),
-          label: Text(widget.lockedTemplate ? 'Aplicar' : 'Concluir'),
+          onPressed: _isRunningReport ? null : _executeSelectedReport,
+          icon: _isRunningReport
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.play_arrow_rounded, size: 18),
+          label: Text(_isRunningReport ? 'Executando' : 'Executar'),
+        ),
+        TextButton(
+          onPressed: _isRunningReport
+              ? null
+              : () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
         ),
       ],
     );
@@ -885,6 +914,8 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
     _delivery = template.family == _CrmReportFamily.automation
         ? 'Email'
         : 'Painel';
+    _execution = null;
+    _reportError = null;
   }
 
   void _toggleRequiredFilter(String filter) {
@@ -921,6 +952,68 @@ class _CrmReportsCenterDialogState extends State<_CrmReportsCenterDialog> {
     for (final entry in _defaultValuesForReportFilter(filter).entries) {
       _filterValues.putIfAbsent(entry.key, () => entry.value);
     }
+  }
+
+  Future<void> _executeSelectedReport() async {
+    setState(() {
+      _isRunningReport = true;
+      _reportError = null;
+    });
+
+    try {
+      final result = await _reportsRepository.executeReport(
+        template: _selected,
+        filters: Map<String, String>.from(_filterValues),
+        requiredFilters: Set<String>.from(_requiredFilters),
+        optionalFilters: Set<String>.from(_optionalFilters),
+        delivery: _delivery,
+        frequency: _frequency,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _execution = result;
+        _isRunningReport = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isReady
+                ? 'Relatorio executado com ${result.rows.length} linhas.'
+                : 'Relatorio preparado para a proxima etapa de implementacao.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isRunningReport = false;
+        _reportError = _reportExecutionErrorMessage(error);
+      });
+    }
+  }
+
+  Future<void> _copyCurrentCsv() async {
+    final csv = _execution?.csv;
+    if (csv == null || csv.isEmpty) {
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: csv));
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('CSV do relatorio copiado.')));
   }
 }
 
@@ -1170,6 +1263,11 @@ class _CrmReportDesignerPanel extends StatelessWidget {
     required this.onFilterValueChanged,
     required this.onFrequencyChanged,
     required this.onDeliveryChanged,
+    required this.execution,
+    required this.isRunning,
+    required this.errorMessage,
+    required this.onRun,
+    required this.onCopyCsv,
   });
 
   final _CrmReportTemplate template;
@@ -1184,6 +1282,11 @@ class _CrmReportDesignerPanel extends StatelessWidget {
   final void Function(String key, String value) onFilterValueChanged;
   final ValueChanged<String> onFrequencyChanged;
   final ValueChanged<String> onDeliveryChanged;
+  final _ReportExecutionResult? execution;
+  final bool isRunning;
+  final String? errorMessage;
+  final VoidCallback onRun;
+  final VoidCallback? onCopyCsv;
 
   @override
   Widget build(BuildContext context) {
@@ -1334,6 +1437,298 @@ class _CrmReportDesignerPanel extends StatelessWidget {
               value: 'Manual, com filtros proprios',
             ),
           ],
+          const SizedBox(height: 16),
+          _CrmReportExecutionPanel(
+            execution: execution,
+            isRunning: isRunning,
+            errorMessage: errorMessage,
+            onRun: onRun,
+            onCopyCsv: onCopyCsv,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportExecutionPanel extends StatelessWidget {
+  const _CrmReportExecutionPanel({
+    required this.execution,
+    required this.isRunning,
+    required this.errorMessage,
+    required this.onRun,
+    required this.onCopyCsv,
+  });
+
+  final _ReportExecutionResult? execution;
+  final bool isRunning;
+  final String? errorMessage;
+  final VoidCallback onRun;
+  final VoidCallback? onCopyCsv;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = execution;
+    final ready = result?.isReady == true;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5EAE8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                ready
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.analytics_outlined,
+                color: ready ? _tealColor : _slateColor,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Resultado',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: isRunning ? null : onRun,
+                icon: isRunning
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.play_arrow_rounded, size: 17),
+                label: Text(isRunning ? 'Executando' : 'Executar'),
+              ),
+            ],
+          ),
+          if (errorMessage != null) ...[
+            const SizedBox(height: 8),
+            _CrmReportExecutionNotice(
+              icon: Icons.error_outline_rounded,
+              color: _roseColor,
+              message: errorMessage!,
+            ),
+          ] else if (isRunning) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(minHeight: 3),
+          ] else if (result == null) ...[
+            const SizedBox(height: 8),
+            _CrmReportExecutionNotice(
+              icon: Icons.info_outline_rounded,
+              color: _slateColor,
+              message: 'Aguardando execucao do relatorio selecionado.',
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            if (result.metrics.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final metric in result.metrics)
+                    _CrmReportMetricPill(metric: metric),
+                ],
+              ),
+            if (result.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              for (final note in result.notes.take(2)) ...[
+                _CrmReportExecutionNotice(
+                  icon: Icons.info_outline_rounded,
+                  color: result.isReady ? _amberColor : _slateColor,
+                  message: note,
+                ),
+                const SizedBox(height: 6),
+              ],
+            ],
+            if (result.hasRows) ...[
+              const SizedBox(height: 10),
+              _CrmReportPreviewTable(result: result),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${result.rows.length} linhas retornadas',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: _mutedColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: onCopyCsv,
+                    icon: const Icon(Icons.table_view_outlined, size: 17),
+                    label: const Text('CSV'),
+                  ),
+                ],
+              ),
+            ] else if (result.isReady) ...[
+              const SizedBox(height: 8),
+              _CrmReportExecutionNotice(
+                icon: Icons.manage_search_outlined,
+                color: _slateColor,
+                message: 'Relatorio executado sem linhas para este recorte.',
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportMetricPill extends StatelessWidget {
+  const _CrmReportMetricPill({required this.metric});
+
+  final _ReportMetric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 96),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: const Color(0xFFE5EAE8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            metric.value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: _deepTealColor,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            metric.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: _mutedColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportPreviewTable extends StatelessWidget {
+  const _CrmReportPreviewTable({required this.result});
+
+  final _ReportExecutionResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = result.columns.take(6).toList(growable: false);
+    final rows = result.rows.take(6).toList(growable: false);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingRowHeight: 34,
+        dataRowMinHeight: 34,
+        dataRowMaxHeight: 42,
+        horizontalMargin: 10,
+        columnSpacing: 18,
+        columns: [
+          for (final column in columns)
+            DataColumn(
+              label: Text(
+                column.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: _inkColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+        ],
+        rows: [
+          for (final row in rows)
+            DataRow(
+              cells: [
+                for (final column in columns)
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 180),
+                      child: Text(
+                        _apiText(row[column.keyName], fallback: '-'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: _inkColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmReportExecutionNotice extends StatelessWidget {
+  const _CrmReportExecutionNotice({
+    required this.icon,
+    required this.color,
+    required this.message,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _inkColor,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1990,6 +2385,13 @@ String _reportAudienceDeniedMessage(
 ) {
   final current = _viewerReportAudienceLabel(viewer);
   return 'Seu perfil ($current) nao permite selecionar $audience. Solicite liberacao ao admin para relatorios acima da sua hierarquia.';
+}
+
+String _reportExecutionErrorMessage(Object error) {
+  if (error is ApiException) {
+    return 'Nao foi possivel executar o relatorio (${error.code}).';
+  }
+  return 'Nao foi possivel executar o relatorio agora.';
 }
 
 List<String> _optionsForReportFilter(String filter) {
