@@ -1,6 +1,6 @@
 param(
   [string]$WebPort = "8082",
-  [string]$ApiBaseUrl = "http://127.0.0.1:3000/api/v1",
+  [string]$ApiBaseUrl = "http://localhost:3000/api/v1",
   [string]$EnvFile = ".env.front.preview",
   [switch]$UseDevToken
 )

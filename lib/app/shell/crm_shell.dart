@@ -3109,6 +3109,11 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: _savingProfile ? null : () => unawaited(_logout()),
+            icon: const Icon(Icons.logout_rounded, size: 18),
+            label: const Text('Sair'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Fechar'),
@@ -3129,6 +3134,13 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
         ],
       ),
     );
+  }
+
+  Future<void> _logout() async {
+    await _profileApi.logout();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _loadCurrentUserProfile() async {
