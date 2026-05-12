@@ -3615,6 +3615,24 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                   icon: const Icon(Icons.chevron_right_rounded),
                 ),
                 IconButton(
+                  tooltip: 'Hoje',
+                  onPressed: () {
+                    final now = DateTime.now();
+                    setState(() {
+                      _calendarMonth = DateTime(now.year, now.month);
+                    });
+                    unawaited(_loadSharedCalendar());
+                  },
+                  icon: const Icon(Icons.today_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Novo evento',
+                  onPressed: () => unawaited(
+                    _openCalendarEntryDialog(initialDate: DateTime.now()),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                ),
+                IconButton(
                   tooltip: 'Filtros',
                   onPressed: _openCalendarFilters,
                   icon: const Icon(Icons.filter_alt_outlined),
@@ -3697,6 +3715,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                         today.day == day,
                     entries: _calendarEntriesForDay(day),
                     nonBusinessDays: _calendarNonBusinessDaysForDay(day),
+                    onTap: () => unawaited(_openCalendarDay(day)),
                   ),
               ],
             ),
@@ -3860,6 +3879,138 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     }
   }
 
+  Future<void> _openCalendarDay(int day) async {
+    final date = DateTime(_calendarMonth.year, _calendarMonth.month, day);
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _CalendarDayDetailsDialog(
+        date: date,
+        entries: _calendarEntriesForDay(day),
+        nonBusinessDays: _calendarNonBusinessDaysForDay(day),
+        onAddEvent: () =>
+            unawaited(_openCalendarEntryDialog(initialDate: date)),
+        onEditEntry: (entry) => unawaited(
+          _openCalendarEntryDialog(initialDate: date, entry: entry),
+        ),
+        onCancelEntry: (entry) => unawaited(_confirmCancelCalendarEntry(entry)),
+        onApplicability: (scope) =>
+            unawaited(_openCalendarApplicability(scope)),
+        scopeFromEntry: _calendarScopeFromEntry,
+        scopeFromNonBusinessDay: _calendarScopeFromNonBusinessDay,
+      ),
+    );
+  }
+
+  Future<void> _openCalendarEntryDialog({
+    required DateTime initialDate,
+    Map<String, dynamic>? entry,
+  }) async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) =>
+          _SharedCalendarEntryDialog(initialDate: initialDate, entry: entry),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    setState(() => _loadingCalendar = true);
+    try {
+      final publicId = _apiText(entry?['publicId']);
+      if (publicId.isEmpty) {
+        await _calendarApi.postMap('agenda', body: body);
+      } else {
+        await _calendarApi.patchMap('agenda/$publicId', body: body);
+      }
+      if (mounted) {
+        setState(() => _loadingCalendar = false);
+      }
+      await _loadSharedCalendar();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            publicId.isEmpty
+                ? 'Evento adicionado ao calendario.'
+                : 'Evento atualizado no calendario.',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: _roseColor),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingCalendar = false);
+      }
+    }
+  }
+
+  Future<void> _confirmCancelCalendarEntry(Map<String, dynamic> entry) async {
+    final publicId = _apiText(entry['publicId']);
+    if (publicId.isEmpty) {
+      return;
+    }
+    final title = _apiText(entry['title'], fallback: 'sem titulo');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar evento'),
+        content: Text(
+          'O item "$title" sera marcado como cancelado, preservando historico e auditoria.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancelar item'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _loadingCalendar = true);
+    try {
+      await _calendarApi.deleteMap('agenda/$publicId');
+      if (mounted) {
+        setState(() => _loadingCalendar = false);
+      }
+      await _loadSharedCalendar();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Evento cancelado no calendario.')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: _roseColor),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingCalendar = false);
+      }
+    }
+  }
+
   Widget _calendarSummaryBand(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -4003,7 +4154,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                 const SizedBox(height: 3),
                 Text(
                   [
-                    _apiText(entry['startsAtLabel']),
+                    _calendarEntryDateLabel(entry),
                     _apiText(target['label']),
                     _apiText(entry['category']),
                   ].where((value) => value.isNotEmpty).join(' | '),
@@ -4035,6 +4186,13 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                       color: _mutedColor,
                       background: _lineColor.withValues(alpha: 0.55),
                     ),
+                    if (_apiText(entry['recurrenceRule']).isNotEmpty)
+                      _Tag(
+                        label: _calendarRecurrenceLabel(entry),
+                        icon: Icons.event_repeat_outlined,
+                        color: _amberColor,
+                        background: _amberColor.withValues(alpha: 0.10),
+                      ),
                   ],
                 ),
               ],
@@ -4118,12 +4276,36 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
 
   List<Map<String, dynamic>> _calendarEntriesForDay(int day) {
     return _calendarEntries.where((entry) {
-      final date = _parseApiDate(_apiText(entry['startsAt']));
+      final date = _calendarOccurrenceDate(entry);
       return date != null &&
           date.year == _calendarMonth.year &&
           date.month == _calendarMonth.month &&
           date.day == day;
     }).toList();
+  }
+
+  DateTime? _calendarOccurrenceDate(Map<String, dynamic> entry) {
+    return _parseApiDate(
+          _apiText(
+            entry['occurrenceStartsAt'],
+            fallback: _apiText(entry['startsAt']),
+          ),
+        ) ??
+        _parseApiDate(_apiText(entry['startsAt']));
+  }
+
+  String _calendarEntryDateLabel(Map<String, dynamic> entry) {
+    return _apiText(
+      entry['occurrenceStartsAtLabel'],
+      fallback: _apiText(entry['startsAtLabel']),
+    );
+  }
+
+  String _calendarRecurrenceLabel(Map<String, dynamic> entry) {
+    return _apiText(
+      entry['recurrenceRuleLabel'],
+      fallback: _recurrenceRuleLabel(_apiText(entry['recurrenceRule'])),
+    );
   }
 
   List<Map<String, dynamic>> _calendarNonBusinessDaysForDay(int day) {
@@ -4637,6 +4819,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     required bool selected,
     required List<Map<String, dynamic>> entries,
     required List<Map<String, dynamic>> nonBusinessDays,
+    required VoidCallback onTap,
   }) {
     final hasNonBusinessDay = nonBusinessDays.isNotEmpty;
     final background = hasNonBusinessDay
@@ -4650,53 +4833,62 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
         ? _tealColor.withValues(alpha: 0.32)
         : _lineColor;
 
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: background,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '$day',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: hasNonBusinessDay || selected ? _deepTealColor : _inkColor,
-              fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-            ),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderColor),
           ),
-          const SizedBox(height: 3),
-          Row(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (entries.isNotEmpty)
-                Container(
-                  constraints: const BoxConstraints(minWidth: 18),
-                  height: 17,
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  decoration: BoxDecoration(
-                    color: _deepTealColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${entries.length}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+              Text(
+                '$day',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: hasNonBusinessDay || selected
+                      ? _deepTealColor
+                      : _inkColor,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
                 ),
-              if (hasNonBusinessDay) ...[
-                if (entries.isNotEmpty) const SizedBox(width: 4),
-                Icon(Icons.block_rounded, color: _amberColor, size: 15),
-              ],
+              ),
+              const SizedBox(height: 3),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (entries.isNotEmpty)
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 18),
+                      height: 17,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: _deepTealColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${entries.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  if (hasNonBusinessDay) ...[
+                    if (entries.isNotEmpty) const SizedBox(width: 4),
+                    Icon(Icons.block_rounded, color: _amberColor, size: 15),
+                  ],
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -4974,6 +5166,69 @@ class _CalendarApplicabilityDialog extends StatelessWidget {
   }
 }
 
+String _calendarEntryDisplayDateLabel(Map<String, dynamic> entry) {
+  return _apiText(
+    entry['occurrenceStartsAtLabel'],
+    fallback: _apiText(entry['startsAtLabel']),
+  );
+}
+
+String _calendarEntryRecurrenceDisplayLabel(Map<String, dynamic> entry) {
+  return _apiText(
+    entry['recurrenceRuleLabel'],
+    fallback: _recurrenceRuleLabel(_apiText(entry['recurrenceRule'])),
+  );
+}
+
+String _recurrenceRuleLabel(String rule) {
+  return switch (rule.trim().toUpperCase()) {
+    'DAILY' => 'Todos os dias',
+    'WEEKDAYS' => 'Dias uteis',
+    'WEEKLY' => 'Semanal',
+    'MONTHLY' => 'Mensal',
+    'MONTHLY_NTH_WEEKDAY' => 'Mensal por dia da semana',
+    'YEARLY' => 'Anual',
+    _ => 'Nao se repete',
+  };
+}
+
+Map<String, String> _calendarRecurrenceOptions(DateTime date) {
+  return {
+    'NONE': 'Nao se repete',
+    'DAILY': 'Todos os dias',
+    'WEEKLY': 'Semanal: toda ${_weekdayLabel(date.weekday)}',
+    'MONTHLY': 'Mensal: todo dia ${date.day}',
+    'MONTHLY_NTH_WEEKDAY':
+        'Mensal: ${_weekOfMonthLabel(date)} ${_weekdayLabel(date.weekday)}',
+    'YEARLY': 'Anual: ${date.day}/${date.month.toString().padLeft(2, '0')}',
+    'WEEKDAYS': 'Todos os dias da semana (segunda a sexta-feira)',
+  };
+}
+
+String _weekdayLabel(int weekday) {
+  const labels = {
+    DateTime.monday: 'segunda-feira',
+    DateTime.tuesday: 'terca-feira',
+    DateTime.wednesday: 'quarta-feira',
+    DateTime.thursday: 'quinta-feira',
+    DateTime.friday: 'sexta-feira',
+    DateTime.saturday: 'sabado',
+    DateTime.sunday: 'domingo',
+  };
+  return labels[weekday] ?? 'dia da semana';
+}
+
+String _weekOfMonthLabel(DateTime date) {
+  final week = ((date.day - 1) ~/ 7) + 1;
+  return switch (week) {
+    1 => 'na primeira',
+    2 => 'na segunda',
+    3 => 'na terceira',
+    4 => 'na quarta',
+    _ => 'na quinta',
+  };
+}
+
 class _SharedCalendarFiltersDialog extends StatefulWidget {
   const _SharedCalendarFiltersDialog({required this.initialFilters});
 
@@ -5127,7 +5382,16 @@ class _SharedCalendarFiltersDialogState
                 width: fieldWidth,
                 label: 'Recorrencia',
                 value: _recurrenceRule,
-                values: const {'': 'Todas', 'YEARLY': 'Anual'},
+                values: const {
+                  '': 'Todas',
+                  'NONE': 'Nao se repete',
+                  'DAILY': 'Todos os dias',
+                  'WEEKDAYS': 'Dias uteis',
+                  'WEEKLY': 'Semanal',
+                  'MONTHLY': 'Mensal',
+                  'MONTHLY_NTH_WEEKDAY': 'Mensal por dia da semana',
+                  'YEARLY': 'Anual',
+                },
                 onChanged: (value) =>
                     setState(() => _recurrenceRule = value ?? ''),
               ),
@@ -5505,6 +5769,621 @@ class _SharedCalendarNonBusinessDayDialogState
     put('cityName', _cityName.text);
     put('notes', _notes.text);
     Navigator.of(context).pop(body);
+  }
+}
+
+class _CalendarDayDetailsDialog extends StatelessWidget {
+  const _CalendarDayDetailsDialog({
+    required this.date,
+    required this.entries,
+    required this.nonBusinessDays,
+    required this.onAddEvent,
+    required this.onEditEntry,
+    required this.onCancelEntry,
+    required this.onApplicability,
+    required this.scopeFromEntry,
+    required this.scopeFromNonBusinessDay,
+  });
+
+  final DateTime date;
+  final List<Map<String, dynamic>> entries;
+  final List<Map<String, dynamic>> nonBusinessDays;
+  final VoidCallback onAddEvent;
+  final ValueChanged<Map<String, dynamic>> onEditEntry;
+  final ValueChanged<Map<String, dynamic>> onCancelEntry;
+  final ValueChanged<Map<String, String>> onApplicability;
+  final Map<String, String> Function(Map<String, dynamic>) scopeFromEntry;
+  final Map<String, String> Function(Map<String, dynamic>)
+  scopeFromNonBusinessDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = min(MediaQuery.sizeOf(context).width * 0.92, 760.0);
+    return AlertDialog(
+      title: Text(_apiLongDate(date)),
+      content: SizedBox(
+        width: width,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (nonBusinessDays.isNotEmpty) ...[
+                _sectionTitle(context, 'Dias nao uteis'),
+                const SizedBox(height: 8),
+                for (final item in nonBusinessDays)
+                  _nonBusinessDayTile(context, item),
+                const SizedBox(height: 12),
+              ],
+              _sectionTitle(context, 'Itens do dia'),
+              const SizedBox(height: 8),
+              if (entries.isEmpty)
+                const _HubEmptyLine(
+                  icon: Icons.event_available_outlined,
+                  text: 'Nenhum item para este dia.',
+                )
+              else
+                for (final entry in entries) _entryTile(context, entry),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
+        ),
+        FilledButton.icon(
+          onPressed: () => _closeThen(context, onAddEvent),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Novo item'),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String text) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        color: _inkColor,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+
+  Widget _nonBusinessDayTile(BuildContext context, Map<String, dynamic> item) {
+    final scope = scopeFromNonBusinessDay(item);
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.event_busy_outlined, color: _amberColor),
+      title: Text(_apiText(item['name'], fallback: 'Dia nao util')),
+      subtitle: Text(
+        [
+          _apiText(item['dateLabel'], fallback: _apiText(item['date'])),
+          _apiText(item['regionCode']),
+          _apiText(item['stateCode']),
+          _apiText(item['cityName']),
+        ].where((value) => value.isNotEmpty).join(' | '),
+      ),
+      trailing: scope.isEmpty
+          ? null
+          : IconButton(
+              tooltip: 'Ver aplicabilidade',
+              onPressed: () =>
+                  _closeThen(context, () => onApplicability(scope)),
+              icon: const Icon(Icons.groups_2_outlined),
+            ),
+    );
+  }
+
+  Widget _entryTile(BuildContext context, Map<String, dynamic> entry) {
+    final scope = scopeFromEntry(entry);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: _lineColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListTile(
+        title: Text(_apiText(entry['title'], fallback: 'Item de calendario')),
+        subtitle: Text(
+          [
+            _calendarEntryDisplayDateLabel(entry),
+            _apiText(entry['kindLabel'], fallback: _apiText(entry['kind'])),
+            _apiText(entry['statusLabel'], fallback: _apiText(entry['status'])),
+            if (_apiText(entry['recurrenceRule']).isNotEmpty)
+              _calendarEntryRecurrenceDisplayLabel(entry),
+          ].where((value) => value.isNotEmpty).join(' | '),
+        ),
+        trailing: Wrap(
+          spacing: 2,
+          children: [
+            if (scope.isNotEmpty)
+              IconButton(
+                tooltip: 'Ver aplicabilidade',
+                onPressed: () =>
+                    _closeThen(context, () => onApplicability(scope)),
+                icon: const Icon(Icons.groups_2_outlined),
+              ),
+            IconButton(
+              tooltip: 'Editar',
+              onPressed: entry['canEdit'] == true
+                  ? () => _closeThen(context, () => onEditEntry(entry))
+                  : null,
+              icon: const Icon(Icons.edit_outlined),
+            ),
+            IconButton(
+              tooltip: 'Cancelar',
+              onPressed: entry['canCancel'] == true
+                  ? () => _closeThen(context, () => onCancelEntry(entry))
+                  : null,
+              icon: const Icon(Icons.event_busy_outlined),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _closeThen(BuildContext context, VoidCallback callback) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) => callback());
+  }
+}
+
+class _SharedCalendarEntryDialog extends StatefulWidget {
+  const _SharedCalendarEntryDialog({required this.initialDate, this.entry});
+
+  final DateTime initialDate;
+  final Map<String, dynamic>? entry;
+
+  @override
+  State<_SharedCalendarEntryDialog> createState() =>
+      _SharedCalendarEntryDialogState();
+}
+
+class _SharedCalendarEntryDialogState
+    extends State<_SharedCalendarEntryDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _title;
+  late final TextEditingController _description;
+  late final TextEditingController _category;
+  late final TextEditingController _startsAt;
+  late final TextEditingController _endsAt;
+  late final TextEditingController _holidayRegionCode;
+  late final TextEditingController _appliesToRegionCode;
+  late final TextEditingController _appliesToStateCode;
+  late final TextEditingController _appliesToCityName;
+  late final TextEditingController _notificationTime;
+  late final TextEditingController _notificationOffsetBusinessDays;
+  late String _kind;
+  late String _priority;
+  late String _recurrenceRule;
+  late String _businessDayPolicy;
+  late String _notificationPolicy;
+  late bool _isAllDay;
+  late Set<String> _notificationChannels;
+
+  @override
+  void initState() {
+    super.initState();
+    final entry = widget.entry;
+    final notification = _apiMap(entry?['notification']);
+    final applicability = _apiMap(entry?['applicability']);
+    _kind = _apiText(entry?['kind'], fallback: 'REMINDER');
+    _priority = _apiText(entry?['priority'], fallback: 'NORMAL');
+    _recurrenceRule = _apiText(entry?['recurrenceRule'], fallback: 'NONE');
+    _businessDayPolicy = _apiText(
+      entry?['businessDayPolicy'],
+      fallback: 'ALLOW_NON_BUSINESS_DAY',
+    );
+    _notificationPolicy = _apiText(
+      notification['policy'],
+      fallback: _apiText(
+        entry?['notificationPolicy'],
+        fallback: 'ONE_BUSINESS_DAY_BEFORE',
+      ),
+    );
+    _isAllDay = entry?['isAllDay'] != false;
+    _notificationChannels = _readChannels(notification['channels']);
+    _title = TextEditingController(text: _apiText(entry?['title']));
+    _description = TextEditingController(text: _apiText(entry?['description']));
+    _category = TextEditingController(text: _apiText(entry?['category']));
+    _startsAt = TextEditingController(
+      text: _dateInputFromApi(
+        entry?['seriesStartsAt'] ?? entry?['startsAt'],
+        widget.initialDate,
+      ),
+    );
+    _endsAt = TextEditingController(text: _dateInputFromApi(entry?['endsAt']));
+    _holidayRegionCode = TextEditingController(
+      text: _apiText(entry?['holidayRegionCode']),
+    );
+    _appliesToRegionCode = TextEditingController(
+      text: _apiText(applicability['regionCode']),
+    );
+    _appliesToStateCode = TextEditingController(
+      text: _apiText(applicability['stateCode']),
+    );
+    _appliesToCityName = TextEditingController(
+      text: _apiText(applicability['cityName']),
+    );
+    _notificationTime = TextEditingController(
+      text: _apiText(notification['time'], fallback: '09:00'),
+    );
+    _notificationOffsetBusinessDays = TextEditingController(
+      text: _apiText(notification['offsetBusinessDays'], fallback: '1'),
+    );
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    _category.dispose();
+    _startsAt.dispose();
+    _endsAt.dispose();
+    _holidayRegionCode.dispose();
+    _appliesToRegionCode.dispose();
+    _appliesToStateCode.dispose();
+    _appliesToCityName.dispose();
+    _notificationTime.dispose();
+    _notificationOffsetBusinessDays.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = min(MediaQuery.sizeOf(context).width * 0.92, 760.0);
+    final fieldWidth = width < 620 ? width : (width - 16) / 2;
+    final recurrenceOptions = _calendarRecurrenceOptions(_selectedDate);
+    return AlertDialog(
+      title: Text(widget.entry == null ? 'Novo item de agenda' : 'Editar item'),
+      content: SizedBox(
+        width: width,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 12,
+              children: [
+                _textField(
+                  width: width,
+                  controller: _title,
+                  label: 'Titulo',
+                  icon: Icons.title_outlined,
+                  required: true,
+                ),
+                _textField(
+                  width: width,
+                  controller: _description,
+                  label: 'Descricao',
+                  icon: Icons.notes_outlined,
+                  maxLines: 4,
+                ),
+                _dropdownField(
+                  width: fieldWidth,
+                  label: 'Tipo',
+                  value: _kind,
+                  values: const {
+                    'REMINDER': 'Lembrete',
+                    'APPOINTMENT': 'Compromisso',
+                    'NOTICE': 'Recado',
+                  },
+                  onChanged: (value) =>
+                      setState(() => _kind = value ?? 'REMINDER'),
+                ),
+                _dropdownField(
+                  width: fieldWidth,
+                  label: 'Prioridade',
+                  value: _priority,
+                  values: const {
+                    'LOW': 'Baixa',
+                    'NORMAL': 'Normal',
+                    'HIGH': 'Alta',
+                    'CRITICAL': 'Critica',
+                  },
+                  onChanged: (value) =>
+                      setState(() => _priority = value ?? 'NORMAL'),
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _startsAt,
+                  label: 'Inicio',
+                  icon: Icons.event_outlined,
+                  required: true,
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _endsAt,
+                  label: 'Fim',
+                  icon: Icons.event_available_outlined,
+                ),
+                _dropdownField(
+                  width: fieldWidth,
+                  label: 'Recorrencia',
+                  value: recurrenceOptions.containsKey(_recurrenceRule)
+                      ? _recurrenceRule
+                      : 'NONE',
+                  values: recurrenceOptions,
+                  onChanged: (value) =>
+                      setState(() => _recurrenceRule = value ?? 'NONE'),
+                ),
+                _dropdownField(
+                  width: fieldWidth,
+                  label: 'Dia util',
+                  value: _businessDayPolicy,
+                  values: const {
+                    'ALLOW_NON_BUSINESS_DAY': 'Permitir',
+                    'MOVE_TO_PREVIOUS_BUSINESS_DAY': 'Mover para anterior',
+                    'MOVE_TO_NEXT_BUSINESS_DAY': 'Mover para proximo',
+                    'REQUIRE_BUSINESS_DAY': 'Bloquear',
+                  },
+                  onChanged: (value) => setState(
+                    () =>
+                        _businessDayPolicy = value ?? 'ALLOW_NON_BUSINESS_DAY',
+                  ),
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _category,
+                  label: 'Classificacao',
+                  icon: Icons.label_outline,
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _holidayRegionCode,
+                  label: 'Regiao calendario',
+                  icon: Icons.location_city_outlined,
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _appliesToRegionCode,
+                  label: 'Aplica a regiao',
+                  icon: Icons.travel_explore_outlined,
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _appliesToStateCode,
+                  label: 'Aplica ao estado',
+                  icon: Icons.flag_outlined,
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _appliesToCityName,
+                  label: 'Aplica a cidade',
+                  icon: Icons.location_on_outlined,
+                ),
+                _dropdownField(
+                  width: fieldWidth,
+                  label: 'Notificacao',
+                  value: _notificationPolicy,
+                  values: const {
+                    'ON_DUE_DATE': 'No dia',
+                    'ONE_BUSINESS_DAY_BEFORE': '1 dia util antes',
+                    'SAME_DAY_OR_PREVIOUS_BUSINESS_DAY':
+                        'No dia ou util anterior',
+                    'CUSTOM_BUSINESS_DAYS_BEFORE': 'Dias uteis antes',
+                  },
+                  onChanged: (value) => setState(
+                    () => _notificationPolicy =
+                        value ?? 'ONE_BUSINESS_DAY_BEFORE',
+                  ),
+                ),
+                _textField(
+                  width: fieldWidth,
+                  controller: _notificationTime,
+                  label: 'Hora',
+                  icon: Icons.schedule_outlined,
+                ),
+                if (_notificationPolicy == 'CUSTOM_BUSINESS_DAYS_BEFORE')
+                  _textField(
+                    width: fieldWidth,
+                    controller: _notificationOffsetBusinessDays,
+                    label: 'Dias uteis antes',
+                    icon: Icons.work_history_outlined,
+                  ),
+                SizedBox(
+                  width: fieldWidth,
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _isAllDay,
+                    onChanged: (value) => setState(() => _isAllDay = value),
+                    title: const Text('Dia inteiro'),
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _channelChip(
+                        'IN_APP',
+                        'No app',
+                        Icons.notifications_none,
+                      ),
+                      _channelChip('EMAIL', 'Email', Icons.mail_outline),
+                      _channelChip('PUSH', 'Push', Icons.phone_iphone_outlined),
+                      _channelChip(
+                        'WEBHOOK',
+                        'Webhook',
+                        Icons.webhook_outlined,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.check_rounded, size: 18),
+          label: const Text('Salvar'),
+        ),
+      ],
+    );
+  }
+
+  DateTime get _selectedDate =>
+      DateTime.tryParse(_startsAt.text) ?? widget.initialDate;
+
+  Widget _textField({
+    required double width,
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool required = false,
+    int maxLines = 1,
+  }) {
+    return SizedBox(
+      width: width,
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        decoration: _inputDecoration(label: label, icon: icon),
+        validator: required
+            ? (value) =>
+                  (value?.trim().isEmpty ?? true) ? 'Campo obrigatorio' : null
+            : null,
+      ),
+    );
+  }
+
+  Widget _dropdownField({
+    required double width,
+    required String label,
+    required String value,
+    required Map<String, String> values,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return SizedBox(
+      width: width,
+      child: DropdownButtonFormField<String>(
+        initialValue: values.containsKey(value) ? value : values.keys.first,
+        decoration: _inputDecoration(label: label, icon: Icons.tune_outlined),
+        items: [
+          for (final item in values.entries)
+            DropdownMenuItem(value: item.key, child: Text(item.value)),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _channelChip(String value, String label, IconData icon) {
+    final selected = _notificationChannels.contains(value);
+    return FilterChip(
+      selected: selected,
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      onSelected: (checked) {
+        setState(() {
+          if (checked) {
+            _notificationChannels.add(value);
+          } else {
+            _notificationChannels.remove(value);
+          }
+        });
+      },
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, size: 18),
+      border: const OutlineInputBorder(),
+      isDense: true,
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (!_isValidTimeInput(_notificationTime.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe a hora no formato HH:mm.')),
+      );
+      return;
+    }
+
+    final offset =
+        int.tryParse(_notificationOffsetBusinessDays.text.trim()) ?? 0;
+    if (_notificationPolicy == 'CUSTOM_BUSINESS_DAYS_BEFORE' &&
+        (offset < 1 || offset > 30)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Use de 1 a 30 dias uteis.')),
+      );
+      return;
+    }
+
+    final channels = _notificationChannels.isEmpty
+        ? const ['IN_APP']
+        : _notificationChannels.toList(growable: false);
+    Navigator.of(context).pop(
+      _cleanMutationBody({
+        'kind': _kind,
+        'title': _title.text,
+        'description': _description.text,
+        'category': _category.text.toUpperCase(),
+        'recurrenceRule': _recurrenceRule,
+        'startsAt': _startsAt.text,
+        'endsAt': _endsAt.text,
+        'timezone': 'America/Sao_Paulo',
+        'isAllDay': _isAllDay,
+        'priority': _priority,
+        'businessDayPolicy': _businessDayPolicy,
+        'holidayRegionCode': _holidayRegionCode.text.toUpperCase(),
+        'appliesToRegionCode': _appliesToRegionCode.text.toUpperCase(),
+        'appliesToStateCode': _appliesToStateCode.text.toUpperCase(),
+        'appliesToCityName': _appliesToCityName.text,
+        'notificationPolicy': _notificationPolicy,
+        'notificationOffsetBusinessDays':
+            _notificationPolicy == 'CUSTOM_BUSINESS_DAYS_BEFORE'
+            ? offset
+            : (_notificationPolicy == 'ONE_BUSINESS_DAY_BEFORE' ? 1 : 0),
+        'notificationTime': _notificationTime.text,
+        'notificationChannels': channels,
+      }),
+    );
+  }
+
+  Set<String> _readChannels(Object? value) {
+    if (value is List) {
+      final parsed = value
+          .map(_apiText)
+          .where((item) => item.isNotEmpty)
+          .toSet();
+      if (parsed.isNotEmpty) {
+        return parsed;
+      }
+    }
+    return {'IN_APP', 'EMAIL'};
+  }
+
+  String _dateInputFromApi(Object? value, [DateTime? fallback]) {
+    final text = _apiText(value);
+    final parsed = text.isEmpty ? null : DateTime.tryParse(text);
+    if (parsed != null) {
+      return _inputDateFor(parsed);
+    }
+    return fallback == null ? '' : _inputDateFor(fallback);
   }
 }
 
