@@ -1023,6 +1023,10 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
                       DropdownMenuItem(value: 'EMAIL', child: Text('E-mail')),
                       DropdownMenuItem(value: 'PHONE', child: Text('Telefone')),
                       DropdownMenuItem(
+                        value: 'WHATSAPP',
+                        child: Text('WhatsApp'),
+                      ),
+                      DropdownMenuItem(
                         value: 'NONE',
                         child: Text('Enviar para análise'),
                       ),
@@ -1379,7 +1383,8 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
     }
 
     if (_verificationAccepted &&
-        _verificationChannel == 'PHONE' &&
+        (_verificationChannel == 'PHONE' ||
+            _verificationChannel == 'WHATSAPP') &&
         phone.isEmpty) {
       _showMessage('Informe o telefone usado na verificação.');
       return;
