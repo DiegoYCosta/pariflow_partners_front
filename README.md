@@ -15,10 +15,11 @@ explicito; host publico exige Firebase real e Firebase Admin no backend.
 
 ## Relatorios (WIP)
 
-A Central de Relatorios esta em desenvolvimento. A UI ja organiza o catalogo por
-familias estrategicas, gerenciais, controles, compliance/risco, logs/auditoria e
-automacao, com subrelatorios e filtros configuraveis como periodo, publico,
-status, empresa e responsavel.
+A Central de Relatorios esta em desenvolvimento, mas ja possui integracao real
+com `POST /api/v1/relatorios/executar` para templates suportados. A UI organiza
+o catalogo por familias estrategicas, gerenciais, controles, compliance/risco,
+logs/auditoria e automacao, com subrelatorios e filtros configuraveis como
+periodo, publico, status, empresa e responsavel.
 
 O filtro `Publico` ja indica a hierarquia do usuario atual, destaca o perfil
 dele e bloqueia selecoes acima da permissao disponivel, exibindo uma mensagem
@@ -26,15 +27,26 @@ curta quando o acesso exige liberacao de admin. Essa protecao visual nao
 substitui a ACL do backend; a liberacao final de dados sensiveis deve continuar
 validada pela API.
 
-Ainda faltam a persistencia de modelos de relatorio, execucao com dados reais,
-exportacao, auditoria das execucoes e alinhamento final das permissoes
+O relatorio `controls_calendar` ja representa agenda, compromissos e lembretes.
+Ainda faltam persistencia de modelos de relatorio, exportacao, auditoria das
+execucoes, filtros avancados estilo CMNET e alinhamento final das permissoes
 granulares com backend e banco.
+
+## Calendario Compartilhado (planejado)
+
+A agenda atual existe no fluxo de People/Focus Board. A proxima evolucao e um
+calendario compartilhado da equipe, acessado pelo shell, com feriados e dias
+nao uteis cadastraveis pelo RH, comunicados por grupo, lembretes classificados
+por pessoa/empresa/contrato e filtros avancados em janela propria. Lembretes
+para funcionarios desligados devem ficar desativados por padrao, com reativacao
+manual por usuario autorizado.
 
 ## Documentacao Viva
 
 - [Indice documental](docs/README.md)
 - [Guia operacional, seguranca e deploy](docs/guia-operacional-ambientes-e-funcoes.md)
 - [Estado atual e proximos passos](docs/current-implementation-status.md)
+- [Calendario compartilhado, lembretes e relatorios](docs/calendario-compartilhado-e-relatorios.md)
 - [Consolidacao arquitetural do front](docs/front-architecture-consolidation.md)
 - [Contrato relacional de Network](docs/relational-graph-contract.md)
 - [Design system CRM](docs/new-ui-design-system.md)

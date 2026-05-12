@@ -6,21 +6,30 @@ import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'package:http/http.dart' as http;
 
 import '../../firebase_options.dart';
+import 'api_http_client.dart';
 
 class ApiClient {
   ApiClient({http.Client? httpClient, String? baseUrl})
-    : _httpClient = httpClient ?? http.Client(),
+    : _httpClient = httpClient ?? createApiHttpClient(),
       baseUrl = baseUrl ?? _defaultApiBaseUrl;
 
   final http.Client _httpClient;
   final String baseUrl;
-  String? _accessToken;
-  SessionSnapshot? _session;
+  static String? _accessToken;
+  static SessionSnapshot? _session;
+  static DateTime? _accessTokenRefreshAt;
 
   bool get hasSession => _accessToken != null;
 
   Future<SessionSnapshot> ensureDevelopmentSession() async {
-    if (_session != null && _accessToken != null) {
+    if (_session != null &&
+        _accessToken != null &&
+        (_accessTokenRefreshAt == null ||
+            DateTime.now().isBefore(_accessTokenRefreshAt!))) {
+      return _session!;
+    }
+
+    if (await _tryRefreshSession()) {
       return _session!;
     }
 
@@ -56,9 +65,34 @@ class ApiClient {
       requiresAuth: false,
     );
     final session = SessionSnapshot.fromMap(data);
-    _session = session;
-    _accessToken = session.accessToken;
+    _storeSession(session);
     return session;
+  }
+
+  Future<void> logout({bool signOutFirebase = true}) async {
+    try {
+      await _httpClient.post(
+        _uri('auth/logout'),
+        headers: _headers(requiresAuth: false),
+        body: '{}',
+      );
+    } catch (_) {
+      // Logout local ainda precisa limpar estado mesmo se a API estiver fora.
+    } finally {
+      _clearSession();
+    }
+
+    if (!signOutFirebase ||
+        !DefaultFirebaseOptions.isConfiguredForCurrentPlatform ||
+        Firebase.apps.isEmpty) {
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.signOut();
+    } on FirebaseException {
+      // A sessao interna ja foi limpa. Firebase pode estar indisponivel em dev.
+    }
   }
 
   Future<Map<String, dynamic>> getMap(
@@ -66,13 +100,12 @@ class ApiClient {
     Map<String, String?> query = const {},
     bool requiresAuth = true,
   }) async {
-    if (requiresAuth) {
-      await ensureDevelopmentSession();
-    }
-
-    final response = await _httpClient.get(
-      _uri(path, query: query),
-      headers: _headers(requiresAuth: requiresAuth),
+    final response = await _sendWithOptionalRefresh(
+      () => _httpClient.get(
+        _uri(path, query: query),
+        headers: _headers(requiresAuth: requiresAuth),
+      ),
+      requiresAuth: requiresAuth,
     );
 
     return _decodeMap(response);
@@ -83,14 +116,13 @@ class ApiClient {
     required Map<String, dynamic> body,
     bool requiresAuth = true,
   }) async {
-    if (requiresAuth) {
-      await ensureDevelopmentSession();
-    }
-
-    final response = await _httpClient.post(
-      _uri(path),
-      headers: _headers(requiresAuth: requiresAuth),
-      body: jsonEncode(body),
+    final response = await _sendWithOptionalRefresh(
+      () => _httpClient.post(
+        _uri(path),
+        headers: _headers(requiresAuth: requiresAuth),
+        body: jsonEncode(body),
+      ),
+      requiresAuth: requiresAuth,
     );
 
     return _decodeMap(response);
@@ -101,14 +133,13 @@ class ApiClient {
     required Map<String, dynamic> body,
     bool requiresAuth = true,
   }) async {
-    if (requiresAuth) {
-      await ensureDevelopmentSession();
-    }
-
-    final response = await _httpClient.patch(
-      _uri(path),
-      headers: _headers(requiresAuth: requiresAuth),
-      body: jsonEncode(body),
+    final response = await _sendWithOptionalRefresh(
+      () => _httpClient.patch(
+        _uri(path),
+        headers: _headers(requiresAuth: requiresAuth),
+        body: jsonEncode(body),
+      ),
+      requiresAuth: requiresAuth,
     );
 
     return _decodeMap(response);
@@ -118,16 +149,76 @@ class ApiClient {
     String path, {
     bool requiresAuth = true,
   }) async {
-    if (requiresAuth) {
-      await ensureDevelopmentSession();
-    }
-
-    final response = await _httpClient.delete(
-      _uri(path),
-      headers: _headers(requiresAuth: requiresAuth),
+    final response = await _sendWithOptionalRefresh(
+      () => _httpClient.delete(
+        _uri(path),
+        headers: _headers(requiresAuth: requiresAuth),
+      ),
+      requiresAuth: requiresAuth,
     );
 
     return _decodeMap(response);
+  }
+
+  Future<http.Response> _sendWithOptionalRefresh(
+    Future<http.Response> Function() send, {
+    required bool requiresAuth,
+  }) async {
+    if (!requiresAuth) {
+      return send();
+    }
+
+    await ensureDevelopmentSession();
+    var response = await send();
+    if (response.statusCode != 401) {
+      return response;
+    }
+
+    if (await _tryRefreshSession()) {
+      response = await send();
+    }
+    return response;
+  }
+
+  Future<bool> _tryRefreshSession() async {
+    try {
+      final response = await _httpClient.post(
+        _uri('auth/refresh'),
+        headers: _headers(requiresAuth: false),
+        body: '{}',
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        _clearSession();
+        return false;
+      }
+
+      final session = SessionSnapshot.fromMap(_decodeMap(response));
+      _storeSession(session);
+      return true;
+    } catch (_) {
+      _clearSession();
+      return false;
+    }
+  }
+
+  static void _storeSession(SessionSnapshot session) {
+    _session = session;
+    _accessToken = session.accessToken;
+    final refreshMarginSeconds = session.expiresInSeconds > 90 ? 45 : 10;
+    _accessTokenRefreshAt = DateTime.now().add(
+      Duration(
+        seconds: (session.expiresInSeconds - refreshMarginSeconds).clamp(
+          5,
+          session.expiresInSeconds,
+        ),
+      ),
+    );
+  }
+
+  static void _clearSession() {
+    _session = null;
+    _accessToken = null;
+    _accessTokenRefreshAt = null;
   }
 
   Uri _uri(String path, {Map<String, String?> query = const {}}) {
@@ -230,6 +321,8 @@ class SessionSnapshot {
     required this.accessToken,
     required this.userPublicId,
     required this.userName,
+    required this.expiresInSeconds,
+    required this.refreshExpiresInSeconds,
     required this.securityContext,
     required this.profiles,
     required this.audienceGroups,
@@ -242,6 +335,11 @@ class SessionSnapshot {
       accessToken: '${map['accessToken'] ?? ''}',
       userPublicId: '${user['publicId'] ?? ''}',
       userName: '${user['nome'] ?? user['name'] ?? user['email'] ?? 'Sessao'}',
+      expiresInSeconds: _intFromMap(map['expiresInSeconds'], fallback: 600),
+      refreshExpiresInSeconds: _intFromMap(
+        map['refreshExpiresInSeconds'],
+        fallback: 0,
+      ),
       securityContext: '${map['securityContext'] ?? 'authenticated'}',
       profiles: [
         for (final profile in (map['profiles'] as List? ?? const []))
@@ -257,9 +355,18 @@ class SessionSnapshot {
   final String accessToken;
   final String userPublicId;
   final String userName;
+  final int expiresInSeconds;
+  final int refreshExpiresInSeconds;
   final String securityContext;
   final List<String> profiles;
   final List<String> audienceGroups;
+}
+
+int _intFromMap(Object? value, {required int fallback}) {
+  if (value is int) {
+    return value;
+  }
+  return int.tryParse('${value ?? ''}') ?? fallback;
 }
 
 class ApiException implements Exception {

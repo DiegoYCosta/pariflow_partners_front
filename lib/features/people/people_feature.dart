@@ -5,11 +5,13 @@ class _PeopleWorkspace extends StatefulWidget {
     required this.viewerProfile,
     required this.selectedIndex,
     required this.onSelectItem,
+    this.onFocusPersonChanged,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final int selectedIndex;
   final ValueChanged<int> onSelectItem;
+  final ValueChanged<String>? onFocusPersonChanged;
 
   @override
   State<_PeopleWorkspace> createState() => _PeopleWorkspaceState();
@@ -19,6 +21,7 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
   final _PeopleApiRepository _repository = _PeopleApiRepository();
   late final TextEditingController _searchController;
   _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.initial();
+  String? _lastPublishedFocusPersonId;
 
   @override
   void initState() {
@@ -373,6 +376,15 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
         ? null
         : data.items.indexOf(selectedItem);
     final profile = selectedItem?.personProfile;
+    if (selectedItem != null &&
+        _lastPublishedFocusPersonId != selectedItem.publicId) {
+      _lastPublishedFocusPersonId = selectedItem.publicId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onFocusPersonChanged?.call(selectedItem.publicId);
+        }
+      });
+    }
     final visibleAttachments = selectedItem == null
         ? <_AttachmentRecord>[]
         : selectedItem.attachments
@@ -568,7 +580,7 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
           const SizedBox(height: 24),
           LayoutBuilder(
             builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 1540;
+              final wide = constraints.maxWidth >= 1320;
               final medium = constraints.maxWidth >= 1120;
               final profilePanel = _PeopleProfilePanel(
                 item: selectedItem,
@@ -617,11 +629,11 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                       children: [
                         Expanded(flex: 5, child: profilePanel),
                         const SizedBox(width: 24),
-                        Expanded(flex: 7, child: linksPanel),
+                        Expanded(flex: 5, child: sideColumn),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    sideColumn,
+                    linksPanel,
                   ],
                 );
               }
@@ -630,9 +642,9 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                 children: [
                   profilePanel,
                   const SizedBox(height: 24),
-                  linksPanel,
-                  const SizedBox(height: 24),
                   sideColumn,
+                  const SizedBox(height: 24),
+                  linksPanel,
                 ],
               );
             },
@@ -1355,6 +1367,528 @@ class _PeopleSideColumn extends StatelessWidget {
   }
 }
 
+class _FocusBoardHubPanel extends StatelessWidget {
+  const _FocusBoardHubPanel({
+    required this.viewerProfile,
+    required this.item,
+    required this.profile,
+    required this.attachments,
+    required this.sections,
+    required this.calendarEntries,
+    required this.onAddCalendarEntry,
+    required this.onCancelCalendarEntry,
+    this.onDetach,
+    this.onRefresh,
+    this.detachLabel,
+  });
+
+  final _ViewerAccessProfile viewerProfile;
+  final _EntityItem item;
+  final _PersonProfileData profile;
+  final List<_AttachmentRecord> attachments;
+  final List<_SensitiveSectionGroup> sections;
+  final List<_CalendarEntryRecord> calendarEntries;
+  final VoidCallback onAddCalendarEntry;
+  final ValueChanged<_CalendarEntryRecord> onCancelCalendarEntry;
+  final VoidCallback? onDetach;
+  final VoidCallback? onRefresh;
+  final String? detachLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoAttachments = attachments
+        .where(_isImageAttachment)
+        .take(4)
+        .toList(growable: false);
+    final documentAttachments = attachments
+        .where((attachment) => !_isImageAttachment(attachment))
+        .take(4)
+        .toList(growable: false);
+    final visibleNotes = [
+      for (final section in sections) ...section.notes,
+    ].take(4).toList(growable: false);
+    final upcomingEntries = calendarEntries.where((entry) {
+      final status = entry.status.toUpperCase();
+      return status != 'CANCELED' && status != 'COMPLETED';
+    }).toList()..sort((left, right) => left.startsAt.compareTo(right.startsAt));
+
+    return _Panel(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _deepTealColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.dashboard_customize_outlined,
+                  color: _deepTealColor,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Focus Board',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Lembre-se que pode haver itens não disponíveis para serem vistos por seu usuário: ${item.title} | ${profile.roleTitle}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: _mutedColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: onAddCalendarEntry,
+                icon: const Icon(Icons.add_alert_outlined, size: 18),
+                label: const Text('Lembrete'),
+              ),
+              if (onRefresh != null) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  tooltip: 'Atualizar Focus Board',
+                  onPressed: onRefresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+              if (onDetach != null) ...[
+                const SizedBox(width: 2),
+                IconButton(
+                  tooltip: detachLabel ?? 'Desacoplar Focus Board',
+                  onPressed: onDetach,
+                  icon: Icon(
+                    detachLabel == null
+                        ? Icons.open_in_full_rounded
+                        : Icons.call_received_rounded,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          _HubAccessNotice(viewerProfile: viewerProfile),
+          const SizedBox(height: 16),
+          _HubSectionHeader(
+            icon: Icons.notification_important_outlined,
+            title: 'Lembretes e compromissos',
+            count: upcomingEntries.length,
+          ),
+          const SizedBox(height: 10),
+          if (upcomingEntries.isEmpty)
+            const _HubEmptyLine(
+              icon: Icons.event_available_outlined,
+              text: 'Nenhum lembrete ou compromisso registrado neste recorte.',
+            )
+          else
+            for (final entry in upcomingEntries.take(4)) ...[
+              _HubReminderTile(
+                entry: entry,
+                onCancel: entry.canCancel
+                    ? () => onCancelCalendarEntry(entry)
+                    : null,
+              ),
+              const SizedBox(height: 8),
+            ],
+          const SizedBox(height: 14),
+          _HubSectionHeader(
+            icon: Icons.description_outlined,
+            title: 'Documentos disponíveis',
+            count: documentAttachments.length,
+          ),
+          const SizedBox(height: 10),
+          if (documentAttachments.isEmpty)
+            const _HubEmptyLine(
+              icon: Icons.lock_outline_rounded,
+              text: 'Sem documentos liberados para este perfil.',
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final attachment in documentAttachments)
+                  _HubAttachmentPreview(attachment: attachment),
+              ],
+            ),
+          const SizedBox(height: 14),
+          _HubSectionHeader(
+            icon: Icons.photo_library_outlined,
+            title: 'Fotos e imagens',
+            count: photoAttachments.length,
+          ),
+          const SizedBox(height: 10),
+          if (photoAttachments.isEmpty)
+            const _HubEmptyLine(
+              icon: Icons.image_not_supported_outlined,
+              text: 'Sem imagens compartilhadas com este perfil.',
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final attachment in photoAttachments)
+                  _HubPhotoPreview(attachment: attachment),
+              ],
+            ),
+          const SizedBox(height: 14),
+          _HubSectionHeader(
+            icon: Icons.psychology_alt_outlined,
+            title: 'Detalhes contextuais',
+            count: visibleNotes.length,
+          ),
+          const SizedBox(height: 10),
+          if (visibleNotes.isEmpty)
+            _HubEmptyLine(
+              icon: viewerProfile.canViewSensitive
+                  ? Icons.info_outline_rounded
+                  : Icons.visibility_off_outlined,
+              text: viewerProfile.canViewSensitive
+                  ? 'Sem detalhes contextuais liberados para esta ficha.'
+                  : 'Detalhes protegidos permanecem ocultos para este perfil.',
+            )
+          else
+            for (final note in visibleNotes) ...[
+              _HubSensitiveNotePreview(note: note),
+              const SizedBox(height: 8),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HubAccessNotice extends StatelessWidget {
+  const _HubAccessNotice({required this.viewerProfile});
+
+  final _ViewerAccessProfile viewerProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _tealColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: _tealColor.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          Icon(viewerProfile.icon, color: _deepTealColor, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Previews respeitam a ACL do backend; conteudo nao autorizado nao entra neste hub.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _deepTealColor,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HubSectionHeader extends StatelessWidget {
+  const _HubSectionHeader({
+    required this.icon,
+    required this.title,
+    required this.count,
+  });
+
+  final IconData icon;
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: _slateColor, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: _inkColor,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        _Tag(
+          label: '$count',
+          icon: Icons.circle,
+          color: _tealColor,
+          background: _tealColor.withValues(alpha: 0.10),
+        ),
+      ],
+    );
+  }
+}
+
+class _HubReminderTile extends StatelessWidget {
+  const _HubReminderTile({required this.entry, required this.onCancel});
+
+  final _CalendarEntryRecord entry;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (entry.priority.toUpperCase()) {
+      'CRITICAL' => _roseColor,
+      'HIGH' => _amberColor,
+      _ => _tealColor,
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.alarm_outlined, color: color, size: 19),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${entry.startsAtLabel} | ${entry.statusLabel}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _mutedColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${entry.notificationPolicyLabel}: ${entry.notificationScheduledAtLabel} | ${entry.notificationChannelsLabel}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _deepTealColor,
+                    height: 1.25,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Cancelar lembrete',
+            onPressed: onCancel,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HubAttachmentPreview extends StatelessWidget {
+  const _HubAttachmentPreview({required this.attachment});
+
+  final _AttachmentRecord attachment;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _attachmentColorFor(attachment);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 132, maxWidth: 178),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(_attachmentIconFor(attachment.title), color: color, size: 22),
+            const SizedBox(height: 8),
+            Text(
+              attachment.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _inkColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              attachment.updatedAtLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: _mutedColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HubPhotoPreview extends StatelessWidget {
+  const _HubPhotoPreview({required this.attachment});
+
+  final _AttachmentRecord attachment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 74,
+      height: 74,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _tealColor.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _tealColor.withValues(alpha: 0.18)),
+      ),
+      child: Icon(
+        _attachmentIconFor(attachment.title),
+        color: _tealColor,
+        size: 26,
+      ),
+    );
+  }
+}
+
+class _HubSensitiveNotePreview extends StatelessWidget {
+  const _HubSensitiveNotePreview({required this.note});
+
+  final _SensitiveNoteTag note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: note.color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: note.color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(note.classification.icon, color: note.color, size: 19),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  note.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  note.note,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _mutedColor,
+                    height: 1.24,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HubEmptyLine extends StatelessWidget {
+  const _HubEmptyLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: _mutedColor, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _mutedColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OccurrencesPanel extends StatelessWidget {
   const _OccurrencesPanel({
     required this.occurrences,
@@ -1816,6 +2350,12 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
   late final TextEditingController _email;
   late final TextEditingController _phone;
   late final TextEditingController _birthDate;
+  late final TextEditingController _zipCode;
+  late final TextEditingController _street;
+  late final TextEditingController _number;
+  late final TextEditingController _district;
+  late final TextEditingController _city;
+  late final TextEditingController _state;
   late final TextEditingController _notes;
 
   @override
@@ -1828,6 +2368,12 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
     _email = TextEditingController(text: initial?.email ?? '');
     _phone = TextEditingController(text: initial?.phone ?? '');
     _birthDate = TextEditingController(text: initial?.birthDateInput ?? '');
+    _zipCode = TextEditingController(text: initial?.zipCode ?? '');
+    _street = TextEditingController(text: initial?.street ?? '');
+    _number = TextEditingController(text: initial?.number ?? '');
+    _district = TextEditingController(text: initial?.district ?? '');
+    _city = TextEditingController(text: initial?.city ?? '');
+    _state = TextEditingController(text: initial?.state ?? '');
     _notes = TextEditingController(text: initial?.notes ?? '');
   }
 
@@ -1839,6 +2385,12 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
     _email.dispose();
     _phone.dispose();
     _birthDate.dispose();
+    _zipCode.dispose();
+    _street.dispose();
+    _number.dispose();
+    _district.dispose();
+    _city.dispose();
+    _state.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -1892,6 +2444,54 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
                   hintText: 'yyyy-mm-dd',
                   dateLike: true,
                 ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _zipCode,
+                        label: 'CEP',
+                        icon: Icons.markunread_mailbox_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _state,
+                        label: 'Estado',
+                        icon: Icons.flag_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogTextField(
+                  controller: _city,
+                  label: 'Cidade',
+                  icon: Icons.location_city_outlined,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _street,
+                        label: 'Logradouro',
+                        icon: Icons.signpost_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _number,
+                        label: 'Numero',
+                        icon: Icons.tag_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogTextField(
+                  controller: _district,
+                  label: 'Bairro',
+                  icon: Icons.map_outlined,
+                ),
                 _dialogTextField(
                   controller: _notes,
                   label: 'Notas',
@@ -1930,9 +2530,28 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
         'email': _email.text,
         'phone': _phone.text,
         'birthDate': _dateInputToIso(_birthDate.text),
+        'addressJson': _addressJson(),
         'notes': _notes.text,
       }),
     );
+  }
+
+  Map<String, String>? _addressJson() {
+    final address = <String, String>{};
+    void put(String key, String value) {
+      final text = value.trim();
+      if (text.isNotEmpty) {
+        address[key] = key == 'state' ? text.toUpperCase() : text;
+      }
+    }
+
+    put('zipCode', _zipCode.text);
+    put('street', _street.text);
+    put('number', _number.text);
+    put('district', _district.text);
+    put('city', _city.text);
+    put('state', _state.text);
+    return address.isEmpty ? null : address;
   }
 }
 
@@ -2649,6 +3268,394 @@ class _AttachmentCrudDialogState extends State<_AttachmentCrudDialog> {
   }
 }
 
+class _CalendarEntryCrudDialog extends StatefulWidget {
+  const _CalendarEntryCrudDialog({
+    required this.personPublicId,
+    required this.personName,
+    required this.profile,
+  });
+
+  final String personPublicId;
+  final String personName;
+  final _PersonProfileData profile;
+
+  @override
+  State<_CalendarEntryCrudDialog> createState() =>
+      _CalendarEntryCrudDialogState();
+}
+
+class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _title;
+  late final TextEditingController _description;
+  late final TextEditingController _startsAt;
+  late final TextEditingController _notificationTime;
+  late final TextEditingController _offsetBusinessDays;
+  late final TextEditingController _holidayRegionCode;
+  late final TextEditingController _appliesToStateCode;
+  late final TextEditingController _appliesToCityName;
+  late String _kind;
+  late String _priority;
+  late String _notificationPolicy;
+  late Set<String> _channels;
+
+  @override
+  void initState() {
+    super.initState();
+    _kind = 'REMINDER';
+    _priority = 'NORMAL';
+    _notificationPolicy = 'ONE_BUSINESS_DAY_BEFORE';
+    _channels = {'IN_APP', 'EMAIL'};
+    _title = TextEditingController(
+      text: 'Encerramento de periodo de experiencia',
+    );
+    _description = TextEditingController(
+      text:
+          'Revisar documentos, contrato e decisao operacional antes do prazo.',
+    );
+    _startsAt = TextEditingController(
+      text: _inputDateFor(DateTime.now().add(const Duration(days: 30))),
+    );
+    _notificationTime = TextEditingController(text: '09:00');
+    _offsetBusinessDays = TextEditingController(text: '2');
+    _holidayRegionCode = TextEditingController(text: 'BR-SP-CAMPINAS');
+    _appliesToStateCode = TextEditingController(text: 'SP');
+    _appliesToCityName = TextEditingController(text: 'Campinas');
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    _startsAt.dispose();
+    _notificationTime.dispose();
+    _offsetBusinessDays.dispose();
+    _holidayRegionCode.dispose();
+    _appliesToStateCode.dispose();
+    _appliesToCityName.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Novo lembrete'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 640),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: _tealColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _tealColor.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.person_pin_circle_outlined,
+                        color: _deepTealColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${widget.personName} | ${widget.profile.roleTitle}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: _deepTealColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _dialogTextField(
+                  controller: _title,
+                  label: 'Titulo',
+                  icon: Icons.title_outlined,
+                  required: true,
+                ),
+                _dialogTextField(
+                  controller: _description,
+                  label: 'Descricao',
+                  icon: Icons.notes_outlined,
+                  minLines: 3,
+                  maxLines: 5,
+                ),
+                Row(
+                  children: [
+                    Expanded(child: _datePickerField(context)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _notificationTime,
+                        label: 'Hora da notificacao',
+                        icon: Icons.schedule_outlined,
+                        hintText: '09:00',
+                        keyboardType: TextInputType.datetime,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _holidayRegionCode,
+                        label: 'Regiao aplicavel',
+                        icon: Icons.travel_explore_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _appliesToStateCode,
+                        label: 'Estado',
+                        icon: Icons.flag_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogTextField(
+                  controller: _appliesToCityName,
+                  label: 'Cidade aplicavel',
+                  icon: Icons.location_on_outlined,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogDropdown(
+                        label: 'Tipo',
+                        value: _kind,
+                        icon: Icons.event_note_outlined,
+                        values: const ['REMINDER', 'APPOINTMENT'],
+                        labels: const {
+                          'REMINDER': 'Lembrete',
+                          'APPOINTMENT': 'Compromisso',
+                        },
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _kind = value);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogDropdown(
+                        label: 'Prioridade',
+                        value: _priority,
+                        icon: Icons.flag_outlined,
+                        values: const ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'],
+                        labels: const {
+                          'LOW': 'Baixa',
+                          'NORMAL': 'Normal',
+                          'HIGH': 'Alta',
+                          'CRITICAL': 'Critica',
+                        },
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _priority = value);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogDropdown(
+                  label: 'Politica de notificacao',
+                  value: _notificationPolicy,
+                  icon: Icons.alarm_outlined,
+                  values: const [
+                    'ON_DUE_DATE',
+                    'ONE_BUSINESS_DAY_BEFORE',
+                    'SAME_DAY_OR_PREVIOUS_BUSINESS_DAY',
+                    'CUSTOM_BUSINESS_DAYS_BEFORE',
+                  ],
+                  labels: const {
+                    'ON_DUE_DATE': 'No dia',
+                    'ONE_BUSINESS_DAY_BEFORE': '1 dia util antes',
+                    'SAME_DAY_OR_PREVIOUS_BUSINESS_DAY':
+                        'No dia ou util anterior',
+                    'CUSTOM_BUSINESS_DAYS_BEFORE': 'Dias uteis antes',
+                  },
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _notificationPolicy = value);
+                    }
+                  },
+                ),
+                if (_notificationPolicy == 'CUSTOM_BUSINESS_DAYS_BEFORE')
+                  _dialogTextField(
+                    controller: _offsetBusinessDays,
+                    label: 'Dias uteis antes',
+                    icon: Icons.work_history_outlined,
+                    required: true,
+                    keyboardType: TextInputType.number,
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 8),
+                  child: Text(
+                    'Canais',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: _inkColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _channelChip('IN_APP', 'No app', Icons.notifications_none),
+                    _channelChip('EMAIL', 'Email', Icons.mail_outline),
+                    _channelChip('PUSH', 'Push', Icons.phone_iphone_outlined),
+                    _channelChip('WEBHOOK', 'Webhook', Icons.webhook_outlined),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Criar')),
+      ],
+    );
+  }
+
+  Widget _datePickerField(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: _startsAt,
+        readOnly: true,
+        decoration: InputDecoration(
+          labelText: 'Data alvo',
+          prefixIcon: const Icon(Icons.event_outlined),
+          suffixIcon: IconButton(
+            tooltip: 'Selecionar data',
+            icon: const Icon(Icons.calendar_month_outlined),
+            onPressed: _pickDate,
+          ),
+          border: const OutlineInputBorder(),
+        ),
+        onTap: _pickDate,
+        validator: (value) {
+          final text = value?.trim() ?? '';
+          if (text.isEmpty) {
+            return 'Campo obrigatorio';
+          }
+          if (!_isValidInputDate(text)) {
+            return 'Use yyyy-mm-dd';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _channelChip(String value, String label, IconData icon) {
+    final selected = _channels.contains(value);
+    return FilterChip(
+      selected: selected,
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      onSelected: (checked) {
+        setState(() {
+          if (checked) {
+            _channels.add(value);
+          } else {
+            _channels.remove(value);
+          }
+        });
+      },
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final current = DateTime.tryParse(_startsAt.text) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035, 12, 31),
+    );
+    if (picked == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _startsAt.text = _inputDateFor(picked);
+    });
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (!_isValidTimeInput(_notificationTime.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe a hora no formato HH:mm.')),
+      );
+      return;
+    }
+
+    final offset = int.tryParse(_offsetBusinessDays.text.trim()) ?? 0;
+    if (_notificationPolicy == 'CUSTOM_BUSINESS_DAYS_BEFORE' &&
+        (offset < 1 || offset > 30)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Use de 1 a 30 dias uteis.')),
+      );
+      return;
+    }
+
+    final normalizedChannels = _channels.isEmpty ? {'IN_APP'} : _channels;
+    final notificationOffsetBusinessDays = switch (_notificationPolicy) {
+      'ONE_BUSINESS_DAY_BEFORE' => 1,
+      'CUSTOM_BUSINESS_DAYS_BEFORE' => offset,
+      _ => 0,
+    };
+
+    Navigator.of(context).pop(
+      _cleanMutationBody({
+        'personPublicId': widget.personPublicId,
+        'kind': _kind,
+        'title': _title.text,
+        'description': _description.text,
+        'startsAt': _startsAt.text,
+        'isAllDay': true,
+        'priority': _priority,
+        'holidayRegionCode': _holidayRegionCode.text.toUpperCase(),
+        'appliesToRegionCode': _holidayRegionCode.text.toUpperCase(),
+        'appliesToStateCode': _appliesToStateCode.text.toUpperCase(),
+        'appliesToCityName': _appliesToCityName.text,
+        'notificationPolicy': _notificationPolicy,
+        'notificationOffsetBusinessDays': notificationOffsetBusinessDays,
+        'notificationTime': _notificationTime.text,
+        'notificationChannels': normalizedChannels.toList(growable: false),
+      }),
+    );
+  }
+}
+
 List<_SensitiveSectionGroup> _buildSensitiveSections(
   List<_SensitiveNoteTag> notes,
 ) {
@@ -2712,6 +3719,16 @@ IconData _attachmentIconFor(String title) {
     return Icons.image_outlined;
   }
   return Icons.insert_drive_file_outlined;
+}
+
+bool _isImageAttachment(_AttachmentRecord attachment) {
+  final lowerTitle = attachment.title.toLowerCase();
+  final lowerMime = attachment.mimeType.toLowerCase();
+  return lowerMime.startsWith('image/') ||
+      lowerTitle.endsWith('.jpg') ||
+      lowerTitle.endsWith('.jpeg') ||
+      lowerTitle.endsWith('.png') ||
+      lowerTitle.endsWith('.webp');
 }
 
 Color _attachmentColorFor(_AttachmentRecord attachment) {
@@ -2844,10 +3861,17 @@ bool _isValidInputDate(String value) {
 }
 
 String _todayInputDate() {
-  final now = DateTime.now();
-  final month = now.month.toString().padLeft(2, '0');
-  final day = now.day.toString().padLeft(2, '0');
-  return '${now.year}-$month-$day';
+  return _inputDateFor(DateTime.now());
+}
+
+String _inputDateFor(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
+}
+
+bool _isValidTimeInput(String value) {
+  return RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(value.trim());
 }
 
 String _attachmentClassificationApiValue(
@@ -2893,6 +3917,7 @@ class _PersonProfileData {
     required this.employmentLinks,
     this.crudSnapshot,
     this.occurrences = const [],
+    this.calendarEntries = const [],
   });
 
   final String roleTitle;
@@ -2907,6 +3932,7 @@ class _PersonProfileData {
   final List<_EmploymentLinkRecord> employmentLinks;
   final _PersonCrudSnapshot? crudSnapshot;
   final List<_OccurrenceRecord> occurrences;
+  final List<_CalendarEntryRecord> calendarEntries;
 }
 
 class _PersonCrudSnapshot {
@@ -2918,6 +3944,12 @@ class _PersonCrudSnapshot {
     required this.email,
     required this.phone,
     required this.birthDateInput,
+    required this.zipCode,
+    required this.street,
+    required this.number,
+    required this.district,
+    required this.city,
+    required this.state,
     required this.notes,
   });
 
@@ -2928,6 +3960,12 @@ class _PersonCrudSnapshot {
   final String email;
   final String phone;
   final String birthDateInput;
+  final String zipCode;
+  final String street;
+  final String number;
+  final String district;
+  final String city;
+  final String state;
   final String notes;
 }
 
@@ -2961,6 +3999,48 @@ class _OccurrenceRecord {
   final String status;
   final int attachmentCount;
   final bool showInExecutivePanel;
+}
+
+class _CalendarEntryRecord {
+  const _CalendarEntryRecord({
+    required this.publicId,
+    required this.kind,
+    required this.kindLabel,
+    required this.status,
+    required this.statusLabel,
+    required this.priority,
+    required this.priorityLabel,
+    required this.title,
+    required this.description,
+    required this.startsAt,
+    required this.startsAtLabel,
+    required this.notificationPolicy,
+    required this.notificationPolicyLabel,
+    required this.notificationScheduledAt,
+    required this.notificationScheduledAtLabel,
+    required this.notificationChannelsLabel,
+    required this.canEdit,
+    required this.canCancel,
+  });
+
+  final String publicId;
+  final String kind;
+  final String kindLabel;
+  final String status;
+  final String statusLabel;
+  final String priority;
+  final String priorityLabel;
+  final String title;
+  final String description;
+  final DateTime startsAt;
+  final String startsAtLabel;
+  final String notificationPolicy;
+  final String notificationPolicyLabel;
+  final DateTime? notificationScheduledAt;
+  final String notificationScheduledAtLabel;
+  final String notificationChannelsLabel;
+  final bool canEdit;
+  final bool canCancel;
 }
 
 class _PersonInfoField {

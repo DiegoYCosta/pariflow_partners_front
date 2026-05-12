@@ -35,14 +35,29 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   _ViewerAccessProfile _viewerProfile = _diegoViewerProfile;
   _NetworkFilterState _networkFilters = const _NetworkFilterState();
   bool _showAdvancedNetworkFilters = false;
+  bool _focusBoardDetached = false;
   String _selectedNetworkNodeId = '';
   String? _hoveredNetworkNodeId;
+  late final _FocusBoardPersistentController _focusBoardController;
   final Map<_Destination, int> _selectedItemIndex = {
     _Destination.companies: 0,
     _Destination.clientCompanies: 0,
     _Destination.contracts: 0,
     _Destination.people: 0,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _focusBoardController = _FocusBoardPersistentController();
+    _focusBoardController.ensureLoaded();
+  }
+
+  @override
+  void dispose() {
+    _focusBoardController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -223,48 +238,70 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                           },
                         ),
                         Expanded(
-                          child: SingleChildScrollView(
-                            padding: EdgeInsets.fromLTRB(
-                              _destination == _Destination.network
-                                  ? 0
-                                  : showSidebar
-                                  ? 28
-                                  : 16,
-                              _destination == _Destination.network
-                                  ? 0
-                                  : _destination == _Destination.home
-                                  ? 16
-                                  : 24,
-                              _destination == _Destination.network
-                                  ? 0
-                                  : showSidebar
-                                  ? 28
-                                  : 16,
-                              _destination == _Destination.network
-                                  ? 0
-                                  : showSidebar
-                                  ? 24
-                                  : 96,
-                            ),
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: _destination == _Destination.network
-                                      ? double.infinity
-                                      : 1560,
+                          child: _focusBoardDetached
+                              ? _FocusBoardDetachedWorkspace(
+                                  controller: _focusBoardController,
+                                  viewerProfile: _viewerProfile,
+                                  onAttach: () {
+                                    setState(() {
+                                      _focusBoardDetached = false;
+                                    });
+                                  },
+                                )
+                              : SingleChildScrollView(
+                                  padding: EdgeInsets.fromLTRB(
+                                    _destination == _Destination.network
+                                        ? 0
+                                        : showSidebar
+                                        ? 28
+                                        : 16,
+                                    _destination == _Destination.network
+                                        ? 0
+                                        : _destination == _Destination.home
+                                        ? 16
+                                        : 24,
+                                    _destination == _Destination.network
+                                        ? 0
+                                        : showSidebar
+                                        ? 28
+                                        : 16,
+                                    _destination == _Destination.network
+                                        ? 0
+                                        : showSidebar
+                                        ? 24
+                                        : 96,
+                                  ),
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            _destination == _Destination.network
+                                            ? double.infinity
+                                            : 1560,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildWorkspaceContent(page, width),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildWorkspaceContent(page, width),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
                         ),
                       ],
+                    ),
+                    _PersistentFocusBoardDock(
+                      controller: _focusBoardController,
+                      viewerProfile: _viewerProfile,
+                      detached: _focusBoardDetached,
+                      onDetach: () {
+                        setState(() {
+                          _focusBoardDetached = true;
+                        });
+                      },
                     ),
                   ],
                 ),
@@ -423,6 +460,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         return _PeopleWorkspace(
           viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          onFocusPersonChanged: _focusBoardController.selectPerson,
           onSelectItem: (index) {
             setState(() {
               _selectedItemIndex[_destination] = index;
@@ -435,6 +473,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   void _handleDestination(_Destination destination) {
     setState(() {
       _destination = destination;
+      _focusBoardDetached = false;
     });
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
