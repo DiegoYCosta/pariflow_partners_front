@@ -2923,42 +2923,843 @@ class _CrmHeaderViewerMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<_ViewerAccessProfile>(
-        value: viewerProfile,
-        isDense: true,
-        borderRadius: BorderRadius.circular(12),
-        dropdownColor: Colors.white,
-        icon: const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          color: Color(0xFF1F302C),
-          size: 19,
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (context) => _CrmProfileSettingsDialog(
+          viewerProfile: viewerProfile,
+          onViewerChanged: onViewerChanged,
         ),
-        onChanged: (value) {
-          if (value != null) {
-            onViewerChanged(value);
-          }
-        },
-        selectedItemBuilder: (context) {
-          return _viewerProfiles.map((value) {
-            return _CrmHeaderViewerIdentity(
-              viewerProfile: value,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _CrmHeaderViewerIdentity(
+              viewerProfile: viewerProfile,
               compact: compact,
-            );
-          }).toList();
-        },
-        items: [
-          for (final value in _viewerProfiles)
-            DropdownMenuItem(
-              value: value,
-              child: _CrmHeaderViewerIdentity(
-                viewerProfile: value,
-                compact: false,
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF1F302C),
+              size: 19,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CrmProfileSettingsDialog extends StatefulWidget {
+  const _CrmProfileSettingsDialog({
+    required this.viewerProfile,
+    required this.onViewerChanged,
+  });
+
+  final _ViewerAccessProfile viewerProfile;
+  final ValueChanged<_ViewerAccessProfile> onViewerChanged;
+
+  @override
+  State<_CrmProfileSettingsDialog> createState() =>
+      _CrmProfileSettingsDialogState();
+}
+
+class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
+  late _ViewerAccessProfile _selectedViewer;
+  String _language = 'Portugues (Brasil)';
+  String _timeZone = 'America/Sao_Paulo';
+  bool _use24h = true;
+  bool _notifyInApp = true;
+  bool _notifyEmail = true;
+  bool _notifyPush = true;
+  bool _notifyWhatsapp = false;
+  bool _secondaryEmailActive = true;
+  bool _secondaryWhatsappActive = false;
+  bool _secondarySmsActive = false;
+  bool _linkWhatsapp = false;
+  final bool _linkEmail = true;
+  bool _linkSms = false;
+  late DateTime _calendarMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedViewer = widget.viewerProfile;
+    final now = DateTime.now();
+    _calendarMonth = DateTime(now.year, now.month);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return DefaultTabController(
+      length: 6,
+      child: AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        titlePadding: const EdgeInsets.fromLTRB(24, 20, 12, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        title: Row(
+          children: [
+            _CrmHeaderAvatar(viewerProfile: _selectedViewer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Perfis e configuracoes',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_selectedViewer.name} | ${_viewerRoleLabel(_selectedViewer)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _mutedColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
+            IconButton(
+              tooltip: 'Fechar',
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: min(size.width * 0.92, 920),
+          height: min(size.height * 0.78, 680),
+          child: Column(
+            children: [
+              const TabBar(
+                isScrollable: true,
+                tabs: [
+                  Tab(text: 'Perfil'),
+                  Tab(text: 'Conta'),
+                  Tab(text: 'Seguranca'),
+                  Tab(text: 'Personalizacao'),
+                  Tab(text: 'Contatos'),
+                  Tab(text: 'Calendario'),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _profileTab(context),
+                    _accountTab(context),
+                    _securityTab(context),
+                    _personalizationTab(context),
+                    _contactsTab(context),
+                    _calendarTab(context),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fechar'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              widget.onViewerChanged(_selectedViewer);
+              Navigator.of(context).pop();
+            },
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text('Aplicar'),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _profileTab(BuildContext context) {
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Perfil ativo',
+          icon: Icons.account_circle_outlined,
+          children: [
+            _settingsInfoTile(
+              icon: _selectedViewer.icon,
+              title: _selectedViewer.name,
+              subtitle:
+                  '${_selectedViewer.publicId ?? 'sem publicId'} | ${_selectedViewer.label}',
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _selectedViewer.description,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _mutedColor,
+                height: 1.3,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _settingsSection(
+          context,
+          title: 'Alternar perfil de validacao',
+          icon: Icons.switch_account_outlined,
+          children: [
+            for (final profile in _viewerProfiles) ...[
+              _profileChoice(profile),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _accountTab(BuildContext context) {
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Dados cadastrais',
+          icon: Icons.badge_outlined,
+          children: [
+            _settingsInfoTile(
+              icon: Icons.person_outline_rounded,
+              title: 'Nome',
+              subtitle: _selectedViewer.name,
+            ),
+            _settingsInfoTile(
+              icon: Icons.fingerprint_rounded,
+              title: 'ID de usuario',
+              subtitle: _selectedViewer.publicId ?? 'perfil publico sem ID',
+            ),
+            _settingsInfoTile(
+              icon: Icons.group_outlined,
+              title: 'Grupos',
+              subtitle: _viewerRoleLabel(_selectedViewer),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _settingsSection(
+          context,
+          title: 'Organizacao',
+          icon: Icons.business_center_outlined,
+          children: [
+            _settingsInfoTile(
+              icon: Icons.apartment_rounded,
+              title: 'Empresa vinculada',
+              subtitle: 'PariFlow Partners | pfp_local_company',
+            ),
+            _settingsInfoTile(
+              icon: Icons.verified_user_outlined,
+              title: 'Nivel operacional',
+              subtitle: _selectedViewer.canViewSensitive
+                  ? 'Interno autenticado'
+                  : 'Entrada publica',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _securityTab(BuildContext context) {
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Seguranca',
+          icon: Icons.shield_outlined,
+          children: [
+            _settingsInfoTile(
+              icon: Icons.lock_outline_rounded,
+              title: 'Contexto de acesso',
+              subtitle: _selectedViewer.canViewSensitive
+                  ? 'Privilegiado conforme sessao interna'
+                  : 'Publico, sem leitura protegida',
+            ),
+            _settingsInfoTile(
+              icon: Icons.visibility_outlined,
+              title: 'Dados sensiveis',
+              subtitle: _selectedViewer.canViewSensitive
+                  ? 'Pode visualizar payloads autorizados pela ACL'
+                  : 'Bloqueado',
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: true,
+              onChanged: null,
+              title: const Text('Auditoria ativa'),
+              subtitle: const Text(
+                'Criacao, cancelamento e acessos sensiveis ficam rastreaveis.',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _personalizationTab(BuildContext context) {
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Personalizacao',
+          icon: Icons.tune_outlined,
+          children: [
+            _settingsDropdown(
+              label: 'Lingua',
+              value: _language,
+              values: const ['Portugues (Brasil)', 'English', 'Espanol'],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _language = value);
+                }
+              },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _use24h,
+              onChanged: (value) => setState(() => _use24h = value),
+              title: const Text('Usar horario em 24 horas'),
+              subtitle: Text(_use24h ? '14:30' : '2:30 PM'),
+            ),
+            _settingsDropdown(
+              label: 'Fuso horario',
+              value: _timeZone,
+              values: const [
+                'America/Sao_Paulo',
+                'America/Manaus',
+                'America/Fortaleza',
+                'UTC',
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _timeZone = value);
+                }
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _settingsSection(
+          context,
+          title: 'Notificacoes',
+          icon: Icons.notifications_active_outlined,
+          children: [
+            _settingsSwitch(
+              title: 'No app',
+              subtitle: 'Sempre recomendado para compromissos e lembretes.',
+              value: _notifyInApp,
+              onChanged: (value) => setState(() => _notifyInApp = value),
+            ),
+            _settingsSwitch(
+              title: 'Email',
+              subtitle: 'Ativo por padrao em novos lembretes.',
+              value: _notifyEmail,
+              onChanged: (value) => setState(() => _notifyEmail = value),
+            ),
+            _settingsSwitch(
+              title: 'Push',
+              subtitle: 'Usado quando houver dispositivo vinculado.',
+              value: _notifyPush,
+              onChanged: (value) => setState(() => _notifyPush = value),
+            ),
+            _settingsSwitch(
+              title: 'WhatsApp',
+              subtitle: 'Depende de contato vinculado e autorizado.',
+              value: _notifyWhatsapp,
+              onChanged: (value) => setState(() => _notifyWhatsapp = value),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _contactsTab(BuildContext context) {
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Canais vinculados',
+          icon: Icons.contact_phone_outlined,
+          children: [
+            _settingsSwitch(
+              title: 'Vincular WhatsApp',
+              subtitle: 'Canal separado para mensagens e confirmacoes.',
+              value: _linkWhatsapp,
+              onChanged: (value) => setState(() => _linkWhatsapp = value),
+            ),
+            _settingsSwitch(
+              title: 'Vincular E-mail',
+              subtitle: 'Canal principal de notificacao escrita.',
+              value: _linkEmail,
+              onChanged: null,
+            ),
+            _settingsSwitch(
+              title: 'Vincular SMS',
+              subtitle: 'Canal curto para alertas criticos.',
+              value: _linkSms,
+              onChanged: (value) => setState(() => _linkSms = value),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _settingsSection(
+          context,
+          title: 'Destinatarios',
+          icon: Icons.forward_to_inbox_outlined,
+          children: [
+            _notificationContactCard(
+              title: 'Contato principal',
+              channel: 'Email',
+              value: _selectedViewer.isAuthenticated
+                  ? '${_selectedViewer.key}@pariflow.local'
+                  : 'sem contato autenticado',
+              relationship: 'Proprio usuario',
+              active: true,
+              locked: true,
+              message:
+                  'Canal pessoal sempre ativo para compromissos e lembretes.',
+              onChanged: null,
+            ),
+            _notificationContactCard(
+              title: 'Contato secundario',
+              channel: 'Email',
+              value: 'gestao.${_selectedViewer.key}@pariflow.local',
+              relationship: 'Gestao direta',
+              active: _secondaryEmailActive,
+              message: _defaultNotificationDelegationMessage('Gestao direta'),
+              onChanged: (value) =>
+                  setState(() => _secondaryEmailActive = value),
+            ),
+            _notificationContactCard(
+              title: 'Contato secundario',
+              channel: 'WhatsApp',
+              value: '+55 11 90000-0000',
+              relationship: 'Contato operacional',
+              active: _secondaryWhatsappActive,
+              message: _defaultNotificationDelegationMessage(
+                'Contato operacional',
+              ),
+              onChanged: (value) =>
+                  setState(() => _secondaryWhatsappActive = value),
+            ),
+            _notificationContactCard(
+              title: 'Contato secundario',
+              channel: 'SMS',
+              value: '+55 11 98888-0000',
+              relationship: 'Escalacao de urgencia',
+              active: _secondarySmsActive,
+              message: _defaultNotificationDelegationMessage(
+                'Escalacao de urgencia',
+              ),
+              onChanged: (value) => setState(() => _secondarySmsActive = value),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _calendarTab(BuildContext context) {
+    final firstDay = DateTime(_calendarMonth.year, _calendarMonth.month);
+    final daysInMonth = DateTime(
+      _calendarMonth.year,
+      _calendarMonth.month + 1,
+      0,
+    ).day;
+    final leadingEmptyCells = firstDay.weekday % 7;
+    final today = DateTime.now();
+
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Calendario',
+          icon: Icons.calendar_month_outlined,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'Mes anterior',
+                  onPressed: () {
+                    setState(() {
+                      _calendarMonth = DateTime(
+                        _calendarMonth.year,
+                        _calendarMonth.month - 1,
+                      );
+                    });
+                  },
+                  icon: const Icon(Icons.chevron_left_rounded),
+                ),
+                Expanded(
+                  child: Text(
+                    _calendarMonthLabel(_calendarMonth),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: _inkColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Proximo mes',
+                  onPressed: () {
+                    setState(() {
+                      _calendarMonth = DateTime(
+                        _calendarMonth.year,
+                        _calendarMonth.month + 1,
+                      );
+                    });
+                  },
+                  icon: const Icon(Icons.chevron_right_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            GridView.count(
+              crossAxisCount: 7,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              childAspectRatio: 1.45,
+              children: [
+                for (final day in const [
+                  'Dom',
+                  'Seg',
+                  'Ter',
+                  'Qua',
+                  'Qui',
+                  'Sex',
+                  'Sab',
+                ])
+                  _calendarWeekdayCell(context, day),
+                for (var index = 0; index < leadingEmptyCells; index += 1)
+                  const SizedBox.shrink(),
+                for (var day = 1; day <= daysInMonth; day += 1)
+                  _calendarDayCell(
+                    context,
+                    day: day,
+                    selected:
+                        today.year == _calendarMonth.year &&
+                        today.month == _calendarMonth.month &&
+                        today.day == day,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _profileChoice(_ViewerAccessProfile profile) {
+    final selected = profile.key == _selectedViewer.key;
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedViewer = profile);
+        widget.onViewerChanged(profile);
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: selected
+              ? profile.color.withValues(alpha: 0.10)
+              : const Color(0xFFF8FAFB),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? profile.color.withValues(alpha: 0.28)
+                : _lineColor,
+          ),
+        ),
+        child: Row(
+          children: [
+            _CrmHeaderAvatar(viewerProfile: profile),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    profile.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _inkColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _viewerRoleLabel(profile),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _mutedColor, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              Icon(Icons.check_circle_rounded, color: profile.color, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsSection(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: _deepTealColor, size: 19),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: _inkColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsInfoTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, color: _mutedColor, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _mutedColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsDropdown({
+    required String label,
+    required String value,
+    required List<String> values,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<String>(
+        initialValue: value,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        items: [
+          for (final item in values)
+            DropdownMenuItem(value: item, child: Text(item)),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _calendarWeekdayCell(BuildContext context, String label) {
+    return Center(
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: _mutedColor,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _calendarDayCell(
+    BuildContext context, {
+    required int day,
+    required bool selected,
+  }) {
+    return Container(
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected
+            ? _tealColor.withValues(alpha: 0.12)
+            : const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: selected ? _tealColor.withValues(alpha: 0.32) : _lineColor,
+        ),
+      ),
+      child: Text(
+        '$day',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: selected ? _deepTealColor : _inkColor,
+          fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsSwitch({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      value: value,
+      onChanged: onChanged,
+      title: Text(title),
+      subtitle: Text(subtitle),
+    );
+  }
+
+  Widget _notificationContactCard({
+    required String title,
+    required String channel,
+    required String value,
+    required String relationship,
+    required bool active,
+    required String message,
+    required ValueChanged<bool>? onChanged,
+    bool locked = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: active
+            ? _tealColor.withValues(alpha: 0.07)
+            : const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: active ? _tealColor.withValues(alpha: 0.20) : _lineColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$title | $channel',
+                  style: const TextStyle(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Switch(value: active, onChanged: locked ? null : onChanged),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(value, style: const TextStyle(color: _mutedColor, fontSize: 12)),
+          const SizedBox(height: 6),
+          _Tag(
+            label: relationship,
+            icon: Icons.link_rounded,
+            color: _tealColor,
+            background: _tealColor.withValues(alpha: 0.10),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(
+              color: _mutedColor,
+              fontSize: 12,
+              height: 1.28,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _defaultNotificationDelegationMessage(String relationship) {
+    final userId = _selectedViewer.publicId ?? 'sem-id';
+    return 'Esta mensagem foi enviada pelo usuario ${_selectedViewer.name}, ID $userId, pelo PariFlow Partners, e esta configurada para ser enviada automaticamente para esse tipo de compromisso/lembrete. Relacionamento: $relationship.';
+  }
+
+  String _calendarMonthLabel(DateTime month) {
+    const labels = [
+      'Janeiro',
+      'Fevereiro',
+      'Marco',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
+    return '${labels[month.month - 1]} ${month.year}';
   }
 }
 

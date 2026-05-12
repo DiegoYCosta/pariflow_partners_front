@@ -5,11 +5,13 @@ class _PeopleWorkspace extends StatefulWidget {
     required this.viewerProfile,
     required this.selectedIndex,
     required this.onSelectItem,
+    this.onFocusPersonChanged,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final int selectedIndex;
   final ValueChanged<int> onSelectItem;
+  final ValueChanged<String>? onFocusPersonChanged;
 
   @override
   State<_PeopleWorkspace> createState() => _PeopleWorkspaceState();
@@ -19,6 +21,7 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
   final _PeopleApiRepository _repository = _PeopleApiRepository();
   late final TextEditingController _searchController;
   _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.initial();
+  String? _lastPublishedFocusPersonId;
 
   @override
   void initState() {
@@ -323,47 +326,6 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
     );
   }
 
-  Future<void> _openCreateCalendarEntryDialog(
-    _EntityItem item,
-    _PersonProfileData profile,
-  ) async {
-    final body = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => _CalendarEntryCrudDialog(
-        personPublicId: item.publicId,
-        personName: item.title,
-        profile: profile,
-      ),
-    );
-
-    if (body == null) {
-      return;
-    }
-
-    await _runPeopleMutation(
-      () => _repository.createCalendarEntry(body),
-      successMessage: 'Lembrete criado na agenda.',
-    );
-  }
-
-  Future<void> _cancelCalendarEntry(_CalendarEntryRecord entry) async {
-    final confirmed = await _confirmAction(
-      title: 'Cancelar lembrete',
-      message:
-          'O item sera marcado como cancelado, preservando historico e auditoria.',
-      confirmLabel: 'Cancelar item',
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    await _runPeopleMutation(
-      () => _repository.cancelCalendarEntry(entry.publicId),
-      successMessage: 'Item de agenda cancelado.',
-    );
-  }
-
   Future<bool> _confirmAction({
     required String title,
     required String message,
@@ -414,6 +376,15 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
         ? null
         : data.items.indexOf(selectedItem);
     final profile = selectedItem?.personProfile;
+    if (selectedItem != null &&
+        _lastPublishedFocusPersonId != selectedItem.publicId) {
+      _lastPublishedFocusPersonId = selectedItem.publicId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onFocusPersonChanged?.call(selectedItem.publicId);
+        }
+      });
+    }
     final visibleAttachments = selectedItem == null
         ? <_AttachmentRecord>[]
         : selectedItem.attachments
@@ -609,7 +580,7 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
           const SizedBox(height: 24),
           LayoutBuilder(
             builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 1540;
+              final wide = constraints.maxWidth >= 1320;
               final medium = constraints.maxWidth >= 1120;
               final profilePanel = _PeopleProfilePanel(
                 item: selectedItem,
@@ -627,7 +598,6 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                 profile: profile,
                 sections: sensitiveSections,
                 attachments: visibleAttachments,
-                calendarEntries: profile.calendarEntries,
                 onAddOccurrence: () =>
                     _openCreateOccurrenceDialog(selectedItem),
                 onEditOccurrence: (occurrence) =>
@@ -636,9 +606,6 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                 onAddAttachment: () => _openCreateAttachmentDialog(profile),
                 onEditAttachment: _openEditAttachmentDialog,
                 onRemoveAttachment: _removeAttachment,
-                onAddCalendarEntry: () =>
-                    _openCreateCalendarEntryDialog(selectedItem, profile),
-                onCancelCalendarEntry: _cancelCalendarEntry,
               );
 
               if (wide) {
@@ -662,11 +629,11 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                       children: [
                         Expanded(flex: 5, child: profilePanel),
                         const SizedBox(width: 24),
-                        Expanded(flex: 7, child: linksPanel),
+                        Expanded(flex: 5, child: sideColumn),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    sideColumn,
+                    linksPanel,
                   ],
                 );
               }
@@ -675,9 +642,9 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                 children: [
                   profilePanel,
                   const SizedBox(height: 24),
-                  linksPanel,
-                  const SizedBox(height: 24),
                   sideColumn,
+                  const SizedBox(height: 24),
+                  linksPanel,
                 ],
               );
             },
@@ -1350,15 +1317,12 @@ class _PeopleSideColumn extends StatelessWidget {
     required this.profile,
     required this.sections,
     required this.attachments,
-    required this.calendarEntries,
     required this.onAddOccurrence,
     required this.onEditOccurrence,
     required this.onRemoveOccurrence,
     required this.onAddAttachment,
     required this.onEditAttachment,
     required this.onRemoveAttachment,
-    required this.onAddCalendarEntry,
-    required this.onCancelCalendarEntry,
   });
 
   final _ViewerAccessProfile viewerProfile;
@@ -1366,31 +1330,17 @@ class _PeopleSideColumn extends StatelessWidget {
   final _PersonProfileData profile;
   final List<_SensitiveSectionGroup> sections;
   final List<_AttachmentRecord> attachments;
-  final List<_CalendarEntryRecord> calendarEntries;
   final VoidCallback onAddOccurrence;
   final ValueChanged<_OccurrenceRecord> onEditOccurrence;
   final ValueChanged<_OccurrenceRecord> onRemoveOccurrence;
   final VoidCallback onAddAttachment;
   final ValueChanged<_AttachmentRecord> onEditAttachment;
   final ValueChanged<_AttachmentRecord> onRemoveAttachment;
-  final VoidCallback onAddCalendarEntry;
-  final ValueChanged<_CalendarEntryRecord> onCancelCalendarEntry;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _FocusBoardHubPanel(
-          viewerProfile: viewerProfile,
-          item: item,
-          profile: profile,
-          attachments: attachments,
-          sections: sections,
-          calendarEntries: calendarEntries,
-          onAddCalendarEntry: onAddCalendarEntry,
-          onCancelCalendarEntry: onCancelCalendarEntry,
-        ),
-        const SizedBox(height: 18),
         _OccurrencesPanel(
           occurrences: profile.occurrences,
           onAdd: onAddOccurrence,
@@ -1427,6 +1377,9 @@ class _FocusBoardHubPanel extends StatelessWidget {
     required this.calendarEntries,
     required this.onAddCalendarEntry,
     required this.onCancelCalendarEntry,
+    this.onDetach,
+    this.onRefresh,
+    this.detachLabel,
   });
 
   final _ViewerAccessProfile viewerProfile;
@@ -1437,6 +1390,9 @@ class _FocusBoardHubPanel extends StatelessWidget {
   final List<_CalendarEntryRecord> calendarEntries;
   final VoidCallback onAddCalendarEntry;
   final ValueChanged<_CalendarEntryRecord> onCancelCalendarEntry;
+  final VoidCallback? onDetach;
+  final VoidCallback? onRefresh;
+  final String? detachLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1483,12 +1439,12 @@ class _FocusBoardHubPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Hub do colaborador',
+                      'Focus Board',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${item.title} | ${profile.roleTitle}',
+                      'Lembre-se que pode haver itens não disponíveis para serem vistos por seu usuário: ${item.title} | ${profile.roleTitle}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1504,6 +1460,26 @@ class _FocusBoardHubPanel extends StatelessWidget {
                 icon: const Icon(Icons.add_alert_outlined, size: 18),
                 label: const Text('Lembrete'),
               ),
+              if (onRefresh != null) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  tooltip: 'Atualizar Focus Board',
+                  onPressed: onRefresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+              if (onDetach != null) ...[
+                const SizedBox(width: 2),
+                IconButton(
+                  tooltip: detachLabel ?? 'Desacoplar Focus Board',
+                  onPressed: onDetach,
+                  icon: Icon(
+                    detachLabel == null
+                        ? Icons.open_in_full_rounded
+                        : Icons.call_received_rounded,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 16),
@@ -1533,7 +1509,7 @@ class _FocusBoardHubPanel extends StatelessWidget {
           const SizedBox(height: 14),
           _HubSectionHeader(
             icon: Icons.description_outlined,
-            title: 'Documentos autorizados',
+            title: 'Documentos disponíveis',
             count: documentAttachments.length,
           ),
           const SizedBox(height: 10),
@@ -3241,7 +3217,7 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
     _kind = 'REMINDER';
     _priority = 'NORMAL';
     _notificationPolicy = 'ONE_BUSINESS_DAY_BEFORE';
-    _channels = {'IN_APP'};
+    _channels = {'IN_APP', 'EMAIL'};
     _title = TextEditingController(
       text: 'Encerramento de periodo de experiencia',
     );

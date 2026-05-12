@@ -28,6 +28,7 @@ part '../features/client_companies/client_companies_feature.dart';
 part '../features/contracts/contracts_feature.dart';
 part '../features/people/people_feature.dart';
 part '../features/people/infrastructure/people_api_data.dart';
+part '../features/focus_board/focus_board_feature.dart';
 part '../features/reports/reports_api_data.dart';
 part '../features/home/home_dashboard_api_data.dart';
 part 'shell/shell_variant.dart';
@@ -186,11 +187,11 @@ class _LocalPreviewBanner extends StatelessWidget {
     return IgnorePointer(
       child: SafeArea(
         child: Align(
-          alignment: Alignment.topRight,
+          alignment: Alignment.bottomRight,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380),
+              constraints: const BoxConstraints(maxWidth: 320),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFFBF5),
