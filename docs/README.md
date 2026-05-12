@@ -1,6 +1,6 @@
 # Documentacao do Front
 
-Data de referencia: `2026-05-08`.
+Data de referencia: `2026-05-12`.
 
 Esta pasta foi consolidada para reduzir documentos pequenos e duplicados. O
 runbook operacional agora concentra ambiente, Firebase, sessao, integracao com
@@ -11,9 +11,10 @@ backend, deploy AWS e smoke tests.
 1. [Estado atual e proximos passos](current-implementation-status.md)
 2. [Guia operacional, seguranca e deploy](guia-operacional-ambientes-e-funcoes.md)
 3. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
-4. [Contrato relacional de Network](relational-graph-contract.md)
-5. [Design system CRM](new-ui-design-system.md)
-6. [Icones e moldes](icones-moldes.md)
+4. [Calendario compartilhado, lembretes e relatorios](calendario-compartilhado-e-relatorios.md)
+5. [Contrato relacional de Network](relational-graph-contract.md)
+6. [Design system CRM](new-ui-design-system.md)
+7. [Icones e moldes](icones-moldes.md)
 
 ## Fontes de Verdade
 
@@ -32,6 +33,8 @@ backend, deploy AWS e smoke tests.
 | Clients | lista, detalhe e CRUD conectados a API real; relacoes ainda podem cruzar contratos no front |
 | Contracts | CRUD de contratos, tipos, modelos, servicos, postos e documentos |
 | People | CRUD de pessoa, vinculos, ocorrencias e anexos; leitura de tags/anexos por ACL |
+| Focus Board/Agenda | hub contextual com lembretes por pessoa e criacao em `POST /api/v1/agenda` |
+| Relatorios | Central de Relatorios integrada a `POST /api/v1/relatorios/executar`, incluindo `controls_calendar` |
 | Network | consome `GET /api/v1/network/graph` |
 | Auth | `dev-token` so funciona em localhost com opt-in; host publico exige Firebase Admin real |
 | Mocks | removidos de `lib/` e fora do bundle publicado |
@@ -47,4 +50,7 @@ backend, deploy AWS e smoke tests.
 6. Integrar o front ao refresh/logout do backend quando a UX de sessao for
    fechada.
 7. Fechar sensitive-session/step-up.
-8. Validar CRUDs e Network com dados reais de homologacao.
+8. Evoluir a agenda atual para calendario compartilhado com feriados/dias nao
+   uteis configuraveis, comunicados por grupo e filtros avancados estilo CMNET.
+9. Validar CRUDs, relatorios, calendario e Network com dados reais de
+   homologacao.
