@@ -466,6 +466,7 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
   final _contactName = TextEditingController();
   final _contactEmail = TextEditingController();
   final _contactPhone = TextEditingController();
+  final _verificationCode = TextEditingController();
   final _quotaControllers = <String, TextEditingController>{};
 
   List<_OnboardingOption> _companyTypes = _fallbackCompanyTypes;
@@ -476,9 +477,13 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
   String _verificationChannel = 'EMAIL';
   bool _verificationAccepted = true;
   bool _checkingCnpj = false;
+  bool _sendingVerification = false;
   bool _submitting = false;
   Timer? _cnpjDebounce;
   String? _lastCheckedCnpj;
+  String? _verificationChallengePublicId;
+  String? _verificationDevCode;
+  DateTime? _verificationExpiresAt;
   _CnpjStatusSnapshot? _cnpjStatus;
   _OnboardingResultSnapshot? _result;
 
@@ -505,6 +510,7 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
     _contactName.dispose();
     _contactEmail.dispose();
     _contactPhone.dispose();
+    _verificationCode.dispose();
     for (final controller in _quotaControllers.values) {
       controller.dispose();
     }
@@ -755,7 +761,11 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
                           ),
                           _fieldBox(
                             constraints.maxWidth,
-                            _buildVerificationPanel(fieldWidth),
+                            _buildVerificationPanel(
+                              compact,
+                              constraints.maxWidth,
+                              fieldWidth,
+                            ),
                           ),
                           _fieldBox(
                             constraints.maxWidth,
@@ -951,7 +961,11 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
     );
   }
 
-  Widget _buildVerificationPanel(double fieldWidth) {
+  Widget _buildVerificationPanel(
+    bool compact,
+    double fullWidth,
+    double fieldWidth,
+  ) {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFFF9FBF8),
@@ -960,64 +974,140 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Wrap(
-          spacing: 14,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: fieldWidth,
-              child: CheckboxListTile(
-                value: _verificationAccepted,
-                onChanged: (value) {
-                  setState(() {
-                    _verificationAccepted = value ?? true;
-                    if (!_verificationAccepted) {
-                      _verificationChannel = 'NONE';
-                    } else if (_verificationChannel == 'NONE') {
-                      _verificationChannel = 'EMAIL';
-                    }
-                  });
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Validar em duas etapas agora'),
-                subtitle: Text(
-                  _verificationAccepted
-                      ? 'Libera imediatamente quando bater com o contato comercial.'
-                      : 'Segue para analise manual.',
-                ),
-              ),
-            ),
-            SizedBox(
-              width: fieldWidth,
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('verification-channel-$_verificationChannel'),
-                initialValue: _verificationChannel,
-                isExpanded: true,
-                decoration: _dialogInputDecoration(
-                  label: 'Canal de validacao',
-                  icon: Icons.security_outlined,
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'EMAIL', child: Text('E-mail')),
-                  DropdownMenuItem(value: 'PHONE', child: Text('Telefone')),
-                  DropdownMenuItem(
-                    value: 'NONE',
-                    child: Text('Enviar para analise'),
-                  ),
-                ],
-                onChanged: _verificationAccepted
-                    ? (value) {
-                        if (value == null) {
-                          return;
+            Wrap(
+              spacing: 14,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: fieldWidth,
+                  child: CheckboxListTile(
+                    value: _verificationAccepted,
+                    onChanged: (value) {
+                      setState(() {
+                        _verificationAccepted = value ?? true;
+                        _resetVerificationChallenge();
+                        if (!_verificationAccepted) {
+                          _verificationChannel = 'NONE';
+                        } else if (_verificationChannel == 'NONE') {
+                          _verificationChannel = 'EMAIL';
                         }
-                        setState(() => _verificationChannel = value);
-                      }
-                    : null,
-              ),
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Validar em duas etapas agora'),
+                    subtitle: Text(
+                      _verificationAccepted
+                          ? 'Libera imediatamente com o código confirmado.'
+                          : 'Seguir para a análise manual.',
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: fieldWidth,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('verification-channel-$_verificationChannel'),
+                    initialValue: _verificationChannel,
+                    isExpanded: true,
+                    decoration: _dialogInputDecoration(
+                      label: 'Canal de validacao',
+                      icon: Icons.security_outlined,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'EMAIL', child: Text('E-mail')),
+                      DropdownMenuItem(value: 'PHONE', child: Text('Telefone')),
+                      DropdownMenuItem(
+                        value: 'NONE',
+                        child: Text('Enviar para análise'),
+                      ),
+                    ],
+                    onChanged: _verificationAccepted
+                        ? (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setState(() {
+                              _verificationChannel = value;
+                              _resetVerificationChallenge();
+                            });
+                          }
+                        : null,
+                  ),
+                ),
+              ],
             ),
+            if (_verificationAccepted && _verificationChannel != 'NONE') ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: compact ? fullWidth : 220,
+                    child: FilledButton.icon(
+                      onPressed: _sendingVerification
+                          ? null
+                          : _startVerification,
+                      icon: _sendingVerification
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.mark_email_read_outlined),
+                      label: const Text('Enviar código'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _brand.deepTealColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: compact ? fullWidth : 220,
+                    child: TextFormField(
+                      controller: _verificationCode,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
+                      ],
+                      decoration: _dialogInputDecoration(
+                        label: 'Código recebido',
+                        icon: Icons.pin_outlined,
+                      ),
+                    ),
+                  ),
+                  if (_verificationDevCode != null)
+                    SizedBox(
+                      width: compact ? fullWidth : 260,
+                      child: Text(
+                        'Código local: $_verificationDevCode',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: _brand.deepTealColor),
+                      ),
+                    )
+                  else if (_verificationExpiresAt != null)
+                    SizedBox(
+                      width: compact ? fullWidth : 260,
+                      child: Text(
+                        'Código enviado. Expira em alguns minutos.',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: _brand.mutedColor),
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1038,7 +1128,7 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Contas iniciais por nivel',
+              'Contas iniciais por nível',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: _brand.deepTealColor,
                 fontWeight: FontWeight.w800,
@@ -1104,7 +1194,7 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    released ? 'Cliente liberado' : 'Solicitacao registrada',
+                    released ? 'Cliente liberado' : 'Solicitação registrada',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: color,
                       fontWeight: FontWeight.w800,
@@ -1277,21 +1367,29 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
     final phone = _contactPhone.text.trim();
 
     if (email.isEmpty && phone.isEmpty) {
-      _showMessage('Informe e-mail ou telefone do contato principal.');
+      _showMessage('Informe o e-mail ou telefone do contato principal.');
       return;
     }
 
     if (_verificationAccepted &&
         _verificationChannel == 'EMAIL' &&
         email.isEmpty) {
-      _showMessage('Informe o e-mail usado na verificacao.');
+      _showMessage('Informe o e-mail usado na verificação.');
       return;
     }
 
     if (_verificationAccepted &&
         _verificationChannel == 'PHONE' &&
         phone.isEmpty) {
-      _showMessage('Informe o telefone usado na verificacao.');
+      _showMessage('Informe o telefone usado na verificação.');
+      return;
+    }
+
+    if (_verificationAccepted &&
+        _verificationChannel != 'NONE' &&
+        (_verificationChallengePublicId == null ||
+            _verificationCode.text.trim().length != 6)) {
+      _showMessage('Informe o código de verificacao.');
       return;
     }
 
@@ -1325,6 +1423,12 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
             ? _verificationChannel
             : 'NONE',
       };
+      _putIfNotBlank(
+        body,
+        'verificationChallengePublicId',
+        _verificationChallengePublicId ?? '',
+      );
+      _putIfNotBlank(body, 'verificationCode', _verificationCode.text);
       _putIfNotBlank(body, 'stateRegistration', _stateRegistration.text);
       _putIfNotBlank(
         body,
@@ -1359,6 +1463,62 @@ class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
         setState(() => _submitting = false);
       }
     }
+  }
+
+  Future<void> _startVerification() async {
+    final cnpj = _digitsOnly(_cnpj.text);
+    if (cnpj.length != 14) {
+      _showMessage('Informe o CNPJ antes de enviar o código.');
+      return;
+    }
+
+    final target = _verificationChannel == 'EMAIL'
+        ? _contactEmail.text.trim()
+        : _contactPhone.text.trim();
+    if (target.isEmpty) {
+      _showMessage(
+        _verificationChannel == 'EMAIL'
+            ? 'Informe o e-mail do contato.'
+            : 'Informe o telefone do contato.',
+      );
+      return;
+    }
+
+    setState(() => _sendingVerification = true);
+
+    try {
+      final data = await _api.postMap(
+        'public/client-onboarding/verification/start',
+        body: {'cnpj': cnpj, 'channel': _verificationChannel, 'target': target},
+        requiresAuth: false,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final devCode = _asText(data['devCode']);
+      setState(() {
+        _verificationChallengePublicId = _asText(data['challengePublicId']);
+        _verificationDevCode = devCode.isEmpty ? null : devCode;
+        _verificationExpiresAt = DateTime.tryParse(_asText(data['expiresAt']));
+        _verificationCode.clear();
+      });
+      _showMessage('Código de verificacao enviado.');
+    } on ApiException catch (error) {
+      _showMessage(error.message);
+    } finally {
+      if (mounted) {
+        setState(() => _sendingVerification = false);
+      }
+    }
+  }
+
+  void _resetVerificationChallenge() {
+    _verificationChallengePublicId = null;
+    _verificationDevCode = null;
+    _verificationExpiresAt = null;
+    _verificationCode.clear();
   }
 
   String? _requiredValidator(String? value) {
