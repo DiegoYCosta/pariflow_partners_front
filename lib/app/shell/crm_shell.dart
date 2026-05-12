@@ -2969,6 +2969,7 @@ class _CrmProfileSettingsDialog extends StatefulWidget {
 
 class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   final _onboardingApi = ApiClient();
+  final _calendarApi = ApiClient();
   late _ViewerAccessProfile _selectedViewer;
   String _language = 'Portugues (Brasil)';
   String _timeZone = 'America/Sao_Paulo';
@@ -2984,6 +2985,11 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   final bool _linkEmail = true;
   bool _linkSms = false;
   late DateTime _calendarMonth;
+  var _calendarEntries = <Map<String, dynamic>>[];
+  var _calendarNonBusinessDays = <Map<String, dynamic>>[];
+  var _calendarFilters = <String, String>{};
+  bool _loadingCalendar = false;
+  String? _calendarError;
   var _onboardingRequests = <Map<String, dynamic>>[];
   bool _loadingOnboarding = false;
   String? _onboardingError;
@@ -2994,6 +3000,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     _selectedViewer = widget.viewerProfile;
     final now = DateTime.now();
     _calendarMonth = DateTime(now.year, now.month);
+    unawaited(_loadSharedCalendar());
     unawaited(_loadOnboardingRequests());
   }
 
@@ -3391,6 +3398,9 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     ).day;
     final leadingEmptyCells = firstDay.weekday % 7;
     final today = DateTime.now();
+    final activeFilters = _calendarFilters.entries
+        .where((entry) => entry.value.trim().isNotEmpty)
+        .toList();
 
     return ListView(
       children: [
@@ -3410,6 +3420,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                         _calendarMonth.month - 1,
                       );
                     });
+                    unawaited(_loadSharedCalendar());
                   },
                   icon: const Icon(Icons.chevron_left_rounded),
                 ),
@@ -3432,11 +3443,62 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                         _calendarMonth.month + 1,
                       );
                     });
+                    unawaited(_loadSharedCalendar());
                   },
                   icon: const Icon(Icons.chevron_right_rounded),
                 ),
+                IconButton(
+                  tooltip: 'Filtros',
+                  onPressed: _openCalendarFilters,
+                  icon: const Icon(Icons.filter_alt_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Novo dia nao util',
+                  onPressed: _openNonBusinessDayDialog,
+                  icon: const Icon(Icons.event_busy_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Atualizar calendario',
+                  onPressed: _loadingCalendar
+                      ? null
+                      : () => unawaited(_loadSharedCalendar()),
+                  icon: _loadingCalendar
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
               ],
             ),
+            if (activeFilters.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final filter in activeFilters)
+                    InputChip(
+                      label: Text('${filter.key}: ${filter.value}'),
+                      onDeleted: () {
+                        setState(() {
+                          _calendarFilters = {..._calendarFilters}
+                            ..remove(filter.key);
+                        });
+                        unawaited(_loadSharedCalendar());
+                      },
+                    ),
+                ],
+              ),
+            ],
+            if (_calendarError != null) ...[
+              const SizedBox(height: 10),
+              _HubEmptyLine(
+                icon: Icons.warning_amber_rounded,
+                text: _calendarError!,
+              ),
+            ],
             const SizedBox(height: 10),
             GridView.count(
               crossAxisCount: 7,
@@ -3466,13 +3528,381 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                         today.year == _calendarMonth.year &&
                         today.month == _calendarMonth.month &&
                         today.day == day,
+                    entries: _calendarEntriesForDay(day),
+                    nonBusinessDays: _calendarNonBusinessDaysForDay(day),
                   ),
               ],
             ),
+            const SizedBox(height: 14),
+            if (_loadingCalendar && _calendarEntries.isEmpty)
+              const LinearProgressIndicator(minHeight: 2)
+            else ...[
+              _calendarSummaryBand(context),
+              const SizedBox(height: 12),
+              if (_calendarNonBusinessDays.isNotEmpty) ...[
+                Text(
+                  'Dias nao uteis',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final day in _calendarNonBusinessDays.take(4)) ...[
+                  _nonBusinessDayCard(context, day),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 4),
+              ],
+              Text(
+                'Itens do mes',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: _inkColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_calendarEntries.isEmpty)
+                const _HubEmptyLine(
+                  icon: Icons.event_available_outlined,
+                  text: 'Nenhum item encontrado para o periodo e filtros.',
+                )
+              else
+                for (final entry in _calendarEntries.take(8)) ...[
+                  _calendarEntryCard(context, entry),
+                  const SizedBox(height: 8),
+                ],
+            ],
           ],
         ),
       ],
     );
+  }
+
+  Future<void> _loadSharedCalendar() async {
+    if (_loadingCalendar) {
+      return;
+    }
+
+    final firstDay = DateTime(_calendarMonth.year, _calendarMonth.month);
+    final lastDay = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+    final query = <String, String?>{
+      'startsAtFrom': _dateQuery(firstDay),
+      'startsAtTo': _dateQuery(lastDay),
+      ..._calendarFilters,
+    };
+    final regionCode = _calendarFilters['holidayRegionCode'];
+
+    setState(() {
+      _loadingCalendar = true;
+      _calendarError = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        _calendarApi.getMap('agenda', query: query),
+        _calendarApi.getMap(
+          'agenda/non-business-days',
+          query: {
+            'from': _dateQuery(firstDay),
+            'to': _dateQuery(lastDay),
+            if (regionCode != null && regionCode.isNotEmpty)
+              'regionCode': regionCode,
+          },
+        ),
+      ]);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _calendarEntries = _apiMapList(results[0]['items']);
+        _calendarNonBusinessDays = _apiMapList(results[1]['items']);
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _calendarError = error.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingCalendar = false);
+      }
+    }
+  }
+
+  Future<void> _openCalendarFilters() async {
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) =>
+          _SharedCalendarFiltersDialog(initialFilters: _calendarFilters),
+    );
+
+    if (result == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _calendarFilters = result;
+    });
+    unawaited(_loadSharedCalendar());
+  }
+
+  Future<void> _openNonBusinessDayDialog() async {
+    final body = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _SharedCalendarNonBusinessDayDialog(),
+    );
+
+    if (body == null || !mounted) {
+      return;
+    }
+
+    setState(() => _loadingCalendar = true);
+    try {
+      await _calendarApi.postMap('agenda/non-business-days', body: body);
+      if (mounted) {
+        setState(() => _loadingCalendar = false);
+      }
+      await _loadSharedCalendar();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dia nao util adicionado ao calendario.')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: _roseColor),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingCalendar = false);
+      }
+    }
+  }
+
+  Widget _calendarSummaryBand(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _Tag(
+            label: '${_calendarEntries.length} itens',
+            icon: Icons.event_note_outlined,
+            color: _deepTealColor,
+            background: _deepTealColor.withValues(alpha: 0.09),
+          ),
+          _Tag(
+            label: '${_calendarNonBusinessDays.length} dias nao uteis',
+            icon: Icons.event_busy_outlined,
+            color: _amberColor,
+            background: _amberColor.withValues(alpha: 0.12),
+          ),
+          _Tag(
+            label: _calendarFilters.isEmpty
+                ? 'sem filtros manuais'
+                : '${_calendarFilters.length} filtros',
+            icon: Icons.filter_alt_outlined,
+            color: _mutedColor,
+            background: _lineColor.withValues(alpha: 0.55),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _nonBusinessDayCard(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: _amberColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _amberColor.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.event_busy_outlined, color: _amberColor, size: 19),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _apiText(item['name'], fallback: 'Dia nao util'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    _apiText(item['dateLabel']),
+                    _apiText(item['regionCode']),
+                    if (item['isRecurringYearly'] == true) 'recorrente anual',
+                  ].where((value) => value.isNotEmpty).join(' | '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _mutedColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _calendarEntryCard(BuildContext context, Map<String, dynamic> entry) {
+    final target = _apiMap(entry['target']);
+    final notification = _apiMap(entry['notification']);
+    final kind = _apiText(entry['kind']);
+    final isNotice = kind == 'NOTICE';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: (isNotice ? _amberColor : _tealColor).withValues(
+                alpha: 0.10,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isNotice
+                  ? Icons.campaign_outlined
+                  : Icons.notifications_active_outlined,
+              color: isNotice ? _amberColor : _tealColor,
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _apiText(entry['title'], fallback: 'Item de calendario'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  [
+                    _apiText(entry['startsAtLabel']),
+                    _apiText(target['label']),
+                    _apiText(entry['category']),
+                  ].where((value) => value.isNotEmpty).join(' | '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _mutedColor,
+                    fontSize: 12,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _Tag(
+                      label: _apiText(entry['kindLabel'], fallback: kind),
+                      icon: Icons.event_note_outlined,
+                      color: _deepTealColor,
+                      background: _deepTealColor.withValues(alpha: 0.09),
+                    ),
+                    _Tag(
+                      label: _apiText(
+                        notification['policyLabel'],
+                        fallback: 'sem notificacao',
+                      ),
+                      icon: Icons.schedule_outlined,
+                      color: _mutedColor,
+                      background: _lineColor.withValues(alpha: 0.55),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _calendarEntriesForDay(int day) {
+    return _calendarEntries.where((entry) {
+      final date = _parseApiDate(_apiText(entry['startsAt']));
+      return date != null &&
+          date.year == _calendarMonth.year &&
+          date.month == _calendarMonth.month &&
+          date.day == day;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _calendarNonBusinessDaysForDay(int day) {
+    return _calendarNonBusinessDays.where((entry) {
+      final date = _parseApiDate(_apiText(entry['date']));
+      if (date == null) {
+        return false;
+      }
+      final recurring = entry['isRecurringYearly'] == true;
+      return recurring
+          ? date.month == _calendarMonth.month && date.day == day
+          : date.year == _calendarMonth.year &&
+                date.month == _calendarMonth.month &&
+                date.day == day;
+    }).toList();
+  }
+
+  DateTime? _parseApiDate(String value) {
+    if (value.isEmpty) {
+      return null;
+    }
+    final parsed = DateTime.tryParse(value);
+    return parsed?.isUtc == true ? parsed!.toLocal() : parsed;
+  }
+
+  String _dateQuery(DateTime value) {
+    return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
   }
 
   Widget _onboardingTab(BuildContext context) {
@@ -3900,24 +4330,68 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     BuildContext context, {
     required int day,
     required bool selected,
+    required List<Map<String, dynamic>> entries,
+    required List<Map<String, dynamic>> nonBusinessDays,
   }) {
+    final hasNonBusinessDay = nonBusinessDays.isNotEmpty;
+    final background = hasNonBusinessDay
+        ? _amberColor.withValues(alpha: 0.10)
+        : selected
+        ? _tealColor.withValues(alpha: 0.12)
+        : const Color(0xFFF8FAFB);
+    final borderColor = hasNonBusinessDay
+        ? _amberColor.withValues(alpha: 0.34)
+        : selected
+        ? _tealColor.withValues(alpha: 0.32)
+        : _lineColor;
+
     return Container(
-      alignment: Alignment.center,
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: selected
-            ? _tealColor.withValues(alpha: 0.12)
-            : const Color(0xFFF8FAFB),
+        color: background,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: selected ? _tealColor.withValues(alpha: 0.32) : _lineColor,
-        ),
+        border: Border.all(color: borderColor),
       ),
-      child: Text(
-        '$day',
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: selected ? _deepTealColor : _inkColor,
-          fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$day',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: hasNonBusinessDay || selected ? _deepTealColor : _inkColor,
+              fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (entries.isNotEmpty)
+                Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  height: 17,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  decoration: BoxDecoration(
+                    color: _deepTealColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${entries.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              if (hasNonBusinessDay) ...[
+                if (entries.isNotEmpty) const SizedBox(width: 4),
+                Icon(Icons.block_rounded, color: _amberColor, size: 15),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -4021,6 +4495,495 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
       'Dezembro',
     ];
     return '${labels[month.month - 1]} ${month.year}';
+  }
+}
+
+class _SharedCalendarFiltersDialog extends StatefulWidget {
+  const _SharedCalendarFiltersDialog({required this.initialFilters});
+
+  final Map<String, String> initialFilters;
+
+  @override
+  State<_SharedCalendarFiltersDialog> createState() =>
+      _SharedCalendarFiltersDialogState();
+}
+
+class _SharedCalendarFiltersDialogState
+    extends State<_SharedCalendarFiltersDialog> {
+  late String _kind;
+  late String _status;
+  late String _recurrenceRule;
+  late bool _includeDismissed;
+  late final TextEditingController _category;
+  late final TextEditingController _startsAtFrom;
+  late final TextEditingController _startsAtTo;
+  late final TextEditingController _createdAtFrom;
+  late final TextEditingController _createdAtTo;
+  late final TextEditingController _holidayRegionCode;
+  late final TextEditingController _personPublicId;
+  late final TextEditingController _providerCompanyPublicId;
+  late final TextEditingController _clientCompanyPublicId;
+  late final TextEditingController _contractPublicId;
+  late final TextEditingController _contractTypePublicId;
+  late final TextEditingController _employmentLinkPublicId;
+  late final TextEditingController _positionPublicId;
+
+  @override
+  void initState() {
+    super.initState();
+    final filters = widget.initialFilters;
+    _kind = filters['kind'] ?? '';
+    _status = filters['status'] ?? '';
+    _recurrenceRule = filters['recurrenceRule'] ?? '';
+    _includeDismissed = filters['includeDismissed'] == 'true';
+    _category = TextEditingController(text: filters['category'] ?? '');
+    _startsAtFrom = TextEditingController(text: filters['startsAtFrom'] ?? '');
+    _startsAtTo = TextEditingController(text: filters['startsAtTo'] ?? '');
+    _createdAtFrom = TextEditingController(
+      text: filters['createdAtFrom'] ?? '',
+    );
+    _createdAtTo = TextEditingController(text: filters['createdAtTo'] ?? '');
+    _holidayRegionCode = TextEditingController(
+      text: filters['holidayRegionCode'] ?? '',
+    );
+    _personPublicId = TextEditingController(
+      text: filters['personPublicId'] ?? '',
+    );
+    _providerCompanyPublicId = TextEditingController(
+      text: filters['providerCompanyPublicId'] ?? '',
+    );
+    _clientCompanyPublicId = TextEditingController(
+      text: filters['clientCompanyPublicId'] ?? '',
+    );
+    _contractPublicId = TextEditingController(
+      text: filters['contractPublicId'] ?? '',
+    );
+    _contractTypePublicId = TextEditingController(
+      text: filters['contractTypePublicId'] ?? '',
+    );
+    _employmentLinkPublicId = TextEditingController(
+      text: filters['employmentLinkPublicId'] ?? '',
+    );
+    _positionPublicId = TextEditingController(
+      text: filters['positionPublicId'] ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _category.dispose();
+    _startsAtFrom.dispose();
+    _startsAtTo.dispose();
+    _createdAtFrom.dispose();
+    _createdAtTo.dispose();
+    _holidayRegionCode.dispose();
+    _personPublicId.dispose();
+    _providerCompanyPublicId.dispose();
+    _clientCompanyPublicId.dispose();
+    _contractPublicId.dispose();
+    _contractTypePublicId.dispose();
+    _employmentLinkPublicId.dispose();
+    _positionPublicId.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = min(MediaQuery.sizeOf(context).width * 0.92, 860.0);
+    final fieldWidth = width < 620 ? width : (width - 18) / 2;
+
+    return AlertDialog(
+      title: const Text('Filtros do calendario'),
+      content: SizedBox(
+        width: width,
+        child: SingleChildScrollView(
+          child: Wrap(
+            spacing: 18,
+            runSpacing: 12,
+            children: [
+              _dropdownField(
+                width: fieldWidth,
+                label: 'Tipo de agenda',
+                value: _kind,
+                values: const {
+                  '': 'Todos',
+                  'REMINDER': 'Lembrete',
+                  'APPOINTMENT': 'Compromisso',
+                  'NOTICE': 'Recado',
+                },
+                onChanged: (value) => setState(() => _kind = value ?? ''),
+              ),
+              _dropdownField(
+                width: fieldWidth,
+                label: 'Status da agenda',
+                value: _status,
+                values: const {
+                  '': 'Todos',
+                  'SCHEDULED': 'Agendado',
+                  'COMPLETED': 'Concluido',
+                  'CANCELED': 'Cancelado',
+                  'MISSED': 'Perdido',
+                },
+                onChanged: (value) => setState(() => _status = value ?? ''),
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _category,
+                label: 'Classificacao',
+                icon: Icons.label_outline,
+              ),
+              _dropdownField(
+                width: fieldWidth,
+                label: 'Recorrencia',
+                value: _recurrenceRule,
+                values: const {'': 'Todas', 'YEARLY': 'Anual'},
+                onChanged: (value) =>
+                    setState(() => _recurrenceRule = value ?? ''),
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _startsAtFrom,
+                label: 'Vigencia de',
+                icon: Icons.event_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _startsAtTo,
+                label: 'Vigencia ate',
+                icon: Icons.event_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _createdAtFrom,
+                label: 'Cadastro de',
+                icon: Icons.manage_history_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _createdAtTo,
+                label: 'Cadastro ate',
+                icon: Icons.manage_history_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _holidayRegionCode,
+                label: 'Regiao calendario',
+                icon: Icons.location_city_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _personPublicId,
+                label: 'Pessoa publicId',
+                icon: Icons.person_outline,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _providerCompanyPublicId,
+                label: 'Prestadora publicId',
+                icon: Icons.business_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _clientCompanyPublicId,
+                label: 'Cliente publicId',
+                icon: Icons.apartment_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _contractPublicId,
+                label: 'Contrato publicId',
+                icon: Icons.assignment_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _contractTypePublicId,
+                label: 'Tipo contrato publicId',
+                icon: Icons.category_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _employmentLinkPublicId,
+                label: 'Vinculo publicId',
+                icon: Icons.badge_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _positionPublicId,
+                label: 'Posto publicId',
+                icon: Icons.work_outline,
+              ),
+              SizedBox(
+                width: fieldWidth,
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _includeDismissed,
+                  onChanged: (value) {
+                    setState(() => _includeDismissed = value);
+                  },
+                  title: const Text('Mostrar desligados'),
+                  subtitle: const Text(
+                    'Por padrao lembretes de desligados ficam ocultos.',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(<String, String>{}),
+          child: const Text('Limpar'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).pop(_buildFilters()),
+          icon: const Icon(Icons.check_rounded, size: 18),
+          label: const Text('Aplicar'),
+        ),
+      ],
+    );
+  }
+
+  Widget _dropdownField({
+    required double width,
+    required String label,
+    required String value,
+    required Map<String, String> values,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return SizedBox(
+      width: width,
+      child: DropdownButtonFormField<String>(
+        initialValue: values.containsKey(value) ? value : '',
+        decoration: _inputDecoration(label: label, icon: Icons.tune_outlined),
+        items: [
+          for (final entry in values.entries)
+            DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _textField({
+    required double width,
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+  }) {
+    return SizedBox(
+      width: width,
+      child: TextField(
+        controller: controller,
+        decoration: _inputDecoration(label: label, icon: icon),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, size: 18),
+      border: const OutlineInputBorder(),
+      isDense: true,
+    );
+  }
+
+  Map<String, String> _buildFilters() {
+    final filters = <String, String>{};
+    void put(String key, String value) {
+      final normalized = value.trim();
+      if (normalized.isNotEmpty) {
+        filters[key] = normalized;
+      }
+    }
+
+    put('kind', _kind);
+    put('status', _status);
+    put('category', _category.text.toUpperCase());
+    put('recurrenceRule', _recurrenceRule);
+    put('startsAtFrom', _startsAtFrom.text);
+    put('startsAtTo', _startsAtTo.text);
+    put('createdAtFrom', _createdAtFrom.text);
+    put('createdAtTo', _createdAtTo.text);
+    put('holidayRegionCode', _holidayRegionCode.text.toUpperCase());
+    put('personPublicId', _personPublicId.text);
+    put('providerCompanyPublicId', _providerCompanyPublicId.text);
+    put('clientCompanyPublicId', _clientCompanyPublicId.text);
+    put('contractPublicId', _contractPublicId.text);
+    put('contractTypePublicId', _contractTypePublicId.text);
+    put('employmentLinkPublicId', _employmentLinkPublicId.text);
+    put('positionPublicId', _positionPublicId.text);
+    if (_includeDismissed) {
+      filters['includeDismissed'] = 'true';
+    }
+    return filters;
+  }
+}
+
+class _SharedCalendarNonBusinessDayDialog extends StatefulWidget {
+  const _SharedCalendarNonBusinessDayDialog();
+
+  @override
+  State<_SharedCalendarNonBusinessDayDialog> createState() =>
+      _SharedCalendarNonBusinessDayDialogState();
+}
+
+class _SharedCalendarNonBusinessDayDialogState
+    extends State<_SharedCalendarNonBusinessDayDialog> {
+  final _date = TextEditingController();
+  final _name = TextEditingController();
+  final _regionCode = TextEditingController(text: 'BR-SP-CAMPINAS');
+  final _cityName = TextEditingController(text: 'Campinas');
+  final _notes = TextEditingController();
+  bool _recurringYearly = false;
+
+  @override
+  void dispose() {
+    _date.dispose();
+    _name.dispose();
+    _regionCode.dispose();
+    _cityName.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = min(MediaQuery.sizeOf(context).width * 0.92, 720.0);
+    final fieldWidth = width < 560 ? width : (width - 16) / 2;
+
+    return AlertDialog(
+      title: const Text('Novo dia nao util'),
+      content: SizedBox(
+        width: width,
+        child: SingleChildScrollView(
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            children: [
+              _textField(
+                width: fieldWidth,
+                controller: _date,
+                label: 'Data',
+                icon: Icons.event_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _name,
+                label: 'Nome',
+                icon: Icons.label_outline,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _regionCode,
+                label: 'Regiao',
+                icon: Icons.location_city_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _cityName,
+                label: 'Cidade',
+                icon: Icons.location_on_outlined,
+              ),
+              SizedBox(
+                width: width,
+                child: TextField(
+                  controller: _notes,
+                  maxLines: 4,
+                  decoration: _inputDecoration(
+                    label: 'Recado associado',
+                    icon: Icons.campaign_outlined,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: fieldWidth,
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _recurringYearly,
+                  onChanged: (value) {
+                    setState(() => _recurringYearly = value);
+                  },
+                  title: const Text('Repetir anualmente'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.check_rounded, size: 18),
+          label: const Text('Salvar'),
+        ),
+      ],
+    );
+  }
+
+  Widget _textField({
+    required double width,
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+  }) {
+    return SizedBox(
+      width: width,
+      child: TextField(
+        controller: controller,
+        decoration: _inputDecoration(label: label, icon: icon),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, size: 18),
+      border: const OutlineInputBorder(),
+      isDense: true,
+    );
+  }
+
+  void _submit() {
+    final date = _date.text.trim();
+    final name = _name.text.trim();
+    if (date.isEmpty || name.isEmpty) {
+      return;
+    }
+
+    final body = <String, dynamic>{
+      'date': date,
+      'name': name,
+      'scope': 'MUNICIPAL_HOLIDAY',
+      'isRecurringYearly': _recurringYearly,
+    };
+    void put(String key, String value) {
+      final normalized = value.trim();
+      if (normalized.isNotEmpty) {
+        body[key] = normalized;
+      }
+    }
+
+    put('regionCode', _regionCode.text.toUpperCase());
+    put('cityName', _cityName.text);
+    put('notes', _notes.text);
+    Navigator.of(context).pop(body);
   }
 }
 
