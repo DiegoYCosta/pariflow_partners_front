@@ -143,24 +143,27 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
     return Positioned(
       top: 66,
       right: sideMargin,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-        child: Material(
-          color: Colors.transparent,
-          elevation: 0,
-          child: AnimatedBuilder(
-            animation: widget.controller,
-            builder: (context, _) {
-              return _FocusBoardRuntimeFrame(
-                controller: widget.controller,
-                viewerProfile: widget.viewerProfile,
-                compact: true,
-                onDetach: widget.onDetach,
-                onRefresh: widget.controller.refresh,
-                onCreateReminder: _openCreateReminder,
-                onCancelReminder: _confirmCancelReminder,
-              );
-            },
+      child: Opacity(
+        opacity: 0.15,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+          child: Material(
+            color: Colors.transparent,
+            elevation: 0,
+            child: AnimatedBuilder(
+              animation: widget.controller,
+              builder: (context, _) {
+                return _FocusBoardRuntimeFrame(
+                  controller: widget.controller,
+                  viewerProfile: widget.viewerProfile,
+                  compact: true,
+                  onDetach: widget.onDetach,
+                  onRefresh: widget.controller.refresh,
+                  onCreateReminder: _openCreateReminder,
+                  onCancelReminder: _confirmCancelReminder,
+                );
+              },
+            ),
           ),
         ),
       ),
