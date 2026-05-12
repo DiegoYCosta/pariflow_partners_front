@@ -2968,6 +2968,7 @@ class _CrmProfileSettingsDialog extends StatefulWidget {
 }
 
 class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
+  final _onboardingApi = ApiClient();
   late _ViewerAccessProfile _selectedViewer;
   String _language = 'Portugues (Brasil)';
   String _timeZone = 'America/Sao_Paulo';
@@ -2983,6 +2984,9 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   final bool _linkEmail = true;
   bool _linkSms = false;
   late DateTime _calendarMonth;
+  var _onboardingRequests = <Map<String, dynamic>>[];
+  bool _loadingOnboarding = false;
+  String? _onboardingError;
 
   @override
   void initState() {
@@ -2990,13 +2994,14 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     _selectedViewer = widget.viewerProfile;
     final now = DateTime.now();
     _calendarMonth = DateTime(now.year, now.month);
+    unawaited(_loadOnboardingRequests());
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: AlertDialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         titlePadding: const EdgeInsets.fromLTRB(24, 20, 12, 0),
@@ -3048,6 +3053,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                   Tab(text: 'Personalizacao'),
                   Tab(text: 'Contatos'),
                   Tab(text: 'Calendario'),
+                  Tab(text: 'Onboarding'),
                 ],
               ),
               const SizedBox(height: 14),
@@ -3060,6 +3066,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                     _personalizationTab(context),
                     _contactsTab(context),
                     _calendarTab(context),
+                    _onboardingTab(context),
                   ],
                 ),
               ),
@@ -3466,6 +3473,260 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
         ),
       ],
     );
+  }
+
+  Widget _onboardingTab(BuildContext context) {
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Solicitacoes de cliente',
+          icon: Icons.domain_add_outlined,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Analise interna de cadastros enviados pelo menu de login.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _mutedColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Atualizar solicitacoes',
+                  onPressed: _loadingOnboarding
+                      ? null
+                      : () => unawaited(_loadOnboardingRequests()),
+                  icon: _loadingOnboarding
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_onboardingError != null)
+              _HubEmptyLine(
+                icon: Icons.warning_amber_rounded,
+                text: _onboardingError!,
+              )
+            else if (_loadingOnboarding && _onboardingRequests.isEmpty)
+              const LinearProgressIndicator(minHeight: 2)
+            else if (_onboardingRequests.isEmpty)
+              const _HubEmptyLine(
+                icon: Icons.inbox_outlined,
+                text: 'Nenhuma solicitacao de onboarding encontrada.',
+              )
+            else
+              for (final request in _onboardingRequests) ...[
+                _onboardingRequestCard(context, request),
+                const SizedBox(height: 10),
+              ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _onboardingRequestCard(
+    BuildContext context,
+    Map<String, dynamic> request,
+  ) {
+    final publicId = _apiText(request['publicId']);
+    final status = _apiText(request['status']);
+    final contact = _apiMap(request['primaryContact']);
+    final rootCompany = _apiMap(request['tenantRootCompany']);
+    final released = status == 'RELEASED';
+    final rejected = status == 'REJECTED';
+    final canReview = !released && !rejected;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _apiText(request['tradeName'], fallback: 'Empresa sem nome'),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              _Tag(
+                label: _apiText(request['statusLabel'], fallback: status),
+                icon: released
+                    ? Icons.verified_rounded
+                    : rejected
+                    ? Icons.block_rounded
+                    : Icons.pending_actions_rounded,
+                color: released
+                    ? _tealColor
+                    : rejected
+                    ? _roseColor
+                    : _amberColor,
+                background:
+                    (released
+                            ? _tealColor
+                            : rejected
+                            ? _roseColor
+                            : _amberColor)
+                        .withValues(alpha: 0.10),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${_apiText(request['legalName'])} | CNPJ ${_apiText(request['cnpj'])}',
+            style: const TextStyle(color: _mutedColor, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${_apiText(contact['name'], fallback: 'Contato nao informado')} | ${_apiText(contact['email'], fallback: _apiText(contact['phone'], fallback: 'sem canal'))}',
+            style: const TextStyle(color: _mutedColor, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Tag(
+                label: _apiText(request['contractTypeLabel']),
+                icon: Icons.assignment_outlined,
+                color: _deepTealColor,
+                background: _deepTealColor.withValues(alpha: 0.09),
+              ),
+              _Tag(
+                label: _apiText(
+                  rootCompany['publicId'],
+                  fallback: 'empresa raiz ainda nao liberada',
+                ),
+                icon: Icons.apartment_rounded,
+                color: _mutedColor,
+                background: _lineColor.withValues(alpha: 0.55),
+              ),
+            ],
+          ),
+          if (canReview) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _loadingOnboarding
+                      ? null
+                      : () =>
+                            _reviewOnboardingRequest(publicId, approve: false),
+                  icon: const Icon(Icons.block_rounded, size: 18),
+                  label: const Text('Negar'),
+                ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _loadingOnboarding
+                      ? null
+                      : () => _reviewOnboardingRequest(publicId, approve: true),
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: const Text('Aprovar'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _loadOnboardingRequests() async {
+    if (_loadingOnboarding) {
+      return;
+    }
+
+    setState(() {
+      _loadingOnboarding = true;
+      _onboardingError = null;
+    });
+
+    try {
+      final data = await _onboardingApi.getMap('client-onboarding/requests');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _onboardingRequests = _apiMapList(data['items']);
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _onboardingError = error.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingOnboarding = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _reviewOnboardingRequest(
+    String publicId, {
+    required bool approve,
+  }) async {
+    if (publicId.isEmpty) {
+      return;
+    }
+
+    setState(() => _loadingOnboarding = true);
+    try {
+      await _onboardingApi.postMap(
+        'client-onboarding/requests/$publicId/${approve ? 'approve' : 'reject'}',
+        body: {
+          'note': approve
+              ? 'Aprovado pela tela interna do CRM.'
+              : 'Negado pela tela interna do CRM.',
+        },
+      );
+      if (mounted) {
+        setState(() => _loadingOnboarding = false);
+      }
+      await _loadOnboardingRequests();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            approve ? 'Solicitacao aprovada.' : 'Solicitacao negada.',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: _roseColor),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingOnboarding = false);
+      }
+    }
   }
 
   Widget _profileChoice(_ViewerAccessProfile profile) {
