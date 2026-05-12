@@ -2968,8 +2968,15 @@ class _CrmProfileSettingsDialog extends StatefulWidget {
 }
 
 class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
+  final _profileApi = ApiClient();
   final _onboardingApi = ApiClient();
   final _calendarApi = ApiClient();
+  late final TextEditingController _profileZipCode;
+  late final TextEditingController _profileStreet;
+  late final TextEditingController _profileNumber;
+  late final TextEditingController _profileDistrict;
+  late final TextEditingController _profileCity;
+  late final TextEditingController _profileState;
   late _ViewerAccessProfile _selectedViewer;
   String _language = 'Portugues (Brasil)';
   String _timeZone = 'America/Sao_Paulo';
@@ -2989,6 +2996,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   var _calendarNonBusinessDays = <Map<String, dynamic>>[];
   var _calendarFilters = <String, String>{};
   bool _loadingCalendar = false;
+  bool _savingProfile = false;
   String? _calendarError;
   var _onboardingRequests = <Map<String, dynamic>>[];
   bool _loadingOnboarding = false;
@@ -2998,17 +3006,35 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   void initState() {
     super.initState();
     _selectedViewer = widget.viewerProfile;
+    _profileZipCode = TextEditingController();
+    _profileStreet = TextEditingController();
+    _profileNumber = TextEditingController();
+    _profileDistrict = TextEditingController();
+    _profileCity = TextEditingController(text: 'Campinas');
+    _profileState = TextEditingController(text: 'SP');
     final now = DateTime.now();
     _calendarMonth = DateTime(now.year, now.month);
+    unawaited(_loadCurrentUserProfile());
     unawaited(_loadSharedCalendar());
     unawaited(_loadOnboardingRequests());
+  }
+
+  @override
+  void dispose() {
+    _profileZipCode.dispose();
+    _profileStreet.dispose();
+    _profileNumber.dispose();
+    _profileDistrict.dispose();
+    _profileCity.dispose();
+    _profileState.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     return DefaultTabController(
-      length: 7,
+      length: 8,
       child: AlertDialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         titlePadding: const EdgeInsets.fromLTRB(24, 20, 12, 0),
@@ -3061,6 +3087,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                   Tab(text: 'Contatos'),
                   Tab(text: 'Calendario'),
                   Tab(text: 'Onboarding'),
+                  Tab(text: 'Whatsapp Agentic AI Workflow'),
                 ],
               ),
               const SizedBox(height: 14),
@@ -3074,6 +3101,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                     _contactsTab(context),
                     _calendarTab(context),
                     _onboardingTab(context),
+                    _whatsappAgenticWorkflowTab(context),
                   ],
                 ),
               ),
@@ -3086,16 +3114,85 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
             child: const Text('Fechar'),
           ),
           FilledButton.icon(
-            onPressed: () {
-              widget.onViewerChanged(_selectedViewer);
-              Navigator.of(context).pop();
-            },
-            icon: const Icon(Icons.check_rounded, size: 18),
+            onPressed: _savingProfile
+                ? null
+                : () => unawaited(_applyProfileSettings()),
+            icon: _savingProfile
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_rounded, size: 18),
             label: const Text('Aplicar'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _loadCurrentUserProfile() async {
+    try {
+      final data = await _profileApi.getMap('auth/me');
+      if (!mounted) {
+        return;
+      }
+      final user = _apiMap(data['user']);
+      final address = _apiMap(user['addressJson']);
+      setState(() {
+        _profileZipCode.text = _apiText(address['zipCode']);
+        _profileStreet.text = _apiText(address['street']);
+        _profileNumber.text = _apiText(address['number']);
+        _profileDistrict.text = _apiText(address['district']);
+        _profileCity.text = _apiText(address['city'], fallback: 'Campinas');
+        _profileState.text = _apiText(address['state'], fallback: 'SP');
+      });
+    } on ApiException {
+      // O dialogo continua utilizavel mesmo que a leitura de preferencias falhe.
+    }
+  }
+
+  Future<void> _applyProfileSettings() async {
+    setState(() => _savingProfile = true);
+    try {
+      await _profileApi.patchMap(
+        'auth/me',
+        body: {'addressJson': _profileAddressJson()},
+      );
+      widget.onViewerChanged(_selectedViewer);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: _roseColor),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _savingProfile = false);
+      }
+    }
+  }
+
+  Map<String, String> _profileAddressJson() {
+    final address = <String, String>{};
+    void put(String key, String value) {
+      final text = value.trim();
+      if (text.isNotEmpty) {
+        address[key] = text;
+      }
+    }
+
+    put('zipCode', _profileZipCode.text);
+    put('street', _profileStreet.text);
+    put('number', _profileNumber.text);
+    put('district', _profileDistrict.text);
+    put('city', _profileCity.text);
+    put('state', _profileState.text.toUpperCase());
+    return address;
   }
 
   Widget _profileTab(BuildContext context) {
@@ -3181,6 +3278,64 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
               subtitle: _selectedViewer.canViewSensitive
                   ? 'Interno autenticado'
                   : 'Entrada publica',
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _settingsSection(
+          context,
+          title: 'Endereco do usuario',
+          icon: Icons.location_on_outlined,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final fieldWidth = constraints.maxWidth < 620
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 12) / 2;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _settingsTextField(
+                      width: fieldWidth,
+                      controller: _profileZipCode,
+                      label: 'CEP',
+                      icon: Icons.markunread_mailbox_outlined,
+                    ),
+                    _settingsTextField(
+                      width: fieldWidth,
+                      controller: _profileStreet,
+                      label: 'Logradouro',
+                      icon: Icons.signpost_outlined,
+                    ),
+                    _settingsTextField(
+                      width: fieldWidth,
+                      controller: _profileNumber,
+                      label: 'Numero',
+                      icon: Icons.tag_outlined,
+                    ),
+                    _settingsTextField(
+                      width: fieldWidth,
+                      controller: _profileDistrict,
+                      label: 'Bairro',
+                      icon: Icons.map_outlined,
+                    ),
+                    _settingsTextField(
+                      width: fieldWidth,
+                      controller: _profileCity,
+                      label: 'Cidade',
+                      icon: Icons.location_city_outlined,
+                    ),
+                    _settingsTextField(
+                      width: fieldWidth,
+                      controller: _profileState,
+                      label: 'Estado',
+                      icon: Icons.flag_outlined,
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -3591,7 +3746,10 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
       'startsAtTo': _dateQuery(lastDay),
       ..._calendarFilters,
     };
-    final regionCode = _calendarFilters['holidayRegionCode'];
+    final regionCode =
+        _calendarFilters['holidayRegionCode'] ??
+        _calendarFilters['appliesToRegionCode'];
+    final stateCode = _calendarFilters['appliesToStateCode'];
 
     setState(() {
       _loadingCalendar = true;
@@ -3608,6 +3766,8 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
             'to': _dateQuery(lastDay),
             if (regionCode != null && regionCode.isNotEmpty)
               'regionCode': regionCode,
+            if (stateCode != null && stateCode.isNotEmpty)
+              'stateCode': stateCode,
           },
         ),
       ]);
@@ -3726,10 +3886,8 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     );
   }
 
-  Widget _nonBusinessDayCard(
-    BuildContext context,
-    Map<String, dynamic> item,
-  ) {
+  Widget _nonBusinessDayCard(BuildContext context, Map<String, dynamic> item) {
+    final scope = _calendarScopeFromNonBusinessDay(item);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(11),
@@ -3769,6 +3927,12 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
               ],
             ),
           ),
+          if (scope.isNotEmpty)
+            IconButton(
+              tooltip: 'Ver aplicabilidade',
+              onPressed: () => _openCalendarApplicability(scope),
+              icon: const Icon(Icons.groups_2_outlined),
+            ),
         ],
       ),
     );
@@ -3777,6 +3941,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   Widget _calendarEntryCard(BuildContext context, Map<String, dynamic> entry) {
     final target = _apiMap(entry['target']);
     final notification = _apiMap(entry['notification']);
+    final scope = _calendarScopeFromEntry(entry);
     final kind = _apiText(entry['kind']);
     final isNotice = kind == 'NOTICE';
 
@@ -3863,9 +4028,80 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
               ],
             ),
           ),
+          if (scope.isNotEmpty)
+            IconButton(
+              tooltip: 'Ver aplicabilidade',
+              onPressed: () => _openCalendarApplicability(scope),
+              icon: const Icon(Icons.groups_2_outlined),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _openCalendarApplicability(Map<String, String> scope) async {
+    try {
+      final data = await _calendarApi.getMap(
+        'agenda/applicability',
+        query: scope,
+      );
+      if (!mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (context) => _CalendarApplicabilityDialog(data: data),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: _roseColor),
+      );
+    }
+  }
+
+  Map<String, String> _calendarScopeFromEntry(Map<String, dynamic> entry) {
+    final applicability = _apiMap(entry['applicability']);
+    final scope = <String, String>{};
+    _putCalendarScope(scope, 'regionCode', applicability['regionCode']);
+    _putCalendarScope(scope, 'stateCode', applicability['stateCode']);
+    _putCalendarScope(scope, 'cityName', applicability['cityName']);
+    if (scope.isEmpty) {
+      _putCalendarScope(scope, 'regionCode', entry['holidayRegionCode']);
+    }
+    return scope;
+  }
+
+  Map<String, String> _calendarScopeFromNonBusinessDay(
+    Map<String, dynamic> item,
+  ) {
+    final applicability = _apiMap(item['applicability']);
+    final scope = <String, String>{};
+    _putCalendarScope(
+      scope,
+      'regionCode',
+      applicability['regionCode'] ?? item['regionCode'],
+    );
+    _putCalendarScope(
+      scope,
+      'stateCode',
+      applicability['stateCode'] ?? item['stateCode'],
+    );
+    _putCalendarScope(
+      scope,
+      'cityName',
+      applicability['cityName'] ?? item['cityName'],
+    );
+    return scope;
+  }
+
+  void _putCalendarScope(Map<String, String> scope, String key, Object? value) {
+    final text = _apiText(value).trim();
+    if (text.isNotEmpty) {
+      scope[key] = text;
+    }
   }
 
   List<Map<String, dynamic>> _calendarEntriesForDay(int day) {
@@ -4159,6 +4395,63 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     }
   }
 
+  Widget _whatsappAgenticWorkflowTab(BuildContext context) {
+    return ListView(
+      children: [
+        _settingsSection(
+          context,
+          title: 'Whatsapp Agentic AI Workflow',
+          icon: Icons.smart_toy_outlined,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _lineColor.withValues(alpha: 0.70),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.construction_rounded,
+                    color: _mutedColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ainda nao implementado',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: _inkColor,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'A aba fica reservada para configuracao futura de automacoes agenticas via WhatsApp.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: _mutedColor,
+                          height: 1.3,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _profileChoice(_ViewerAccessProfile profile) {
     final selected = profile.key == _selectedViewer.key;
     return InkWell(
@@ -4396,6 +4689,28 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     );
   }
 
+  Widget _settingsTextField({
+    required double width,
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+  }) {
+    return SizedBox(
+      width: width,
+      child: TextField(
+        controller: controller,
+        textCapitalization: textCapitalization,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, size: 18),
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
   Widget _settingsSwitch({
     required String title,
     required String subtitle,
@@ -4498,6 +4813,155 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   }
 }
 
+class _CalendarApplicabilityDialog extends StatelessWidget {
+  const _CalendarApplicabilityDialog({required this.data});
+
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = min(MediaQuery.sizeOf(context).width * 0.92, 780.0);
+    final scope = _apiMap(data['scope']);
+    final people = _apiMapList(data['people']);
+    final clients = _apiMapList(data['clientCompanies']);
+    final providers = _apiMapList(data['providerCompanies']);
+
+    return AlertDialog(
+      title: const Text('Aplicabilidade territorial'),
+      content: SizedBox(
+        width: width,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _Tag(
+                    label: _apiText(scope['label'], fallback: 'escopo geral'),
+                    icon: Icons.location_on_outlined,
+                    color: _deepTealColor,
+                    background: _deepTealColor.withValues(alpha: 0.09),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _applicabilitySection(
+                context,
+                title: 'Pessoas',
+                icon: Icons.people_outline_rounded,
+                items: people,
+              ),
+              const SizedBox(height: 12),
+              _applicabilitySection(
+                context,
+                title: 'Clientes',
+                icon: Icons.apartment_outlined,
+                items: clients,
+              ),
+              const SizedBox(height: 12),
+              _applicabilitySection(
+                context,
+                title: 'Prestadoras',
+                icon: Icons.business_outlined,
+                items: providers,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
+        ),
+      ],
+    );
+  }
+
+  Widget _applicabilitySection(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required List<Map<String, dynamic>> items,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: _deepTealColor, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$title (${items.length})',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (items.isEmpty)
+            const _HubEmptyLine(
+              icon: Icons.search_off_outlined,
+              text: 'Nenhum cadastro encontrado para este escopo.',
+            )
+          else
+            for (final item in items.take(8)) ...[
+              _applicabilityItem(item),
+              const SizedBox(height: 8),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _applicabilityItem(Map<String, dynamic> item) {
+    return Row(
+      children: [
+        const Icon(Icons.check_circle_outline_rounded, size: 17),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _apiText(item['name'], fallback: 'Cadastro sem nome'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _inkColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                _apiText(item['address'], fallback: 'endereco nao informado'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: _mutedColor, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SharedCalendarFiltersDialog extends StatefulWidget {
   const _SharedCalendarFiltersDialog({required this.initialFilters});
 
@@ -4520,6 +4984,9 @@ class _SharedCalendarFiltersDialogState
   late final TextEditingController _createdAtFrom;
   late final TextEditingController _createdAtTo;
   late final TextEditingController _holidayRegionCode;
+  late final TextEditingController _appliesToRegionCode;
+  late final TextEditingController _appliesToStateCode;
+  late final TextEditingController _appliesToCityName;
   late final TextEditingController _personPublicId;
   late final TextEditingController _providerCompanyPublicId;
   late final TextEditingController _clientCompanyPublicId;
@@ -4545,6 +5012,15 @@ class _SharedCalendarFiltersDialogState
     _createdAtTo = TextEditingController(text: filters['createdAtTo'] ?? '');
     _holidayRegionCode = TextEditingController(
       text: filters['holidayRegionCode'] ?? '',
+    );
+    _appliesToRegionCode = TextEditingController(
+      text: filters['appliesToRegionCode'] ?? '',
+    );
+    _appliesToStateCode = TextEditingController(
+      text: filters['appliesToStateCode'] ?? '',
+    );
+    _appliesToCityName = TextEditingController(
+      text: filters['appliesToCityName'] ?? '',
     );
     _personPublicId = TextEditingController(
       text: filters['personPublicId'] ?? '',
@@ -4577,6 +5053,9 @@ class _SharedCalendarFiltersDialogState
     _createdAtFrom.dispose();
     _createdAtTo.dispose();
     _holidayRegionCode.dispose();
+    _appliesToRegionCode.dispose();
+    _appliesToStateCode.dispose();
+    _appliesToCityName.dispose();
     _personPublicId.dispose();
     _providerCompanyPublicId.dispose();
     _clientCompanyPublicId.dispose();
@@ -4669,6 +5148,24 @@ class _SharedCalendarFiltersDialogState
                 controller: _holidayRegionCode,
                 label: 'Regiao calendario',
                 icon: Icons.location_city_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _appliesToRegionCode,
+                label: 'Aplica a regiao',
+                icon: Icons.travel_explore_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _appliesToStateCode,
+                label: 'Aplica ao estado',
+                icon: Icons.flag_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _appliesToCityName,
+                label: 'Aplica a cidade',
+                icon: Icons.location_on_outlined,
               ),
               _textField(
                 width: fieldWidth,
@@ -4814,6 +5311,9 @@ class _SharedCalendarFiltersDialogState
     put('createdAtFrom', _createdAtFrom.text);
     put('createdAtTo', _createdAtTo.text);
     put('holidayRegionCode', _holidayRegionCode.text.toUpperCase());
+    put('appliesToRegionCode', _appliesToRegionCode.text.toUpperCase());
+    put('appliesToStateCode', _appliesToStateCode.text.toUpperCase());
+    put('appliesToCityName', _appliesToCityName.text);
     put('personPublicId', _personPublicId.text);
     put('providerCompanyPublicId', _providerCompanyPublicId.text);
     put('clientCompanyPublicId', _clientCompanyPublicId.text);
@@ -4841,6 +5341,7 @@ class _SharedCalendarNonBusinessDayDialogState
   final _date = TextEditingController();
   final _name = TextEditingController();
   final _regionCode = TextEditingController(text: 'BR-SP-CAMPINAS');
+  final _stateCode = TextEditingController(text: 'SP');
   final _cityName = TextEditingController(text: 'Campinas');
   final _notes = TextEditingController();
   bool _recurringYearly = false;
@@ -4850,6 +5351,7 @@ class _SharedCalendarNonBusinessDayDialogState
     _date.dispose();
     _name.dispose();
     _regionCode.dispose();
+    _stateCode.dispose();
     _cityName.dispose();
     _notes.dispose();
     super.dispose();
@@ -4886,6 +5388,12 @@ class _SharedCalendarNonBusinessDayDialogState
                 controller: _regionCode,
                 label: 'Regiao',
                 icon: Icons.location_city_outlined,
+              ),
+              _textField(
+                width: fieldWidth,
+                controller: _stateCode,
+                label: 'Estado',
+                icon: Icons.flag_outlined,
               ),
               _textField(
                 width: fieldWidth,
@@ -4981,6 +5489,7 @@ class _SharedCalendarNonBusinessDayDialogState
     }
 
     put('regionCode', _regionCode.text.toUpperCase());
+    put('stateCode', _stateCode.text.toUpperCase());
     put('cityName', _cityName.text);
     put('notes', _notes.text);
     Navigator.of(context).pop(body);

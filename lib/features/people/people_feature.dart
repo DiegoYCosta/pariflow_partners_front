@@ -2350,6 +2350,12 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
   late final TextEditingController _email;
   late final TextEditingController _phone;
   late final TextEditingController _birthDate;
+  late final TextEditingController _zipCode;
+  late final TextEditingController _street;
+  late final TextEditingController _number;
+  late final TextEditingController _district;
+  late final TextEditingController _city;
+  late final TextEditingController _state;
   late final TextEditingController _notes;
 
   @override
@@ -2362,6 +2368,12 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
     _email = TextEditingController(text: initial?.email ?? '');
     _phone = TextEditingController(text: initial?.phone ?? '');
     _birthDate = TextEditingController(text: initial?.birthDateInput ?? '');
+    _zipCode = TextEditingController(text: initial?.zipCode ?? '');
+    _street = TextEditingController(text: initial?.street ?? '');
+    _number = TextEditingController(text: initial?.number ?? '');
+    _district = TextEditingController(text: initial?.district ?? '');
+    _city = TextEditingController(text: initial?.city ?? '');
+    _state = TextEditingController(text: initial?.state ?? '');
     _notes = TextEditingController(text: initial?.notes ?? '');
   }
 
@@ -2373,6 +2385,12 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
     _email.dispose();
     _phone.dispose();
     _birthDate.dispose();
+    _zipCode.dispose();
+    _street.dispose();
+    _number.dispose();
+    _district.dispose();
+    _city.dispose();
+    _state.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -2426,6 +2444,54 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
                   hintText: 'yyyy-mm-dd',
                   dateLike: true,
                 ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _zipCode,
+                        label: 'CEP',
+                        icon: Icons.markunread_mailbox_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _state,
+                        label: 'Estado',
+                        icon: Icons.flag_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogTextField(
+                  controller: _city,
+                  label: 'Cidade',
+                  icon: Icons.location_city_outlined,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _street,
+                        label: 'Logradouro',
+                        icon: Icons.signpost_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _number,
+                        label: 'Numero',
+                        icon: Icons.tag_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogTextField(
+                  controller: _district,
+                  label: 'Bairro',
+                  icon: Icons.map_outlined,
+                ),
                 _dialogTextField(
                   controller: _notes,
                   label: 'Notas',
@@ -2464,9 +2530,28 @@ class _PersonCrudDialogState extends State<_PersonCrudDialog> {
         'email': _email.text,
         'phone': _phone.text,
         'birthDate': _dateInputToIso(_birthDate.text),
+        'addressJson': _addressJson(),
         'notes': _notes.text,
       }),
     );
+  }
+
+  Map<String, String>? _addressJson() {
+    final address = <String, String>{};
+    void put(String key, String value) {
+      final text = value.trim();
+      if (text.isNotEmpty) {
+        address[key] = key == 'state' ? text.toUpperCase() : text;
+      }
+    }
+
+    put('zipCode', _zipCode.text);
+    put('street', _street.text);
+    put('number', _number.text);
+    put('district', _district.text);
+    put('city', _city.text);
+    put('state', _state.text);
+    return address.isEmpty ? null : address;
   }
 }
 
@@ -3206,6 +3291,9 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
   late final TextEditingController _startsAt;
   late final TextEditingController _notificationTime;
   late final TextEditingController _offsetBusinessDays;
+  late final TextEditingController _holidayRegionCode;
+  late final TextEditingController _appliesToStateCode;
+  late final TextEditingController _appliesToCityName;
   late String _kind;
   late String _priority;
   late String _notificationPolicy;
@@ -3230,6 +3318,9 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
     );
     _notificationTime = TextEditingController(text: '09:00');
     _offsetBusinessDays = TextEditingController(text: '2');
+    _holidayRegionCode = TextEditingController(text: 'BR-SP-CAMPINAS');
+    _appliesToStateCode = TextEditingController(text: 'SP');
+    _appliesToCityName = TextEditingController(text: 'Campinas');
   }
 
   @override
@@ -3239,6 +3330,9 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
     _startsAt.dispose();
     _notificationTime.dispose();
     _offsetBusinessDays.dispose();
+    _holidayRegionCode.dispose();
+    _appliesToStateCode.dispose();
+    _appliesToCityName.dispose();
     super.dispose();
   }
 
@@ -3315,6 +3409,30 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
                       ),
                     ),
                   ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _holidayRegionCode,
+                        label: 'Regiao aplicavel',
+                        icon: Icons.travel_explore_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _dialogTextField(
+                        controller: _appliesToStateCode,
+                        label: 'Estado',
+                        icon: Icons.flag_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                _dialogTextField(
+                  controller: _appliesToCityName,
+                  label: 'Cidade aplicavel',
+                  icon: Icons.location_on_outlined,
                 ),
                 Row(
                   children: [
@@ -3525,6 +3643,10 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
         'startsAt': _startsAt.text,
         'isAllDay': true,
         'priority': _priority,
+        'holidayRegionCode': _holidayRegionCode.text.toUpperCase(),
+        'appliesToRegionCode': _holidayRegionCode.text.toUpperCase(),
+        'appliesToStateCode': _appliesToStateCode.text.toUpperCase(),
+        'appliesToCityName': _appliesToCityName.text,
         'notificationPolicy': _notificationPolicy,
         'notificationOffsetBusinessDays': notificationOffsetBusinessDays,
         'notificationTime': _notificationTime.text,
@@ -3822,6 +3944,12 @@ class _PersonCrudSnapshot {
     required this.email,
     required this.phone,
     required this.birthDateInput,
+    required this.zipCode,
+    required this.street,
+    required this.number,
+    required this.district,
+    required this.city,
+    required this.state,
     required this.notes,
   });
 
@@ -3832,6 +3960,12 @@ class _PersonCrudSnapshot {
   final String email;
   final String phone;
   final String birthDateInput;
+  final String zipCode;
+  final String street;
+  final String number;
+  final String district;
+  final String city;
+  final String state;
   final String notes;
 }
 

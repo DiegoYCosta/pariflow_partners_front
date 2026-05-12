@@ -483,6 +483,7 @@ _PersonProfileData _personProfileFromApi(
   List<_CalendarEntryRecord> calendarEntries,
 ) {
   final currentLink = _currentApiLink(links);
+  final address = _apiMap(person['addressJson']);
   final roleTitle = _apiRoleTitle(currentLink);
   final providerCompany = _apiProviderCompanyName(currentLink);
   final clientCompany = _apiClientCompanyName(currentLink);
@@ -548,8 +549,8 @@ _PersonProfileData _personProfileFromApi(
       ),
       _PersonInfoField(
         icon: Icons.location_on_outlined,
-        label: 'Location',
-        value: location,
+        label: 'Endereco',
+        value: _addressLabel(address, fallback: location),
       ),
     ],
     managerName: providerCompany,
@@ -570,6 +571,12 @@ _PersonProfileData _personProfileFromApi(
       email: _apiText(person['email']),
       phone: _apiText(person['phone']),
       birthDateInput: _apiDateInput(person['birthDate']),
+      zipCode: _apiText(address['zipCode']),
+      street: _apiText(address['street']),
+      number: _apiText(address['number']),
+      district: _apiText(address['district']),
+      city: _apiText(address['city']),
+      state: _apiText(address['state']),
       notes: _apiText(person['notes']),
     ),
     occurrences: occurrences,
@@ -840,6 +847,21 @@ String _apiText(Object? value, {String fallback = ''}) {
   }
   final text = '$value'.trim();
   return text.isEmpty ? fallback : text;
+}
+
+String _addressLabel(Map<String, dynamic> address, {required String fallback}) {
+  final street = _apiText(address['street']);
+  final number = _apiText(address['number']);
+  final district = _apiText(address['district']);
+  final city = _apiText(address['city']);
+  final state = _apiText(address['state']).toUpperCase();
+  final line = [
+    [street, number].where((value) => value.isNotEmpty).join(', '),
+    district,
+    [city, state].where((value) => value.isNotEmpty).join('/'),
+  ].where((value) => value.isNotEmpty).join(' | ');
+
+  return line.isEmpty ? fallback : line;
 }
 
 int _apiInt(Object? value) {
