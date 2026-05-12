@@ -321,6 +321,8 @@ class SessionSnapshot {
     required this.accessToken,
     required this.userPublicId,
     required this.userName,
+    required this.tenantRootCompanyPublicId,
+    required this.tenantRootCompanyName,
     required this.expiresInSeconds,
     required this.refreshExpiresInSeconds,
     required this.securityContext,
@@ -330,11 +332,20 @@ class SessionSnapshot {
 
   factory SessionSnapshot.fromMap(Map<String, dynamic> map) {
     final user = (map['user'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final tenantRootCompany =
+        (user['tenantRootCompany'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final tenantName =
+        '${tenantRootCompany['tradeName'] ?? tenantRootCompany['legalName'] ?? ''}'
+            .trim();
 
     return SessionSnapshot(
       accessToken: '${map['accessToken'] ?? ''}',
       userPublicId: '${user['publicId'] ?? ''}',
       userName: '${user['nome'] ?? user['name'] ?? user['email'] ?? 'Sessao'}',
+      tenantRootCompanyPublicId:
+          '${tenantRootCompany['publicId'] ?? ''}'.trim(),
+      tenantRootCompanyName: tenantName,
       expiresInSeconds: _intFromMap(map['expiresInSeconds'], fallback: 600),
       refreshExpiresInSeconds: _intFromMap(
         map['refreshExpiresInSeconds'],
@@ -355,11 +366,21 @@ class SessionSnapshot {
   final String accessToken;
   final String userPublicId;
   final String userName;
+  final String tenantRootCompanyPublicId;
+  final String tenantRootCompanyName;
   final int expiresInSeconds;
   final int refreshExpiresInSeconds;
   final String securityContext;
   final List<String> profiles;
   final List<String> audienceGroups;
+
+  String get tenantRootCompanyLabel {
+    final parts = [
+      tenantRootCompanyName,
+      tenantRootCompanyPublicId,
+    ].where((part) => part.isNotEmpty).toList(growable: false);
+    return parts.join(' | ');
+  }
 }
 
 int _intFromMap(Object? value, {required int fallback}) {

@@ -964,8 +964,8 @@ class _EntityDetailCard extends StatelessWidget {
       _Tag(
         label: 'autoria ${policy.owner.name}',
         icon: Icons.person_pin_circle_outlined,
-        color: policy.owner.group.color,
-        background: policy.owner.group.color.withValues(alpha: 0.12),
+        color: policy.owner.color,
+        background: policy.owner.color.withValues(alpha: 0.12),
       ),
     ];
 
@@ -994,8 +994,8 @@ class _EntityDetailCard extends StatelessWidget {
           _Tag(
             label: person.name,
             icon: Icons.alternate_email_outlined,
-            color: person.group.color,
-            background: person.group.color.withValues(alpha: 0.12),
+            color: person.color,
+            background: person.color.withValues(alpha: 0.12),
           ),
         );
       }

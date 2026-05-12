@@ -42,10 +42,14 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
   final _searchController = TextEditingController();
   late DateTime _month;
   DateTime? _selectedDate;
+  DateTime? _rangeEnd;
   var _records = <_TimelineRecord>[];
+  var _calendarEntries = <_TimelineCalendarEntry>[];
+  var _nonBusinessDays = <_TimelineNonBusinessDay>[];
   var _category = '';
   var _entityType = '';
   bool _monthOnly = false;
+  bool _rangeMode = false;
   bool _loading = false;
   String? _error;
 
@@ -65,15 +69,15 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedRecords = _selectedDate == null
-        ? _records
-        : _records.where((record) {
-            final date = record.eventDate;
-            return date != null &&
-                date.year == _selectedDate!.year &&
-                date.month == _selectedDate!.month &&
-                date.day == _selectedDate!.day;
-          }).toList();
+    final selectedRecords = _records
+        .where((record) => _recordMatchesSelection(record))
+        .toList();
+    final selectedCalendarEntries = _calendarEntries
+        .where((entry) => _dateMatchesSelection(entry.occurrenceStartsAt))
+        .toList();
+    final selectedNonBusinessDays = _nonBusinessDays
+        .where((item) => _dateMatchesSelection(item.date))
+        .toList();
     final undatedRecords = _records
         .where((record) => record.eventDate == null)
         .toList();
@@ -104,10 +108,13 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
                   child: _TimelineCalendar(
                     month: _month,
                     selectedDate: _selectedDate,
+                    rangeEnd: _rangeEnd,
                     records: _records,
-                    onSelectDate: (date) {
-                      setState(() => _selectedDate = date);
-                    },
+                    calendarEntries: _calendarEntries,
+                    nonBusinessDays: _nonBusinessDays,
+                    onOpenDate: (date) => unawaited(_handleCalendarDate(date)),
+                    onAddRecord: (date) =>
+                        unawaited(_openRecordDialog(initialDate: date)),
                   ),
                 ),
               ),
@@ -115,7 +122,13 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
           ),
         ),
         const SizedBox(height: 18),
-        _recordsPanel(context, selectedRecords, undatedRecords),
+        _recordsPanel(
+          context,
+          selectedRecords,
+          undatedRecords,
+          selectedCalendarEntries,
+          selectedNonBusinessDays,
+        ),
       ],
     );
   }
@@ -151,6 +164,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
                       setState(() {
                         _month = DateTime(_month.year, _month.month - 1);
                         _selectedDate = null;
+                        _rangeEnd = null;
                       });
                       unawaited(_load());
                     },
@@ -164,6 +178,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
                       setState(() {
                         _month = DateTime(_month.year, _month.month + 1);
                         _selectedDate = null;
+                        _rangeEnd = null;
                       });
                       unawaited(_load());
                     },
@@ -249,6 +264,30 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
             unawaited(_load());
           },
         ),
+        FilterChip(
+          selected: _rangeMode,
+          avatar: const Icon(Icons.date_range_outlined, size: 18),
+          label: const Text('Selecionar periodo'),
+          onSelected: (value) {
+            setState(() {
+              _rangeMode = value;
+              if (!value) {
+                _rangeEnd = null;
+              }
+            });
+          },
+        ),
+        if (_selectedDate != null)
+          ActionChip(
+            avatar: const Icon(Icons.close_rounded, size: 18),
+            label: Text(_selectionLabel()),
+            onPressed: () {
+              setState(() {
+                _selectedDate = null;
+                _rangeEnd = null;
+              });
+            },
+          ),
       ],
     );
   }
@@ -257,11 +296,23 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
     BuildContext context,
     List<_TimelineRecord> selectedRecords,
     List<_TimelineRecord> undatedRecords,
+    List<_TimelineCalendarEntry> selectedCalendarEntries,
+    List<_TimelineNonBusinessDay> selectedNonBusinessDays,
   ) {
     final visible = _selectedDate == null ? _records : selectedRecords;
+    final visibleCalendarEntries = _selectedDate == null
+        ? _calendarEntries
+        : selectedCalendarEntries;
+    final visibleNonBusinessDays = _selectedDate == null
+        ? _nonBusinessDays
+        : selectedNonBusinessDays;
+    final totalItems =
+        visible.length +
+        visibleCalendarEntries.length +
+        visibleNonBusinessDays.length;
     final title = _selectedDate == null
-        ? 'Registros de ${_monthLabel(_month)}'
-        : 'Registros de ${_dateLabel(_selectedDate!)}';
+        ? 'Agenda de ${_monthLabel(_month)}'
+        : 'Agenda de ${_selectionLabel()}';
 
     return _Panel(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
@@ -277,7 +328,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
                 ),
               ),
               _Tag(
-                label: '${visible.length} registros',
+                label: '$totalItems itens',
                 icon: Icons.format_list_bulleted_rounded,
                 color: _deepTealColor,
                 background: _deepTealColor.withValues(alpha: 0.09),
@@ -285,23 +336,49 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
             ],
           ),
           const SizedBox(height: 12),
-          if (_loading && _records.isEmpty)
+          if (_loading && totalItems == 0)
             const LinearProgressIndicator(minHeight: 2)
-          else if (visible.isEmpty)
+          else if (totalItems == 0)
             const _TimelineBanner(
               icon: Icons.event_available_outlined,
-              text: 'Nenhum registro encontrado para o recorte atual.',
+              text:
+                  'Nenhum evento, lembrete ou registro encontrado para o recorte atual.',
               color: _mutedColor,
             )
-          else
-            for (final record in visible) ...[
-              _TimelineRecordTile(
-                record: record,
-                onEdit: () => _openRecordDialog(record: record),
-                onRemove: () => _confirmRemove(record),
-              ),
-              const SizedBox(height: 10),
+          else ...[
+            if (visibleCalendarEntries.isNotEmpty) ...[
+              _timelineSectionTitle(context, 'Eventos e lembretes'),
+              const SizedBox(height: 8),
+              for (final entry in visibleCalendarEntries) ...[
+                _TimelineCalendarEntryTile(
+                  entry: entry,
+                  onOpen: () => _openCalendarEntryDetails(entry),
+                ),
+                const SizedBox(height: 10),
+              ],
             ],
+            if (visibleNonBusinessDays.isNotEmpty) ...[
+              _timelineSectionTitle(context, 'Feriados e dias nao uteis'),
+              const SizedBox(height: 8),
+              for (final item in visibleNonBusinessDays) ...[
+                _TimelineNonBusinessDayTile(item: item),
+                const SizedBox(height: 10),
+              ],
+            ],
+            if (visible.isNotEmpty) ...[
+              _timelineSectionTitle(context, 'Registros da Timeline'),
+              const SizedBox(height: 8),
+              for (final record in visible) ...[
+                _TimelineRecordTile(
+                  record: record,
+                  onOpen: () => _openRecordDetails(record),
+                  onEdit: () => _openRecordDialog(record: record),
+                  onRemove: () => _confirmRemove(record),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ],
+          ],
           if (_selectedDate != null && undatedRecords.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -316,6 +393,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
               _TimelineRecordTile(
                 record: record,
                 compact: true,
+                onOpen: () => _openRecordDetails(record),
                 onEdit: () => _openRecordDialog(record: record),
                 onRemove: () => _confirmRemove(record),
               ),
@@ -336,23 +414,42 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
       _error = null;
     });
     try {
-      final records = await _repository.listRecords(
+      final firstDay = DateTime(_month.year, _month.month);
+      final lastDay = DateTime(_month.year, _month.month + 1, 0);
+      final recordsRequest = _repository.listRecords(
         referenceMonth: _monthQuery(_month),
         search: _searchController.text,
         category: _category,
         entityType: _entityType,
         monthOnly: _monthOnly,
       );
+      final calendarEntriesRequest = _repository.listCalendarEntries(
+        from: _dateQuery(firstDay),
+        to: _dateQuery(lastDay),
+      );
+      final nonBusinessDaysRequest = _repository.listNonBusinessDays(
+        from: _dateQuery(firstDay),
+        to: _dateQuery(lastDay),
+      );
+      final records = await recordsRequest;
+      final calendarEntries = await calendarEntriesRequest;
+      final nonBusinessDays = await nonBusinessDaysRequest;
       if (!mounted) {
         return;
       }
-      setState(() => _records = records);
+      setState(() {
+        _records = records;
+        _calendarEntries = calendarEntries;
+        _nonBusinessDays = nonBusinessDays;
+      });
     } on ApiException catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _records = const [];
+        _calendarEntries = const [];
+        _nonBusinessDays = const [];
         _error =
             'API indisponivel para Timeline (${error.code}). Nenhum dado mock foi carregado.';
       });
@@ -363,7 +460,16 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
     }
   }
 
-  Future<void> _openRecordDialog({_TimelineRecord? record}) async {
+  Future<void> _openRecordDialog({
+    _TimelineRecord? record,
+    DateTime? initialDate,
+  }) async {
+    if (initialDate != null && mounted) {
+      setState(() {
+        _selectedDate = initialDate;
+        _rangeEnd = null;
+      });
+    }
     final lookups = await _repository.loadLookups();
     if (!mounted) {
       return;
@@ -372,7 +478,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
       context: context,
       builder: (context) => _TimelineRecordDialog(
         month: _month,
-        selectedDate: _selectedDate,
+        selectedDate: record?.eventDate ?? initialDate ?? _selectedDate,
         record: record,
         lookups: lookups,
       ),
@@ -416,6 +522,85 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
     }
   }
 
+  Future<void> _handleCalendarDate(DateTime date) async {
+    if (_rangeMode) {
+      _selectRangeDate(date);
+      return;
+    }
+    setState(() {
+      _selectedDate = date;
+      _rangeEnd = null;
+    });
+    await _openDayAgenda(date);
+  }
+
+  void _selectRangeDate(DateTime date) {
+    setState(() {
+      if (_selectedDate == null || _rangeEnd != null) {
+        _selectedDate = date;
+        _rangeEnd = null;
+        return;
+      }
+
+      if (date.isBefore(_selectedDate!)) {
+        _rangeEnd = _selectedDate;
+        _selectedDate = date;
+      } else {
+        _rangeEnd = date;
+      }
+    });
+  }
+
+  Future<void> _openDayAgenda(DateTime date) async {
+    final records = _recordsForDay(date);
+    final entries = _calendarEntriesForDay(date);
+    final nonBusinessDays = _nonBusinessDaysForDay(date);
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.15),
+      builder: (dialogContext) => _TimelineDayAgendaDialog(
+        date: date,
+        records: records,
+        calendarEntries: entries,
+        nonBusinessDays: nonBusinessDays,
+        onAddRecord: () {
+          Navigator.of(dialogContext).pop();
+          unawaited(_openRecordDialog(initialDate: date));
+        },
+        onOpenRecord: (record) {
+          Navigator.of(dialogContext).pop();
+          unawaited(_openRecordDetails(record));
+        },
+        onOpenCalendarEntry: (entry) {
+          Navigator.of(dialogContext).pop();
+          unawaited(_openCalendarEntryDetails(entry));
+        },
+      ),
+    );
+  }
+
+  Future<void> _openRecordDetails(_TimelineRecord record) async {
+    final action = await showDialog<String>(
+      context: context,
+      builder: (context) => _TimelineRecordDetailsDialog(record: record),
+    );
+    if (!mounted) {
+      return;
+    }
+    if (action == 'edit') {
+      await _openRecordDialog(record: record);
+    } else if (action == 'remove') {
+      await _confirmRemove(record);
+    }
+  }
+
+  Future<void> _openCalendarEntryDetails(_TimelineCalendarEntry entry) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _TimelineCalendarEntryDetailsDialog(entry: entry),
+    );
+  }
+
   Future<void> _confirmRemove(_TimelineRecord record) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -452,20 +637,89 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
       );
     }
   }
+
+  List<_TimelineRecord> _recordsForDay(DateTime date) {
+    return _records.where((record) {
+      final eventDate = record.eventDate;
+      return eventDate != null && _sameDate(eventDate, date);
+    }).toList();
+  }
+
+  List<_TimelineCalendarEntry> _calendarEntriesForDay(DateTime date) {
+    return _calendarEntries
+        .where((entry) => _sameDate(entry.occurrenceStartsAt, date))
+        .toList();
+  }
+
+  List<_TimelineNonBusinessDay> _nonBusinessDaysForDay(DateTime date) {
+    return _nonBusinessDays.where((item) {
+      if (_sameDate(item.date, date)) {
+        return true;
+      }
+      return item.isRecurringYearly &&
+          item.date.month == date.month &&
+          item.date.day == date.day;
+    }).toList();
+  }
+
+  bool _recordMatchesSelection(_TimelineRecord record) {
+    if (_selectedDate == null) {
+      return true;
+    }
+    return _dateMatchesSelection(record.eventDate);
+  }
+
+  bool _dateMatchesSelection(DateTime? date) {
+    if (_selectedDate == null) {
+      return true;
+    }
+    if (date == null) {
+      return false;
+    }
+    return _isDateInRange(date, _selectedDate!, _rangeEnd ?? _selectedDate!);
+  }
+
+  String _selectionLabel() {
+    if (_selectedDate == null) {
+      return _monthLabel(_month);
+    }
+    if (_rangeEnd == null || _sameDate(_selectedDate!, _rangeEnd!)) {
+      return _dateLabel(_selectedDate!);
+    }
+    return '${_dateLabel(_selectedDate!)} a ${_dateLabel(_rangeEnd!)}';
+  }
+
+  Widget _timelineSectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        color: _inkColor,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+  }
 }
 
 class _TimelineCalendar extends StatelessWidget {
   const _TimelineCalendar({
     required this.month,
     required this.selectedDate,
+    required this.rangeEnd,
     required this.records,
-    required this.onSelectDate,
+    required this.calendarEntries,
+    required this.nonBusinessDays,
+    required this.onOpenDate,
+    required this.onAddRecord,
   });
 
   final DateTime month;
   final DateTime? selectedDate;
+  final DateTime? rangeEnd;
   final List<_TimelineRecord> records;
-  final ValueChanged<DateTime> onSelectDate;
+  final List<_TimelineCalendarEntry> calendarEntries;
+  final List<_TimelineNonBusinessDay> nonBusinessDays;
+  final ValueChanged<DateTime> onOpenDate;
+  final ValueChanged<DateTime> onAddRecord;
 
   @override
   Widget build(BuildContext context) {
@@ -508,103 +762,181 @@ class _TimelineCalendar extends StatelessWidget {
             count: _countForDay(day),
             selected:
                 selectedDate?.year == month.year &&
-                selectedDate?.month == month.month &&
-                selectedDate?.day == day,
+                    selectedDate?.month == month.month &&
+                    selectedDate?.day == day ||
+                rangeEnd?.year == month.year &&
+                    rangeEnd?.month == month.month &&
+                    rangeEnd?.day == day,
+            inRange: _dateIsInCalendarRange(day),
             today:
                 today.year == month.year &&
                 today.month == month.month &&
                 today.day == day,
-            onTap: () => onSelectDate(DateTime(month.year, month.month, day)),
+            onOpen: () => onOpenDate(DateTime(month.year, month.month, day)),
+            onAdd: () => onAddRecord(DateTime(month.year, month.month, day)),
           ),
       ],
     );
   }
 
   int _countForDay(int day) {
-    return records.where((record) {
+    final date = DateTime(month.year, month.month, day);
+    final recordsCount = records.where((record) {
       final date = record.eventDate;
       return date != null &&
           date.year == month.year &&
           date.month == month.month &&
           date.day == day;
     }).length;
+    final calendarCount = calendarEntries
+        .where((entry) => _sameDate(entry.occurrenceStartsAt, date))
+        .length;
+    final nonBusinessCount = nonBusinessDays.where((item) {
+      if (_sameDate(item.date, date)) {
+        return true;
+      }
+      return item.isRecurringYearly &&
+          item.date.month == date.month &&
+          item.date.day == date.day;
+    }).length;
+    return recordsCount + calendarCount + nonBusinessCount;
+  }
+
+  bool _dateIsInCalendarRange(int day) {
+    if (selectedDate == null || rangeEnd == null) {
+      return false;
+    }
+    return _isDateInRange(
+      DateTime(month.year, month.month, day),
+      selectedDate!,
+      rangeEnd!,
+    );
   }
 }
 
-class _TimelineDayCell extends StatelessWidget {
+class _TimelineDayCell extends StatefulWidget {
   const _TimelineDayCell({
     required this.date,
     required this.count,
     required this.selected,
+    required this.inRange,
     required this.today,
-    required this.onTap,
+    required this.onOpen,
+    required this.onAdd,
   });
 
   final DateTime date;
   final int count;
   final bool selected;
+  final bool inRange;
   final bool today;
-  final VoidCallback onTap;
+  final VoidCallback onOpen;
+  final VoidCallback onAdd;
+
+  @override
+  State<_TimelineDayCell> createState() => _TimelineDayCellState();
+}
+
+class _TimelineDayCellState extends State<_TimelineDayCell> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected
+    final color = widget.selected
         ? _deepTealColor
-        : today
+        : widget.inRange
+        ? _tealColor.withValues(alpha: 0.12)
+        : widget.today
         ? _tealColor
         : const Color(0xFFF8FAFB);
-    final textColor = selected ? Colors.white : _inkColor;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected
-                  ? _deepTealColor
-                  : count > 0
-                  ? _tealColor.withValues(alpha: 0.34)
-                  : _lineColor,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '${date.day}',
-                style: TextStyle(color: textColor, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 4),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                constraints: const BoxConstraints(minWidth: 20),
-                height: 18,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  color: count > 0
-                      ? (selected ? Colors.white : _tealColor)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: count > 0
-                    ? Text(
-                        '$count',
+    final textColor = widget.selected ? Colors.white : _inkColor;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: Colors.transparent,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: widget.onOpen,
+                child: Ink(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: widget.selected
+                          ? _deepTealColor
+                          : widget.inRange || widget.count > 0
+                          ? _tealColor.withValues(alpha: 0.34)
+                          : _lineColor,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${widget.date.day}',
                         style: TextStyle(
-                          color: selected ? _deepTealColor : Colors.white,
-                          fontSize: 11,
+                          color: textColor,
                           fontWeight: FontWeight.w900,
                         ),
-                      )
-                    : const SizedBox.shrink(),
+                      ),
+                      const SizedBox(height: 4),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        constraints: const BoxConstraints(minWidth: 20),
+                        height: 18,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: widget.count > 0
+                              ? (widget.selected ? Colors.white : _tealColor)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: widget.count > 0
+                            ? Text(
+                                '${widget.count}',
+                                style: TextStyle(
+                                  color: widget.selected
+                                      ? _deepTealColor
+                                      : Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
+            if (_hovered)
+              Center(
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(999),
+                  elevation: 4,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: widget.onAdd,
+                    child: const SizedBox(
+                      width: 42,
+                      height: 42,
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: _deepTealColor,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -616,124 +948,481 @@ class _TimelineRecordTile extends StatelessWidget {
     required this.record,
     required this.onEdit,
     required this.onRemove,
+    this.onOpen,
     this.compact = false,
+    this.showActions = true,
   });
 
   final _TimelineRecord record;
   final VoidCallback onEdit;
   final VoidCallback onRemove;
+  final VoidCallback? onOpen;
   final bool compact;
+  final bool showActions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: record.auditTooltip,
+      constraints: const BoxConstraints(maxWidth: 320),
+      waitDuration: const Duration(milliseconds: 450),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onOpen,
+          child: Ink(
+            width: double.infinity,
+            padding: EdgeInsets.all(compact ? 10 : 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _lineColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _tealColor.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        record.monthOnly
+                            ? Icons.calendar_view_month_outlined
+                            : Icons.event_note_outlined,
+                        color: _tealColor,
+                        size: 19,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            record.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _inkColor,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            [
+                              record.eventDateLabel.isEmpty
+                                  ? 'Sem data'
+                                  : record.eventDateLabel,
+                              record.referenceMonthLabel,
+                              record.categoryLabel,
+                            ].join(' | '),
+                            style: const TextStyle(
+                              color: _mutedColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (showActions) ...[
+                      IconButton(
+                        tooltip: 'Editar',
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        tooltip: 'Remover',
+                        onPressed: onRemove,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                      ),
+                    ],
+                  ],
+                ),
+                if (!compact) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    record.description,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _inkColor, height: 1.3),
+                  ),
+                ],
+                if (record.links.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final link in record.links.take(5))
+                        _Tag(
+                          label:
+                              '${link.entityTypeLabel}: ${link.labelSnapshot}',
+                          icon: Icons.link_rounded,
+                          color: _deepTealColor,
+                          background: _deepTealColor.withValues(alpha: 0.08),
+                        ),
+                      if (record.links.length > 5)
+                        _Tag(
+                          label: '+${record.links.length - 5}',
+                          icon: Icons.more_horiz_rounded,
+                          color: _mutedColor,
+                          background: _lineColor.withValues(alpha: 0.60),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineCalendarEntryTile extends StatelessWidget {
+  const _TimelineCalendarEntryTile({required this.entry, required this.onOpen});
+
+  final _TimelineCalendarEntry entry;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: entry.auditTooltip,
+      constraints: const BoxConstraints(maxWidth: 320),
+      waitDuration: const Duration(milliseconds: 450),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onOpen,
+          child: Ink(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _lineColor),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _amberColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    entry.kind == 'REMINDER'
+                        ? Icons.notifications_active_outlined
+                        : Icons.event_note_outlined,
+                    color: _amberColor,
+                    size: 19,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _inkColor,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        [
+                          entry.occurrenceStartsAtLabel,
+                          entry.kindLabel,
+                          entry.statusLabel,
+                          entry.targetLabel,
+                        ].where((value) => value.isNotEmpty).join(' | '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _mutedColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineNonBusinessDayTile extends StatelessWidget {
+  const _TimelineNonBusinessDayTile({required this.item});
+
+  final _TimelineNonBusinessDay item;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(compact ? 10 : 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.82),
+        color: _amberColor.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _lineColor),
+        border: Border.all(color: _amberColor.withValues(alpha: 0.20)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
+          const Icon(Icons.event_busy_outlined, color: _amberColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              [
+                item.name,
+                item.dateLabel,
+                item.scope == 'BRAZIL_NATIONAL_HOLIDAY'
+                    ? 'Feriado nacional'
+                    : item.scope,
+              ].where((value) => value.isNotEmpty).join(' | '),
+              style: const TextStyle(
+                color: _inkColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineDayAgendaDialog extends StatelessWidget {
+  const _TimelineDayAgendaDialog({
+    required this.date,
+    required this.records,
+    required this.calendarEntries,
+    required this.nonBusinessDays,
+    required this.onAddRecord,
+    required this.onOpenRecord,
+    required this.onOpenCalendarEntry,
+  });
+
+  final DateTime date;
+  final List<_TimelineRecord> records;
+  final List<_TimelineCalendarEntry> calendarEntries;
+  final List<_TimelineNonBusinessDay> nonBusinessDays;
+  final VoidCallback onAddRecord;
+  final ValueChanged<_TimelineRecord> onOpenRecord;
+  final ValueChanged<_TimelineCalendarEntry> onOpenCalendarEntry;
+
+  @override
+  Widget build(BuildContext context) {
+    final total =
+        records.length + calendarEntries.length + nonBusinessDays.length;
+    return Dialog(
+      insetPadding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _tealColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  record.monthOnly
-                      ? Icons.calendar_view_month_outlined
-                      : Icons.event_note_outlined,
-                  color: _tealColor,
-                  size: 19,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _dateLabel(date),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Novo registro',
+                    onPressed: onAddRecord,
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 8),
+              if (total == 0)
+                const _TimelineBanner(
+                  icon: Icons.event_available_outlined,
+                  text: 'Nenhum evento, lembrete ou registro neste dia.',
+                  color: _mutedColor,
+                )
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: min(
+                      MediaQuery.sizeOf(context).height * 0.62,
+                      480,
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final entry in calendarEntries) ...[
+                          _TimelineCalendarEntryTile(
+                            entry: entry,
+                            onOpen: () => onOpenCalendarEntry(entry),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        for (final item in nonBusinessDays) ...[
+                          _TimelineNonBusinessDayTile(item: item),
+                          const SizedBox(height: 8),
+                        ],
+                        for (final record in records) ...[
+                          _TimelineRecordTile(
+                            record: record,
+                            compact: true,
+                            showActions: false,
+                            onOpen: () => onOpenRecord(record),
+                            onEdit: () => onOpenRecord(record),
+                            onRemove: () => onOpenRecord(record),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineRecordDetailsDialog extends StatelessWidget {
+  const _TimelineRecordDetailsDialog({required this.record});
+
+  final _TimelineRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(record.title),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width * 0.88, 560.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(record.description),
+              const SizedBox(height: 12),
+              _detailsLine(
+                'Data',
+                record.eventDateLabel.isEmpty
+                    ? 'Sem data especifica'
+                    : record.eventDateLabel,
+              ),
+              _detailsLine('Mes', record.referenceMonthLabel),
+              _detailsLine('Categoria', record.categoryLabel),
+              _detailsLine(
+                'Auditoria',
+                record.auditTooltip.replaceAll('\n', ' | '),
+              ),
+              if (record.links.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
-                    Text(
-                      record.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _inkColor,
-                        fontWeight: FontWeight.w900,
+                    for (final link in record.links)
+                      _Tag(
+                        label: '${link.entityTypeLabel}: ${link.labelSnapshot}',
+                        icon: Icons.link_rounded,
+                        color: _deepTealColor,
+                        background: _deepTealColor.withValues(alpha: 0.08),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      [
-                        record.eventDateLabel.isEmpty
-                            ? 'Sem data'
-                            : record.eventDateLabel,
-                        record.referenceMonthLabel,
-                        record.categoryLabel,
-                      ].join(' | '),
-                      style: const TextStyle(
-                        color: _mutedColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
                   ],
                 ),
-              ),
-              IconButton(
-                tooltip: 'Editar',
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-              ),
-              IconButton(
-                tooltip: 'Remover',
-                onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline_rounded),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
+        ),
+        TextButton.icon(
+          onPressed: () => Navigator.of(context).pop('remove'),
+          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+          label: const Text('Remover'),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).pop('edit'),
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          label: const Text('Editar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimelineCalendarEntryDetailsDialog extends StatelessWidget {
+  const _TimelineCalendarEntryDetailsDialog({required this.entry});
+
+  final _TimelineCalendarEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(entry.title),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width * 0.88, 560.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (entry.description.isNotEmpty) Text(entry.description),
+              if (entry.description.isNotEmpty) const SizedBox(height: 12),
+              _detailsLine('Quando', entry.occurrenceStartsAtLabel),
+              _detailsLine('Tipo', entry.kindLabel),
+              _detailsLine('Status', entry.statusLabel),
+              _detailsLine('Vinculo', entry.targetLabel),
+              _detailsLine('Notificacao', entry.notificationLabel),
+              _detailsLine(
+                'Auditoria',
+                entry.auditTooltip.replaceAll('\n', ' | '),
               ),
             ],
           ),
-          if (!compact) ...[
-            const SizedBox(height: 8),
-            Text(
-              record.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: _inkColor, height: 1.3),
-            ),
-          ],
-          if (record.links.isNotEmpty) ...[
-            const SizedBox(height: 9),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final link in record.links.take(5))
-                  _Tag(
-                    label: '${link.entityTypeLabel}: ${link.labelSnapshot}',
-                    icon: Icons.link_rounded,
-                    color: _deepTealColor,
-                    background: _deepTealColor.withValues(alpha: 0.08),
-                  ),
-                if (record.links.length > 5)
-                  _Tag(
-                    label: '+${record.links.length - 5}',
-                    icon: Icons.more_horiz_rounded,
-                    color: _mutedColor,
-                    background: _lineColor.withValues(alpha: 0.60),
-                  ),
-              ],
-            ),
-          ],
-        ],
+        ),
       ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
+        ),
+      ],
     );
   }
 }
@@ -761,6 +1450,7 @@ class _TimelineRecordDialogState extends State<_TimelineRecordDialog> {
   late final TextEditingController _description;
   late final TextEditingController _eventDate;
   late final TextEditingController _manualLabel;
+  late final TextEditingController _editJustification;
   late String _category;
   late String _nature;
   late bool _monthOnly;
@@ -774,6 +1464,7 @@ class _TimelineRecordDialogState extends State<_TimelineRecordDialog> {
     final record = widget.record;
     _title = TextEditingController(text: record?.title ?? '');
     _description = TextEditingController(text: record?.description ?? '');
+    _editJustification = TextEditingController();
     _eventDate = TextEditingController(
       text: record?.eventDate == null
           ? _inputDateFor(widget.selectedDate ?? DateTime.now())
@@ -802,6 +1493,7 @@ class _TimelineRecordDialogState extends State<_TimelineRecordDialog> {
     _description.dispose();
     _eventDate.dispose();
     _manualLabel.dispose();
+    _editJustification.dispose();
     super.dispose();
   }
 
@@ -839,6 +1531,14 @@ class _TimelineRecordDialogState extends State<_TimelineRecordDialog> {
                       maxLines: 6,
                       required: true,
                     ),
+                    if (widget.record != null)
+                      _dialogTextField(
+                        width: width,
+                        controller: _editJustification,
+                        label: 'Justificativa da edicao',
+                        icon: Icons.edit_note_outlined,
+                        maxLines: 2,
+                      ),
                     _dialogDropdown(
                       width: fieldWidth,
                       label: 'Categoria',
@@ -1142,6 +1842,7 @@ class _TimelineRecordDialogState extends State<_TimelineRecordDialog> {
         'eventDate': _monthOnly ? '' : _eventDate.text,
         'isMonthOnly': _monthOnly,
         'visibility': 'INTERNAL',
+        if (widget.record != null) 'editJustification': _editJustification.text,
         'links': [
           for (final link in _links)
             _cleanMutationBody({
@@ -1258,6 +1959,34 @@ class _TimelineApiRepository {
     return _apiMapList(data['items']).map(_timelineRecordFromApi).toList();
   }
 
+  Future<List<_TimelineCalendarEntry>> listCalendarEntries({
+    required String from,
+    required String to,
+  }) async {
+    await _apiClient.ensureDevelopmentSession();
+    final data = await _apiClient.getMap(
+      'agenda',
+      query: {'startsAtFrom': from, 'startsAtTo': to},
+    );
+    return _apiMapList(
+      data['items'],
+    ).map(_timelineCalendarEntryFromApi).toList();
+  }
+
+  Future<List<_TimelineNonBusinessDay>> listNonBusinessDays({
+    required String from,
+    required String to,
+  }) async {
+    await _apiClient.ensureDevelopmentSession();
+    final data = await _apiClient.getMap(
+      'agenda/non-business-days',
+      query: {'from': from, 'to': to},
+    );
+    return _apiMapList(
+      data['items'],
+    ).map(_timelineNonBusinessDayFromApi).toList();
+  }
+
   Future<void> createRecord(Map<String, dynamic> body) async {
     await _apiClient.postMap('timeline', body: body);
   }
@@ -1312,6 +2041,11 @@ class _TimelineRecord {
     required this.eventDateLabel,
     required this.monthOnly,
     required this.links,
+    required this.createdByName,
+    required this.updatedByName,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.lastEditJustification,
   });
 
   final String publicId;
@@ -1326,6 +2060,81 @@ class _TimelineRecord {
   final String eventDateLabel;
   final bool monthOnly;
   final List<_TimelineRecordLink> links;
+  final String createdByName;
+  final String updatedByName;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final String lastEditJustification;
+
+  String get auditTooltip => _auditTooltip(
+    createdByName: createdByName,
+    createdAt: createdAt,
+    updatedByName: updatedByName,
+    updatedAt: updatedAt,
+    lastEditJustification: lastEditJustification,
+  );
+}
+
+class _TimelineCalendarEntry {
+  const _TimelineCalendarEntry({
+    required this.publicId,
+    required this.title,
+    required this.description,
+    required this.kind,
+    required this.kindLabel,
+    required this.statusLabel,
+    required this.targetLabel,
+    required this.notificationLabel,
+    required this.occurrenceStartsAt,
+    required this.occurrenceStartsAtLabel,
+    required this.createdByName,
+    required this.updatedByName,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.lastEditJustification,
+  });
+
+  final String publicId;
+  final String title;
+  final String description;
+  final String kind;
+  final String kindLabel;
+  final String statusLabel;
+  final String targetLabel;
+  final String notificationLabel;
+  final DateTime occurrenceStartsAt;
+  final String occurrenceStartsAtLabel;
+  final String createdByName;
+  final String updatedByName;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final String lastEditJustification;
+
+  String get auditTooltip => _auditTooltip(
+    createdByName: createdByName,
+    createdAt: createdAt,
+    updatedByName: updatedByName,
+    updatedAt: updatedAt,
+    lastEditJustification: lastEditJustification,
+  );
+}
+
+class _TimelineNonBusinessDay {
+  const _TimelineNonBusinessDay({
+    required this.publicId,
+    required this.name,
+    required this.scope,
+    required this.date,
+    required this.dateLabel,
+    required this.isRecurringYearly,
+  });
+
+  final String publicId;
+  final String name;
+  final String scope;
+  final DateTime date;
+  final String dateLabel;
+  final bool isRecurringYearly;
 }
 
 class _TimelineRecordLink {
@@ -1390,6 +2199,8 @@ class _TimelineLookupOption {
 }
 
 _TimelineRecord _timelineRecordFromApi(Map<String, dynamic> item) {
+  final createdBy = _apiMap(item['createdBy']);
+  final updatedBy = _apiMap(item['updatedBy']);
   return _TimelineRecord(
     publicId: _apiText(item['publicId']),
     title: _apiText(item['title'], fallback: 'Registro sem titulo'),
@@ -1403,6 +2214,67 @@ _TimelineRecord _timelineRecordFromApi(Map<String, dynamic> item) {
     eventDateLabel: _apiText(item['eventDateLabel']),
     monthOnly: item['monthOnly'] == true,
     links: _apiMapList(item['links']).map(_timelineLinkFromApi).toList(),
+    createdByName: _apiText(
+      createdBy['name'],
+      fallback: _apiText(
+        item['createdByUserSystemPublicId'],
+        fallback: 'Sistema',
+      ),
+    ),
+    updatedByName: _apiText(updatedBy['name']),
+    createdAt: _apiDate(item['createdAt']),
+    updatedAt: _apiDate(item['updatedAt']),
+    lastEditJustification: _apiText(item['lastEditJustification']),
+  );
+}
+
+_TimelineCalendarEntry _timelineCalendarEntryFromApi(
+  Map<String, dynamic> item,
+) {
+  final target = _apiMap(item['target']);
+  final notification = _apiMap(item['notification']);
+  final createdBy = _apiMap(item['createdBy']);
+  final updatedBy = _apiMap(item['updatedBy']);
+  final occurrence =
+      _apiDate(item['occurrenceStartsAt']) ??
+      _apiDate(item['startsAt']) ??
+      DateTime.fromMillisecondsSinceEpoch(0);
+  return _TimelineCalendarEntry(
+    publicId: _apiText(item['publicId']),
+    title: _apiText(item['title'], fallback: 'Item de calendario'),
+    description: _apiText(item['description']),
+    kind: _apiText(item['kind'], fallback: 'REMINDER'),
+    kindLabel: _apiText(item['kindLabel'], fallback: 'Lembrete'),
+    statusLabel: _apiText(
+      item['statusLabel'],
+      fallback: _apiText(item['status']),
+    ),
+    targetLabel: _apiText(target['label']),
+    notificationLabel: _apiText(notification['policyLabel']),
+    occurrenceStartsAt: occurrence,
+    occurrenceStartsAtLabel: _apiText(
+      item['occurrenceStartsAtLabel'],
+      fallback: _apiText(item['startsAtLabel']),
+    ),
+    createdByName: _apiText(createdBy['name'], fallback: 'Sistema'),
+    updatedByName: _apiText(updatedBy['name']),
+    createdAt: _apiDate(item['createdAt']),
+    updatedAt: _apiDate(item['updatedAt']),
+    lastEditJustification: _apiText(item['lastEditJustification']),
+  );
+}
+
+_TimelineNonBusinessDay _timelineNonBusinessDayFromApi(
+  Map<String, dynamic> item,
+) {
+  final date = _apiDate(item['date']) ?? DateTime.fromMillisecondsSinceEpoch(0);
+  return _TimelineNonBusinessDay(
+    publicId: _apiText(item['publicId']),
+    name: _apiText(item['name'], fallback: 'Dia nao util'),
+    scope: _apiText(item['scope']),
+    date: date,
+    dateLabel: _apiText(item['dateLabel'], fallback: _dateLabel(date)),
+    isRecurringYearly: item['isRecurringYearly'] == true,
   );
 }
 
@@ -1464,6 +2336,10 @@ String _monthQuery(DateTime value) {
   return '${value.year}-${value.month.toString().padLeft(2, '0')}';
 }
 
+String _dateQuery(DateTime value) {
+  return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+}
+
 String _monthLabel(DateTime value) {
   const labels = [
     'Janeiro',
@@ -1484,4 +2360,88 @@ String _monthLabel(DateTime value) {
 
 String _dateLabel(DateTime value) {
   return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+}
+
+bool _sameDate(DateTime? left, DateTime? right) {
+  return left != null &&
+      right != null &&
+      left.year == right.year &&
+      left.month == right.month &&
+      left.day == right.day;
+}
+
+bool _isDateInRange(DateTime date, DateTime start, DateTime end) {
+  final normalizedStart = DateTime(start.year, start.month, start.day);
+  final normalizedEnd = DateTime(end.year, end.month, end.day);
+  final normalizedDate = DateTime(date.year, date.month, date.day);
+  final from = normalizedStart.isBefore(normalizedEnd)
+      ? normalizedStart
+      : normalizedEnd;
+  final to = normalizedStart.isBefore(normalizedEnd)
+      ? normalizedEnd
+      : normalizedStart;
+  return !normalizedDate.isBefore(from) && !normalizedDate.isAfter(to);
+}
+
+String _auditTooltip({
+  required String createdByName,
+  required DateTime? createdAt,
+  required String updatedByName,
+  required DateTime? updatedAt,
+  required String lastEditJustification,
+}) {
+  final createdLine =
+      'Por ${createdByName.isEmpty ? 'Sistema' : createdByName}, ${_shortDateTimeLabel(createdAt)}';
+  if (updatedByName.isEmpty && lastEditJustification.isEmpty) {
+    return createdLine;
+  }
+  final justification = _limitText(lastEditJustification, 30);
+  final updateLine = [
+    'Ultima Edicao: ${updatedByName.isEmpty ? 'Sistema' : updatedByName}',
+    'em: ${_shortDateTimeLabel(updatedAt)}',
+    if (justification.isNotEmpty) '- $justification',
+  ].join(' ');
+  return '$createdLine\n$updateLine';
+}
+
+String _limitText(String value, int maxLength) {
+  final text = value.trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return text.substring(0, maxLength).trimRight();
+}
+
+String _shortDateTimeLabel(DateTime? value) {
+  if (value == null) {
+    return '--/--/--, --:--';
+  }
+  final local = value.isUtc ? value.toLocal() : value;
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final year = (local.year % 100).toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day/$month/$year, $hour:$minute';
+}
+
+Widget _detailsLine(String label, String value) {
+  if (value.trim().isEmpty) {
+    return const SizedBox.shrink();
+  }
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 7),
+    child: RichText(
+      text: TextSpan(
+        style: const TextStyle(color: _inkColor, height: 1.25),
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          TextSpan(text: value),
+        ],
+      ),
+    ),
+  );
 }

@@ -28,41 +28,24 @@ extension on _CollaboratorAudienceGroup {
   };
 }
 
+_CollaboratorAudienceGroup? _audienceGroupFromKey(String key) {
+  final normalized = key.trim().toUpperCase();
+  for (final group in _CollaboratorAudienceGroup.values) {
+    if (group.key == normalized) {
+      return group;
+    }
+  }
+  return null;
+}
+
 class _AudiencePerson {
-  const _AudiencePerson({
-    required this.publicId,
-    required this.name,
-    required this.group,
-  });
+  const _AudiencePerson({required this.publicId, required this.name});
 
   final String publicId;
   final String name;
-  final _CollaboratorAudienceGroup group;
+
+  Color get color => _slateColor;
 }
-
-const _audienceDiego = _AudiencePerson(
-  publicId: 'usr_01hdgo0000000000000001',
-  name: 'Diego Costa',
-  group: _CollaboratorAudienceGroup.board,
-);
-
-const _audienceMarta = _AudiencePerson(
-  publicId: 'usr_01hmrt0000000000000002',
-  name: 'Marta Nogueira',
-  group: _CollaboratorAudienceGroup.supervision,
-);
-
-const _audienceCamila = _AudiencePerson(
-  publicId: 'usr_01hcml0000000000000003',
-  name: 'Camila Prado',
-  group: _CollaboratorAudienceGroup.supervision,
-);
-
-const _audienceLucas = _AudiencePerson(
-  publicId: 'usr_01hlcs0000000000000004',
-  name: 'Lucas Lima',
-  group: _CollaboratorAudienceGroup.auxiliary,
-);
 
 class _ViewerAccessProfile {
   const _ViewerAccessProfile({
@@ -73,6 +56,7 @@ class _ViewerAccessProfile {
     required this.icon,
     required this.color,
     this.publicId,
+    this.organizationLabel,
     this.groups = const [],
   });
 
@@ -83,6 +67,7 @@ class _ViewerAccessProfile {
   final IconData icon;
   final Color color;
   final String? publicId;
+  final String? organizationLabel;
   final List<_CollaboratorAudienceGroup> groups;
 
   bool get isAuthenticated => publicId != null;
@@ -111,89 +96,93 @@ const _publicViewerProfile = _ViewerAccessProfile(
   color: _amberColor,
 );
 
-const _diegoViewerProfile = _ViewerAccessProfile(
-  key: 'diego',
-  name: 'Diego Costa',
-  badge: 'DC',
+const _sessionViewerProfileFallback = _ViewerAccessProfile(
+  key: 'authenticated-session',
+  name: 'Sessao autenticada',
+  badge: 'SA',
   description:
-      'Perfil autenticado da Diretoria. So enxerga o que foi compartilhado com ele, com Diretoria ou por autoria propria.',
-  icon: Icons.approval_outlined,
+      'Perfil autenticado carregado da sessao da API. A leitura fica limitada ao que o backend liberar.',
+  icon: Icons.verified_user_outlined,
   color: _tealColor,
-  publicId: 'usr_01hdgo0000000000000001',
-  groups: [_CollaboratorAudienceGroup.board],
 );
 
-const _martaViewerProfile = _ViewerAccessProfile(
-  key: 'marta',
-  name: 'Marta Nogueira',
-  badge: 'MN',
-  description:
-      'Perfil autenticado de Supervisao. Leitura limitada ao que foi compartilhado com Supervisao, diretamente com Marta ou por autoria propria.',
-  icon: Icons.manage_accounts_outlined,
-  color: _amberColor,
-  publicId: 'usr_01hmrt0000000000000002',
-  groups: [_CollaboratorAudienceGroup.supervision],
-);
+_ViewerAccessProfile _viewerProfileFromSession(SessionSnapshot session) {
+  final groups = [
+    for (final key in session.audienceGroups)
+      if (_audienceGroupFromKey(key) != null) _audienceGroupFromKey(key)!,
+  ];
+  final primaryGroup = groups.isEmpty ? null : groups.first;
+  final name = session.userName.trim().isEmpty
+      ? 'Sessao autenticada'
+      : session.userName.trim();
+  final publicId = session.userPublicId.trim();
 
-const _camilaViewerProfile = _ViewerAccessProfile(
-  key: 'camila',
-  name: 'Camila Prado',
-  badge: 'CP',
-  description:
-      'Perfil autenticado usado para validar compartilhamento por pessoa especifica, sem depender de todo o grupo de Supervisao.',
-  icon: Icons.alternate_email_outlined,
-  color: _roseColor,
-  publicId: 'usr_01hcml0000000000000003',
-  groups: [_CollaboratorAudienceGroup.supervision],
-);
+  return _ViewerAccessProfile(
+    key: publicId.isEmpty ? 'authenticated-session' : publicId,
+    name: name,
+    badge: _viewerBadgeFromName(name),
+    description:
+        'Perfil carregado da sessao da API. Perfis: ${session.profiles.isEmpty ? session.securityContext : session.profiles.join('/')}',
+    icon: primaryGroup?.icon ?? Icons.verified_user_outlined,
+    color: primaryGroup?.color ?? _tealColor,
+    publicId: publicId.isEmpty ? null : publicId,
+    organizationLabel: session.tenantRootCompanyLabel.isEmpty
+        ? null
+        : session.tenantRootCompanyLabel,
+    groups: groups,
+  );
+}
 
-const _lucasViewerProfile = _ViewerAccessProfile(
-  key: 'lucas',
-  name: 'Lucas Lima',
-  badge: 'LL',
-  description:
-      'Perfil autenticado de Auxiliares. So consulta conteudo enviado especificamente para esse grupo, para Lucas ou criado por ele.',
-  icon: Icons.groups_outlined,
-  color: _slateColor,
-  publicId: 'usr_01hlcs0000000000000004',
-  groups: [_CollaboratorAudienceGroup.auxiliary],
-);
+String _viewerBadgeFromName(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList(growable: false);
+  if (parts.isEmpty) {
+    return 'SA';
+  }
+  if (parts.length == 1) {
+    return parts.first.substring(0, min(2, parts.first.length)).toUpperCase();
+  }
+  return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+}
 
-const _viewerProfiles = [
-  _publicViewerProfile,
-  _diegoViewerProfile,
-  _martaViewerProfile,
-  _camilaViewerProfile,
-  _lucasViewerProfile,
-];
+List<_ViewerAccessProfile> _viewerProfileOptions(_ViewerAccessProfile current) {
+  return [current.isAuthenticated ? current : _publicViewerProfile];
+}
 
 class _ProtectedAccessPolicy {
   const _ProtectedAccessPolicy({
     required this.owner,
     this.allowedGroups = const [],
     this.allowedPeople = const [],
+    this.canViewOverride,
+    this.canManageOverride,
   });
 
   final _AudiencePerson owner;
   final List<_CollaboratorAudienceGroup> allowedGroups;
   final List<_AudiencePerson> allowedPeople;
+  final bool? canViewOverride;
+  final bool? canManageOverride;
 
   String get ownerUserPublicId => owner.publicId;
 
-  List<String> get allowedGroupKeys => allowedGroups
-      .map((group) => group.key)
-      .toList(growable: false);
+  List<String> get allowedGroupKeys =>
+      allowedGroups.map((group) => group.key).toList(growable: false);
 
-  List<String> get allowedUserPublicIds => allowedPeople
-      .map((person) => person.publicId)
-      .toList(growable: false);
+  List<String> get allowedUserPublicIds =>
+      allowedPeople.map((person) => person.publicId).toList(growable: false);
 
-  bool get isOwnerOnly =>
-      allowedGroups.isEmpty && allowedPeople.isEmpty;
+  bool get isOwnerOnly => allowedGroups.isEmpty && allowedPeople.isEmpty;
 
   bool canViewerRead(_ViewerAccessProfile viewer) {
     if (!viewer.isAuthenticated || viewer.publicId == null) {
       return false;
+    }
+    if (canViewOverride != null) {
+      return canViewOverride!;
     }
     if (viewer.publicId == owner.publicId) {
       return true;
@@ -210,7 +199,8 @@ class _ProtectedAccessPolicy {
   }
 
   bool canViewerManage(_ViewerAccessProfile viewer) =>
-      viewer.publicId != null && viewer.publicId == owner.publicId;
+      canManageOverride ??
+      (viewer.publicId != null && viewer.publicId == owner.publicId);
 
   bool canViewerEdit(_ViewerAccessProfile viewer) => canViewerManage(viewer);
 

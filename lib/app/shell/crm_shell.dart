@@ -3232,18 +3232,6 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        _settingsSection(
-          context,
-          title: 'Alternar perfil de validacao',
-          icon: Icons.switch_account_outlined,
-          children: [
-            for (final profile in _viewerProfiles) ...[
-              _profileChoice(profile),
-              const SizedBox(height: 8),
-            ],
-          ],
-        ),
       ],
     );
   }
@@ -3282,7 +3270,8 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
             _settingsInfoTile(
               icon: Icons.apartment_rounded,
               title: 'Empresa vinculada',
-              subtitle: 'PariFlow Partners | pfp_local_company',
+              subtitle:
+                  _selectedViewer.organizationLabel ?? 'Nao informado pela API',
             ),
             _settingsInfoTile(
               icon: Icons.verified_user_outlined,
@@ -3508,7 +3497,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
               title: 'Contato principal',
               channel: 'Email',
               value: _selectedViewer.isAuthenticated
-                  ? '${_selectedViewer.key}@pariflow.local'
+                  ? 'Canal cadastrado na API'
                   : 'sem contato autenticado',
               relationship: 'Proprio usuario',
               active: true,
@@ -3520,7 +3509,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
             _notificationContactCard(
               title: 'Contato secundario',
               channel: 'Email',
-              value: 'gestao.${_selectedViewer.key}@pariflow.local',
+              value: 'Nao configurado pela API',
               relationship: 'Gestao direta',
               active: _secondaryEmailActive,
               message: _defaultNotificationDelegationMessage('Gestao direta'),
@@ -3530,7 +3519,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
             _notificationContactCard(
               title: 'Contato secundario',
               channel: 'WhatsApp',
-              value: '+55 11 90000-0000',
+              value: 'Nao configurado pela API',
               relationship: 'Contato operacional',
               active: _secondaryWhatsappActive,
               message: _defaultNotificationDelegationMessage(
@@ -4643,62 +4632,6 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _profileChoice(_ViewerAccessProfile profile) {
-    final selected = profile.key == _selectedViewer.key;
-    return InkWell(
-      onTap: () {
-        setState(() => _selectedViewer = profile);
-        widget.onViewerChanged(profile);
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: selected
-              ? profile.color.withValues(alpha: 0.10)
-              : const Color(0xFFF8FAFB),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected
-                ? profile.color.withValues(alpha: 0.28)
-                : _lineColor,
-          ),
-        ),
-        child: Row(
-          children: [
-            _CrmHeaderAvatar(viewerProfile: profile),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    profile.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _inkColor,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _viewerRoleLabel(profile),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: _mutedColor, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            if (selected)
-              Icon(Icons.check_circle_rounded, color: profile.color, size: 18),
-          ],
-        ),
-      ),
     );
   }
 
@@ -5956,6 +5889,7 @@ class _SharedCalendarEntryDialogState
   late final TextEditingController _appliesToRegionCode;
   late final TextEditingController _appliesToStateCode;
   late final TextEditingController _appliesToCityName;
+  late final TextEditingController _editJustification;
   late final TextEditingController _notificationTime;
   late final TextEditingController _notificationOffsetBusinessDays;
   late String _kind;
@@ -6010,6 +5944,7 @@ class _SharedCalendarEntryDialogState
     _appliesToCityName = TextEditingController(
       text: _apiText(applicability['cityName']),
     );
+    _editJustification = TextEditingController();
     _notificationTime = TextEditingController(
       text: _apiText(notification['time'], fallback: '09:00'),
     );
@@ -6029,6 +5964,7 @@ class _SharedCalendarEntryDialogState
     _appliesToRegionCode.dispose();
     _appliesToStateCode.dispose();
     _appliesToCityName.dispose();
+    _editJustification.dispose();
     _notificationTime.dispose();
     _notificationOffsetBusinessDays.dispose();
     super.dispose();
@@ -6157,6 +6093,14 @@ class _SharedCalendarEntryDialogState
                   label: 'Aplica a cidade',
                   icon: Icons.location_on_outlined,
                 ),
+                if (widget.entry != null)
+                  _textField(
+                    width: width,
+                    controller: _editJustification,
+                    label: 'Justificativa da edicao',
+                    icon: Icons.edit_note_outlined,
+                    maxLines: 2,
+                  ),
                 _dropdownField(
                   width: fieldWidth,
                   label: 'Notificacao',
@@ -6353,6 +6297,7 @@ class _SharedCalendarEntryDialogState
         'appliesToRegionCode': _appliesToRegionCode.text.toUpperCase(),
         'appliesToStateCode': _appliesToStateCode.text.toUpperCase(),
         'appliesToCityName': _appliesToCityName.text,
+        if (widget.entry != null) 'editJustification': _editJustification.text,
         'notificationPolicy': _notificationPolicy,
         'notificationOffsetBusinessDays':
             _notificationPolicy == 'CUSTOM_BUSINESS_DAYS_BEFORE'
@@ -6519,7 +6464,7 @@ class _CrmSidebar extends StatelessWidget {
                 bottom: 1, // Coloca a barra exatamente na linha final do logo
                 child: Container(
                   height: 1,
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white.withValues(alpha: 0.95),
                 ),
               ),
             ],

@@ -34,6 +34,7 @@ backend, deploy AWS e smoke tests.
 | Contracts | CRUD de contratos, tipos, modelos, servicos, postos e documentos |
 | People | CRUD de pessoa, vinculos, ocorrencias e anexos; leitura de tags/anexos por ACL |
 | Focus Board/Agenda | hub contextual com lembretes por pessoa e criacao em `POST /api/v1/agenda` |
+| Timeline | calendario operacional compartilhado com agenda, registros e feriados reais |
 | Relatorios | Central de Relatorios integrada a `POST /api/v1/relatorios/executar`, incluindo `controls_calendar` |
 | Network | consome `GET /api/v1/network/graph` |
 | Auth | `dev-token` so funciona em localhost com opt-in; host publico exige Firebase Admin real |
@@ -50,7 +51,8 @@ backend, deploy AWS e smoke tests.
 6. Integrar o front ao refresh/logout do backend quando a UX de sessao for
    fechada.
 7. Fechar sensitive-session/step-up.
-8. Evoluir a agenda atual para calendario compartilhado com feriados/dias nao
-   uteis configuraveis, comunicados por grupo e filtros avancados estilo CMNET.
+8. Evoluir filtros e comunicados por grupo no calendario compartilhado. Os
+   feriados nacionais do Brasil ja entram por padrao ate 2050; exclusoes devem
+   ser solicitadas ao suporte.
 9. Validar CRUDs, relatorios, calendario e Network com dados reais de
    homologacao.

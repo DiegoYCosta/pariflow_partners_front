@@ -789,7 +789,7 @@ _AttachmentRecord _contractDocumentFromApi(Map<String, dynamic> document) {
         : summaryParts.join(' | '),
     status: _apiText(document['status'], fallback: 'ACTIVE').toLowerCase(),
     updatedAtLabel: 'atualizado em ${_apiLongDate(document['updatedAt'])}',
-    accessPolicy: _apiReturnedContentAccessPolicy,
+    accessPolicy: _protectedAccessPolicyFromApi(document),
     mimeType: _apiText(document['mimeType']),
     externalLink: externalLink,
     physicalLocation: physicalLocation,

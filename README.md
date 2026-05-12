@@ -32,14 +32,15 @@ Ainda faltam persistencia de modelos de relatorio, exportacao, auditoria das
 execucoes, filtros avancados estilo CMNET e alinhamento final das permissoes
 granulares com backend e banco.
 
-## Calendario Compartilhado (planejado)
+## Calendario Compartilhado e Timeline
 
-A agenda atual existe no fluxo de People/Focus Board. A proxima evolucao e um
-calendario compartilhado da equipe, acessado pelo shell, com feriados e dias
-nao uteis cadastraveis pelo RH, comunicados por grupo, lembretes classificados
-por pessoa/empresa/contrato e filtros avancados em janela propria. Lembretes
-para funcionarios desligados devem ficar desativados por padrao, com reativacao
-manual por usuario autorizado.
+A agenda compartilhada e a Timeline usam os mesmos endpoints reais de
+calendario (`/api/v1/agenda` e `/api/v1/agenda/non-business-days`). Toda
+empresa recebe por padrao os feriados nacionais do Brasil ate 2050; pedidos de
+exclusao desses feriados devem ser encaminhados ao suporte. Dias nao uteis
+adicionais podem ser cadastrados por escopo de empresa, regiao, estado ou
+cidade, e lembretes para funcionarios desligados seguem desativados por padrao,
+com reativacao manual por usuario autorizado.
 
 ## Documentacao Viva
 

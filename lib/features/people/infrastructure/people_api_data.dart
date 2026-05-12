@@ -723,7 +723,7 @@ _SensitiveNoteTag _sensitiveNoteFromApi(Map<String, dynamic> tag) {
     classification: classification,
     color: color,
     sortOrder: _apiInt(tag['sortOrder']),
-    accessPolicy: _apiReturnedContentAccessPolicy,
+    accessPolicy: _protectedAccessPolicyFromApi(tag),
   );
 }
 
@@ -741,7 +741,7 @@ _AttachmentRecord _attachmentFromApi(Map<String, dynamic> attachment) {
     summary: _attachmentSummaryFromApi(attachment),
     status: _apiText(attachment['status'], fallback: 'ACTIVE').toLowerCase(),
     updatedAtLabel: 'atualizado em ${_apiLongDate(updatedAt)}',
-    accessPolicy: _apiReturnedContentAccessPolicy,
+    accessPolicy: _protectedAccessPolicyFromApi(attachment),
     displayScope: _apiText(attachment['displayScope']),
     mimeType: _apiText(attachment['mimeType']),
     externalLink: _apiText(attachment['externalLink']),
@@ -1003,15 +1003,70 @@ _AttachmentClassification _attachmentClassificationFromApi(String value) {
   }
 }
 
-const _apiReturnedContentAccessPolicy = _ProtectedAccessPolicy(
-  owner: _audienceDiego,
-  allowedGroups: [
-    _CollaboratorAudienceGroup.board,
-    _CollaboratorAudienceGroup.supervision,
-    _CollaboratorAudienceGroup.auxiliary,
-  ],
-  allowedPeople: [_audienceMarta, _audienceCamila, _audienceLucas],
-);
+_ProtectedAccessPolicy _protectedAccessPolicyFromApi(
+  Map<String, dynamic> item,
+) {
+  final createdBy = _apiMap(item['createdBy']);
+  final ownerPublicId = _apiText(
+    item['ownerUserPublicId'],
+    fallback: _apiText(createdBy['publicId']),
+  );
+  final ownerName = _apiText(
+    createdBy['name'],
+    fallback: ownerPublicId.isEmpty
+        ? 'Autoria registrada pela API'
+        : 'Usuario ${_shortPublicId(ownerPublicId)}',
+  );
+  final allowedGroups = <_CollaboratorAudienceGroup>[];
+  for (final key in _apiTextList(item['allowedGroupKeys'])) {
+    final group = _audienceGroupFromKey(key);
+    if (group != null) {
+      allowedGroups.add(group);
+    }
+  }
+
+  final allowedPeople = <_AudiencePerson>[];
+  for (final publicId in _apiTextList(item['allowedUserPublicIds'])) {
+    if (publicId.isEmpty || publicId == ownerPublicId) {
+      continue;
+    }
+    allowedPeople.add(
+      _AudiencePerson(
+        publicId: publicId,
+        name: 'Usuario ${_shortPublicId(publicId)}',
+      ),
+    );
+  }
+
+  return _ProtectedAccessPolicy(
+    owner: _AudiencePerson(publicId: ownerPublicId, name: ownerName),
+    allowedGroups: allowedGroups,
+    allowedPeople: allowedPeople,
+    canViewOverride: item.containsKey('canView')
+        ? item['canView'] == true
+        : null,
+    canManageOverride: item.containsKey('canManage')
+        ? item['canManage'] == true
+        : null,
+  );
+}
+
+List<String> _apiTextList(Object? value) {
+  if (value is! List) {
+    return const [];
+  }
+  return [
+    for (final item in value)
+      if (_apiText(item).isNotEmpty) _apiText(item),
+  ];
+}
+
+String _shortPublicId(String publicId) {
+  if (publicId.length <= 10) {
+    return publicId;
+  }
+  return '${publicId.substring(0, 7)}...${publicId.substring(publicId.length - 4)}';
+}
 
 String _peopleRuntimeErrorMessage(Object error) {
   if (error is ApiException) {

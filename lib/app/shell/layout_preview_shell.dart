@@ -33,10 +33,15 @@ class _ShellPreviewPage extends StatefulWidget {
 
 class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   _Destination _destination = _Destination.home;
-  _ViewerAccessProfile _viewerProfile = _diegoViewerProfile;
+  _ViewerAccessProfile _viewerProfile = _sessionViewerProfileFallback;
   _NetworkFilterState _networkFilters = const _NetworkFilterState();
   bool _showAdvancedNetworkFilters = false;
   bool _focusBoardDetached = false;
+  bool _focusBoardSlotVisible = true;
+  double _focusBoardSlotScale = 1.0;
+  Offset? _focusBoardFloatingOffset;
+  Size? _focusBoardFloatingSize;
+  bool _focusBoardFloatingMaximized = false;
   String _selectedNetworkNodeId = '';
   String? _hoveredNetworkNodeId;
   late final _FocusBoardPersistentController _focusBoardController;
@@ -52,12 +57,32 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     super.initState();
     _focusBoardController = _FocusBoardPersistentController();
     _focusBoardController.ensureLoaded();
+    unawaited(_loadViewerProfile());
   }
 
   @override
   void dispose() {
     _focusBoardController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadViewerProfile() async {
+    try {
+      final session = await ApiClient().ensureDevelopmentSession();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewerProfile = _viewerProfileFromSession(session);
+      });
+    } on ApiException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewerProfile = _publicViewerProfile;
+      });
+    }
   }
 
   @override
@@ -239,76 +264,275 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                           },
                         ),
                         Expanded(
-                          child: _focusBoardDetached
-                              ? _FocusBoardDetachedWorkspace(
-                                  controller: _focusBoardController,
-                                  viewerProfile: _viewerProfile,
-                                  onAttach: () {
-                                    setState(() {
-                                      _focusBoardDetached = false;
-                                    });
-                                  },
-                                )
-                              : SingleChildScrollView(
-                                  padding: EdgeInsets.fromLTRB(
-                                    _destination == _Destination.network
-                                        ? 0
-                                        : showSidebar
-                                        ? 28
-                                        : 16,
-                                    _destination == _Destination.network
-                                        ? 0
-                                        : _destination == _Destination.home
-                                        ? 16
-                                        : 24,
-                                    _destination == _Destination.network
-                                        ? 0
-                                        : showSidebar
-                                        ? 28
-                                        : 16,
-                                    _destination == _Destination.network
-                                        ? 0
-                                        : showSidebar
-                                        ? 24
-                                        : 96,
-                                  ),
-                                  child: Align(
-                                    alignment: Alignment.topCenter,
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        maxWidth:
-                                            _destination == _Destination.network
-                                            ? double.infinity
-                                            : 1560,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildWorkspaceContent(page, width),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                          child: _buildCrmWorkspaceRegion(
+                            page,
+                            width,
+                            showSidebar,
+                          ),
                         ),
                       ],
-                    ),
-                    _PersistentFocusBoardDock(
-                      controller: _focusBoardController,
-                      viewerProfile: _viewerProfile,
-                      detached: _focusBoardDetached,
-                      onDetach: () {
-                        setState(() {
-                          _focusBoardDetached = true;
-                        });
-                      },
                     ),
                   ],
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCrmWorkspaceRegion(
+    _PageInfo page,
+    double width,
+    bool showSidebar,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sideSlot = constraints.maxWidth >= 980;
+        final workspace = _buildCrmWorkspaceScroll(page, width, showSidebar);
+        final baseExtent = sideSlot
+            ? min(420.0, max(340.0, constraints.maxWidth * 0.24))
+            : min(360.0, max(260.0, constraints.maxHeight * 0.34));
+        final slotScale = _focusBoardSlotScale.clamp(0.8, 1.2).toDouble();
+        final slotExtent = baseExtent * slotScale;
+        final panelExtent = sideSlot
+            ? min(
+                constraints.maxHeight - 24,
+                max(460.0, constraints.maxHeight * 0.68),
+              )
+            : min(constraints.maxWidth - 24, max(320.0, constraints.maxWidth));
+        final slotRect = sideSlot
+            ? Rect.fromLTWH(
+                constraints.maxWidth - slotExtent,
+                0,
+                slotExtent,
+                panelExtent,
+              )
+            : Rect.fromLTWH(
+                0,
+                constraints.maxHeight - slotExtent,
+                constraints.maxWidth,
+                slotExtent,
+              );
+        final slot = _PersistentFocusBoardDock(
+          controller: _focusBoardController,
+          viewerProfile: _viewerProfile,
+          detached: _focusBoardDetached,
+          visible: _focusBoardSlotVisible,
+          resizeAxis: sideSlot ? Axis.horizontal : Axis.vertical,
+          extent: slotExtent,
+          panelExtent: panelExtent,
+          onExtentChanged: (value) {
+            setState(() {
+              _focusBoardSlotScale = (value / baseExtent)
+                  .clamp(0.8, 1.2)
+                  .toDouble();
+            });
+          },
+          onToggleVisibility: () {
+            setState(() {
+              _focusBoardSlotVisible = !_focusBoardSlotVisible;
+            });
+          },
+          onDetach: () {
+            setState(() {
+              _focusBoardDetached = true;
+              _focusBoardSlotVisible = false;
+              _focusBoardFloatingMaximized = false;
+              _focusBoardFloatingSize ??= Size(
+                min(780.0, constraints.maxWidth - 48),
+                min(660.0, constraints.maxHeight - 48),
+              );
+              _focusBoardFloatingOffset ??= Offset(
+                max(
+                  18.0,
+                  constraints.maxWidth - _focusBoardFloatingSize!.width - 28,
+                ),
+                22,
+              );
+            });
+          },
+          onAttach: () {
+            setState(() {
+              _focusBoardDetached = false;
+              _focusBoardSlotVisible = true;
+            });
+          },
+        );
+
+        final body = sideSlot
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: workspace),
+                  SizedBox(width: slotExtent, child: slot),
+                ],
+              )
+            : Column(
+                children: [
+                  Expanded(child: workspace),
+                  SizedBox(height: slotExtent, child: slot),
+                ],
+              );
+
+        return Stack(
+          children: [
+            body,
+            if (_focusBoardDetached)
+              _buildDetachedFocusBoardWindow(constraints, slotRect),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetachedFocusBoardWindow(
+    BoxConstraints constraints,
+    Rect slotRect,
+  ) {
+    final defaultSize = Size(
+      min(780.0, constraints.maxWidth - 48),
+      min(660.0, constraints.maxHeight - 48),
+    );
+    final size = _focusBoardFloatingMaximized
+        ? Size(constraints.maxWidth - 36, constraints.maxHeight - 36)
+        : _clampFloatingSize(
+            _focusBoardFloatingSize ?? defaultSize,
+            constraints,
+          );
+    final offset = _focusBoardFloatingMaximized
+        ? const Offset(18, 18)
+        : _clampFloatingOffset(
+            _focusBoardFloatingOffset ?? const Offset(24, 24),
+            size,
+            constraints,
+          );
+
+    return Positioned(
+      left: offset.dx,
+      top: offset.dy,
+      width: size.width,
+      height: size.height,
+      child: _FocusBoardFloatingWindow(
+        controller: _focusBoardController,
+        viewerProfile: _viewerProfile,
+        maximized: _focusBoardFloatingMaximized,
+        onMove: (delta) {
+          if (_focusBoardFloatingMaximized) {
+            return;
+          }
+          setState(() {
+            _focusBoardFloatingOffset = _clampFloatingOffset(
+              offset + delta,
+              size,
+              constraints,
+            );
+          });
+        },
+        onMoveEnd: () {
+          final dragAnchor = Offset(offset.dx + size.width / 2, offset.dy + 22);
+          if (slotRect.inflate(36).contains(dragAnchor)) {
+            setState(() {
+              _focusBoardDetached = false;
+              _focusBoardSlotVisible = true;
+              _focusBoardFloatingMaximized = false;
+            });
+          }
+        },
+        onResize: (delta) {
+          if (_focusBoardFloatingMaximized) {
+            return;
+          }
+          setState(() {
+            _focusBoardFloatingSize = _clampFloatingSize(
+              Size(size.width + delta.dx, size.height + delta.dy),
+              constraints,
+            );
+          });
+        },
+        onToggleMaximized: () {
+          setState(() {
+            _focusBoardFloatingMaximized = !_focusBoardFloatingMaximized;
+          });
+        },
+        onAttach: () {
+          setState(() {
+            _focusBoardDetached = false;
+            _focusBoardSlotVisible = true;
+            _focusBoardFloatingMaximized = false;
+          });
+        },
+      ),
+    );
+  }
+
+  Size _clampFloatingSize(Size value, BoxConstraints constraints) {
+    return Size(
+      value.width
+          .clamp(360.0, max(360.0, constraints.maxWidth - 36))
+          .toDouble(),
+      value.height
+          .clamp(360.0, max(360.0, constraints.maxHeight - 36))
+          .toDouble(),
+    );
+  }
+
+  Offset _clampFloatingOffset(
+    Offset value,
+    Size size,
+    BoxConstraints constraints,
+  ) {
+    return Offset(
+      value.dx
+          .clamp(12.0, max(12.0, constraints.maxWidth - size.width - 12))
+          .toDouble(),
+      value.dy
+          .clamp(12.0, max(12.0, constraints.maxHeight - size.height - 12))
+          .toDouble(),
+    );
+  }
+
+  Widget _buildCrmWorkspaceScroll(
+    _PageInfo page,
+    double width,
+    bool showSidebar,
+  ) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        _destination == _Destination.network
+            ? 0
+            : showSidebar
+            ? 28
+            : 16,
+        _destination == _Destination.network
+            ? 0
+            : _destination == _Destination.home
+            ? 16
+            : 24,
+        _destination == _Destination.network
+            ? 0
+            : showSidebar
+            ? 28
+            : 16,
+        _destination == _Destination.network
+            ? 0
+            : showSidebar
+            ? 24
+            : 96,
+      ),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: _destination == _Destination.network
+                ? double.infinity
+                : 1560,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [_buildWorkspaceContent(page, width)],
+          ),
         ),
       ),
     );
@@ -626,7 +850,9 @@ class _TopBar extends StatelessWidget {
                         }
                       },
                       items: [
-                        for (final value in _viewerProfiles)
+                        for (final value in _viewerProfileOptions(
+                          viewerProfile,
+                        ))
                           DropdownMenuItem(
                             value: value,
                             child: Row(
