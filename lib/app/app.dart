@@ -29,6 +29,7 @@ part '../features/contracts/contracts_feature.dart';
 part '../features/people/people_feature.dart';
 part '../features/people/infrastructure/people_api_data.dart';
 part '../features/focus_board/focus_board_feature.dart';
+part '../features/timeline/timeline_feature.dart';
 part '../features/reports/reports_api_data.dart';
 part '../features/home/home_dashboard_api_data.dart';
 part 'shell/shell_variant.dart';

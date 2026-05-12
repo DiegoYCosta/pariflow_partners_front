@@ -7,6 +7,7 @@ enum _Destination {
   contracts,
   people,
   network,
+  timeline,
 }
 
 class LayoutPreviewPage extends StatelessWidget {
@@ -467,6 +468,8 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
             });
           },
         );
+      case _Destination.timeline:
+        return _TimelineWorkspace(viewerProfile: _viewerProfile);
     }
   }
 
@@ -932,6 +935,17 @@ const _pageInfo = {
     sidebarHint: 'visual network canonica',
     mold: _SpriteMold.network,
     accent: _slateColor,
+  ),
+  _Destination.timeline: _PageInfo(
+    destination: _Destination.timeline,
+    shortLabel: 'Timeline',
+    title: 'Timeline',
+    description:
+        'Historico operacional mensal com calendario, registros e vinculos.',
+    kicker: 'Logbook mensal para operacao, contratos, pessoas e empresas',
+    sidebarHint: 'registros mensais e historico',
+    mold: _SpriteMold.calendar,
+    accent: _tealColor,
   ),
 };
 
