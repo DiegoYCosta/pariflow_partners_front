@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/api/api_client.dart';
 import '../../firebase_options.dart';
@@ -152,6 +155,34 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 440),
                   child: _buildLoginPanel(context),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, compact ? 12 : 18, 16, 0),
+                child: OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _openClientOnboarding,
+                  icon: const Icon(Icons.business_center_outlined, size: 18),
+                  label: const Text('Cadastrar novo cliente'),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.92),
+                    foregroundColor: _brand.deepTealColor,
+                    side: BorderSide(
+                      color: _brand.deepTealColor.withValues(alpha: 0.22),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -402,6 +433,1175 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openClientOnboarding() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _ClientOnboardingDialog(brand: _brand),
+    );
+  }
+}
+
+class _ClientOnboardingDialog extends StatefulWidget {
+  const _ClientOnboardingDialog({required this.brand});
+
+  final AuthGateBrandConfig brand;
+
+  @override
+  State<_ClientOnboardingDialog> createState() =>
+      _ClientOnboardingDialogState();
+}
+
+class _ClientOnboardingDialogState extends State<_ClientOnboardingDialog> {
+  final _api = ApiClient();
+  final _formKey = GlobalKey<FormState>();
+  final _tradeName = TextEditingController();
+  final _legalName = TextEditingController();
+  final _cnpj = TextEditingController();
+  final _stateRegistration = TextEditingController();
+  final _municipalRegistration = TextEditingController();
+  final _segment = TextEditingController();
+  final _primaryCnae = TextEditingController();
+  final _contactName = TextEditingController();
+  final _contactEmail = TextEditingController();
+  final _contactPhone = TextEditingController();
+  final _quotaControllers = <String, TextEditingController>{};
+
+  List<_OnboardingOption> _companyTypes = _fallbackCompanyTypes;
+  List<_OnboardingOption> _companySizes = _fallbackCompanySizes;
+  List<_AccessQuotaOption> _accessLevels = _fallbackAccessLevels;
+  String _companyType = _fallbackCompanyTypes.first.value;
+  String _companySize = _fallbackCompanySizes[2].value;
+  String _verificationChannel = 'EMAIL';
+  bool _verificationAccepted = true;
+  bool _checkingCnpj = false;
+  bool _submitting = false;
+  Timer? _cnpjDebounce;
+  String? _lastCheckedCnpj;
+  _CnpjStatusSnapshot? _cnpjStatus;
+  _OnboardingResultSnapshot? _result;
+
+  AuthGateBrandConfig get _brand => widget.brand;
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureQuotaControllers(_accessLevels);
+    _cnpj.addListener(_scheduleCnpjCheck);
+    unawaited(_loadOptions());
+  }
+
+  @override
+  void dispose() {
+    _cnpjDebounce?.cancel();
+    _tradeName.dispose();
+    _legalName.dispose();
+    _cnpj.dispose();
+    _stateRegistration.dispose();
+    _municipalRegistration.dispose();
+    _segment.dispose();
+    _primaryCnae.dispose();
+    _contactName.dispose();
+    _contactEmail.dispose();
+    _contactPhone.dispose();
+    for (final controller in _quotaControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(18),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 940,
+          maxHeight: size.height * 0.9,
+        ),
+        child: Column(
+          children: [
+            _buildHeader(context),
+            const Divider(height: 1),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 720;
+                      final fieldWidth = compact
+                          ? constraints.maxWidth
+                          : (constraints.maxWidth - 14) / 2;
+
+                      return Wrap(
+                        spacing: 14,
+                        runSpacing: 14,
+                        children: [
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _tradeName,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'Nome fantasia',
+                                icon: Icons.storefront_outlined,
+                              ),
+                              validator: _requiredValidator,
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _legalName,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'Razao social',
+                                icon: Icons.article_outlined,
+                              ),
+                              validator: _requiredValidator,
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _cnpj,
+                              keyboardType: TextInputType.number,
+                              textInputAction: TextInputAction.next,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(14),
+                              ],
+                              decoration: _dialogInputDecoration(
+                                label: 'CNPJ',
+                                icon: Icons.badge_outlined,
+                                suffixIcon: _checkingCnpj
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(13),
+                                        child: SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      )
+                                    : IconButton(
+                                        tooltip: 'Verificar CNPJ',
+                                        onPressed: _checkCnpj,
+                                        icon: const Icon(
+                                          Icons.manage_search_outlined,
+                                        ),
+                                      ),
+                              ),
+                              validator: (value) {
+                                final cnpj = _digitsOnly(value ?? '');
+                                if (cnpj.length != 14) {
+                                  return 'Informe 14 digitos.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            DropdownButtonFormField<String>(
+                              key: ValueKey('company-type-$_companyType'),
+                              initialValue: _companyType,
+                              isExpanded: true,
+                              decoration: _dialogInputDecoration(
+                                label: 'Tipo de empresa',
+                                icon: Icons.domain_outlined,
+                              ),
+                              items: [
+                                for (final option in _companyTypes)
+                                  DropdownMenuItem(
+                                    value: option.value,
+                                    child: Text(option.label),
+                                  ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) {
+                                  return;
+                                }
+                                setState(() => _companyType = value);
+                              },
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _stateRegistration,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'Inscricao estadual',
+                                icon: Icons.receipt_long_outlined,
+                                helperText: 'Opcional',
+                              ),
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _municipalRegistration,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'Inscricao municipal',
+                                icon: Icons.receipt_outlined,
+                                helperText: 'Opcional',
+                              ),
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _segment,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'Segmento de atuacao',
+                                icon: Icons.category_outlined,
+                              ),
+                              validator: _requiredValidator,
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _primaryCnae,
+                              keyboardType: TextInputType.number,
+                              textInputAction: TextInputAction.next,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(16),
+                              ],
+                              decoration: _dialogInputDecoration(
+                                label: 'CNAE principal',
+                                icon: Icons.numbers_outlined,
+                                helperText: 'Opcional',
+                              ),
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            DropdownButtonFormField<String>(
+                              key: ValueKey('company-size-$_companySize'),
+                              initialValue: _companySize,
+                              isExpanded: true,
+                              decoration: _dialogInputDecoration(
+                                label: 'Porte da empresa',
+                                icon: Icons.apartment_outlined,
+                              ),
+                              items: [
+                                for (final option in _companySizes)
+                                  DropdownMenuItem(
+                                    value: option.value,
+                                    child: Text(option.label),
+                                  ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) {
+                                  return;
+                                }
+                                setState(() => _companySize = value);
+                              },
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _contactName,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'Contato principal',
+                                icon: Icons.person_outline_rounded,
+                              ),
+                              validator: _requiredValidator,
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _contactEmail,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'E-mail do contato',
+                                icon: Icons.mail_outline_rounded,
+                              ),
+                              validator: _emailValidator,
+                            ),
+                          ),
+                          _fieldBox(
+                            fieldWidth,
+                            TextFormField(
+                              controller: _contactPhone,
+                              keyboardType: TextInputType.phone,
+                              textInputAction: TextInputAction.next,
+                              decoration: _dialogInputDecoration(
+                                label: 'Telefone do contato',
+                                icon: Icons.phone_outlined,
+                              ),
+                            ),
+                          ),
+                          _fieldBox(
+                            constraints.maxWidth,
+                            _buildCnpjStatusPanel(context),
+                          ),
+                          _fieldBox(
+                            constraints.maxWidth,
+                            _buildVerificationPanel(fieldWidth),
+                          ),
+                          _fieldBox(
+                            constraints.maxWidth,
+                            _buildQuotaPanel(compact),
+                          ),
+                          if (_result != null)
+                            _fieldBox(
+                              constraints.maxWidth,
+                              _buildResultPanel(context, _result!),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Empresa raiz bloqueada contra exclusao quando criada.',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: _brand.mutedColor,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _submitting ? null : _submit,
+                    icon: _submitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_circle_outline),
+                    label: const Text('Cadastrar'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _brand.tealColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 18, 14, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _brand.tealColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.business_center_outlined,
+              color: _brand.tealColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Cadastrar novo cliente',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: _brand.deepTealColor,
+                    letterSpacing: 0,
+                  ),
+                ),
+                Text(
+                  'Onboarding comercial e empresa raiz',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: _brand.mutedColor),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Fechar',
+            onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCnpjStatusPanel(BuildContext context) {
+    final status = _cnpjStatus;
+    final background = status == null
+        ? const Color(0xFFF8FAF8)
+        : status.canSubmit
+        ? _brand.tealColor.withValues(alpha: 0.08)
+        : const Color(0xFFFFF4ED);
+    final foreground = status == null
+        ? _brand.mutedColor
+        : status.canSubmit
+        ? _brand.deepTealColor
+        : const Color(0xFF9A4B16);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: status == null
+              ? const Color(0xFFDCE5E0)
+              : foreground.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              status == null
+                  ? Icons.manage_search_outlined
+                  : status.canSubmit
+                  ? Icons.verified_outlined
+                  : Icons.block_outlined,
+              color: foreground,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: status == null
+                  ? Text(
+                      'Informe o CNPJ para consultar o tipo de contrato disponivel.',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: foreground),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${status.availabilityLabel} | ${status.contractTypeLabel}',
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: foreground,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          status.message,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: foreground),
+                        ),
+                        if (status.contactLabel.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            status.contactLabel,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: _brand.mutedColor),
+                          ),
+                        ],
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVerificationPanel(double fieldWidth) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FBF8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDCE5E0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Wrap(
+          spacing: 14,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: fieldWidth,
+              child: CheckboxListTile(
+                value: _verificationAccepted,
+                onChanged: (value) {
+                  setState(() {
+                    _verificationAccepted = value ?? true;
+                    if (!_verificationAccepted) {
+                      _verificationChannel = 'NONE';
+                    } else if (_verificationChannel == 'NONE') {
+                      _verificationChannel = 'EMAIL';
+                    }
+                  });
+                },
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Validar em duas etapas agora'),
+                subtitle: Text(
+                  _verificationAccepted
+                      ? 'Libera imediatamente quando bater com o contato comercial.'
+                      : 'Segue para analise manual.',
+                ),
+              ),
+            ),
+            SizedBox(
+              width: fieldWidth,
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('verification-channel-$_verificationChannel'),
+                initialValue: _verificationChannel,
+                isExpanded: true,
+                decoration: _dialogInputDecoration(
+                  label: 'Canal de validacao',
+                  icon: Icons.security_outlined,
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'EMAIL', child: Text('E-mail')),
+                  DropdownMenuItem(value: 'PHONE', child: Text('Telefone')),
+                  DropdownMenuItem(
+                    value: 'NONE',
+                    child: Text('Enviar para analise'),
+                  ),
+                ],
+                onChanged: _verificationAccepted
+                    ? (value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setState(() => _verificationChannel = value);
+                      }
+                    : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuotaPanel(bool compact) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE7DED1)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Contas iniciais por nivel',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: _brand.deepTealColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final level in _accessLevels)
+                  SizedBox(
+                    width: compact ? double.infinity : 158,
+                    child: TextFormField(
+                      controller: _quotaControllers[level.key],
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3),
+                      ],
+                      decoration: _dialogInputDecoration(
+                        label: level.label,
+                        icon: Icons.group_add_outlined,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultPanel(
+    BuildContext context,
+    _OnboardingResultSnapshot result,
+  ) {
+    final released = result.immediateRelease;
+    final color = released ? _brand.tealColor : const Color(0xFF9A6A1A);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              released
+                  ? Icons.check_circle_outline
+                  : Icons.pending_actions_outlined,
+              color: color,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    released ? 'Cliente liberado' : 'Solicitacao registrada',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    result.summary,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: color),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fieldBox(double width, Widget child) {
+    return SizedBox(width: width, child: child);
+  }
+
+  InputDecoration _dialogInputDecoration({
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon,
+    String? helperText,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      helperText: helperText,
+      prefixIcon: Icon(icon),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: const Color(0xFFF8FAF8),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color(0xFFDCE5E0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: _brand.tealColor, width: 1.4),
+      ),
+    );
+  }
+
+  Future<void> _loadOptions() async {
+    try {
+      final data = await _api.getMap(
+        'public/client-onboarding/options',
+        requiresAuth: false,
+      );
+      final companyTypes = _readOptions(
+        data['companyTypes'],
+        _fallbackCompanyTypes,
+      );
+      final companySizes = _readOptions(
+        data['companySizes'],
+        _fallbackCompanySizes,
+      );
+      final accessLevels = _readAccessLevels(
+        data['accessLevels'],
+        _fallbackAccessLevels,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _companyTypes = companyTypes;
+        _companySizes = companySizes;
+        _accessLevels = accessLevels;
+        _companyType = _valueOrFirst(_companyType, _companyTypes);
+        _companySize = _valueOrFirst(_companySize, _companySizes);
+        _ensureQuotaControllers(_accessLevels);
+      });
+    } on ApiException {
+      // Fallback local mantem o cadastro usavel quando a API ainda esta subindo.
+    }
+  }
+
+  void _ensureQuotaControllers(List<_AccessQuotaOption> levels) {
+    final keys = levels.map((level) => level.key).toSet();
+    final staleKeys = _quotaControllers.keys
+        .where((key) => !keys.contains(key))
+        .toList();
+
+    for (final key in staleKeys) {
+      _quotaControllers.remove(key)?.dispose();
+    }
+
+    for (final level in levels) {
+      _quotaControllers.putIfAbsent(
+        level.key,
+        () => TextEditingController(text: '${level.defaultQuota}'),
+      );
+    }
+  }
+
+  void _scheduleCnpjCheck() {
+    final cnpj = _digitsOnly(_cnpj.text);
+    if (cnpj.length != 14) {
+      _cnpjDebounce?.cancel();
+      if (_cnpjStatus != null || _lastCheckedCnpj != null) {
+        setState(() {
+          _cnpjStatus = null;
+          _lastCheckedCnpj = null;
+        });
+      }
+      return;
+    }
+
+    _cnpjDebounce?.cancel();
+    _cnpjDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (_lastCheckedCnpj == cnpj && _cnpjStatus != null) {
+        return;
+      }
+      unawaited(_checkCnpj(showErrors: false));
+    });
+  }
+
+  Future<void> _checkCnpj({bool showErrors = true}) async {
+    final cnpj = _digitsOnly(_cnpj.text);
+    if (cnpj.length != 14) {
+      if (showErrors) {
+        _showMessage('Informe um CNPJ com 14 digitos.');
+      }
+      return;
+    }
+
+    setState(() => _checkingCnpj = true);
+
+    try {
+      final data = await _api.getMap(
+        'public/client-onboarding/cnpj-status',
+        query: {'cnpj': cnpj},
+        requiresAuth: false,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _lastCheckedCnpj = cnpj;
+        _cnpjStatus = _CnpjStatusSnapshot.fromMap(data);
+      });
+    } on ApiException catch (error) {
+      if (showErrors) {
+        _showMessage(error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _checkingCnpj = false);
+      }
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final email = _contactEmail.text.trim();
+    final phone = _contactPhone.text.trim();
+
+    if (email.isEmpty && phone.isEmpty) {
+      _showMessage('Informe e-mail ou telefone do contato principal.');
+      return;
+    }
+
+    if (_verificationAccepted &&
+        _verificationChannel == 'EMAIL' &&
+        email.isEmpty) {
+      _showMessage('Informe o e-mail usado na verificacao.');
+      return;
+    }
+
+    if (_verificationAccepted &&
+        _verificationChannel == 'PHONE' &&
+        phone.isEmpty) {
+      _showMessage('Informe o telefone usado na verificacao.');
+      return;
+    }
+
+    if (_cnpjStatus == null || _lastCheckedCnpj != _digitsOnly(_cnpj.text)) {
+      await _checkCnpj(showErrors: false);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    try {
+      final body = <String, dynamic>{
+        'tradeName': _tradeName.text.trim(),
+        'legalName': _legalName.text.trim(),
+        'cnpj': _digitsOnly(_cnpj.text),
+        'companyType': _companyType,
+        'segment': _segment.text.trim(),
+        'companySize': _companySize,
+        'primaryContactName': _contactName.text.trim(),
+        'accessLevelQuotas': {
+          for (final level in _accessLevels)
+            level.key:
+                int.tryParse(_quotaControllers[level.key]?.text ?? '') ??
+                level.defaultQuota,
+        },
+        'verificationAccepted': _verificationAccepted,
+        'verificationChannel': _verificationAccepted
+            ? _verificationChannel
+            : 'NONE',
+      };
+      _putIfNotBlank(body, 'stateRegistration', _stateRegistration.text);
+      _putIfNotBlank(
+        body,
+        'municipalRegistration',
+        _municipalRegistration.text,
+      );
+      _putIfNotBlank(body, 'primaryCnae', _primaryCnae.text);
+      _putIfNotBlank(body, 'primaryContactEmail', email);
+      _putIfNotBlank(body, 'primaryContactPhone', phone);
+
+      final data = await _api.postMap(
+        'public/client-onboarding',
+        body: body,
+        requiresAuth: false,
+      );
+      final result = _OnboardingResultSnapshot.fromMap(data);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _result = result);
+      _showMessage(
+        result.immediateRelease
+            ? 'Cliente liberado com verificacao em duas etapas.'
+            : 'Solicitacao registrada para analise.',
+      );
+    } on ApiException catch (error) {
+      _showMessage(error.message);
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  String? _requiredValidator(String? value) {
+    if ((value ?? '').trim().isEmpty) {
+      return 'Campo obrigatorio.';
+    }
+    return null;
+  }
+
+  String? _emailValidator(String? value) {
+    final email = (value ?? '').trim();
+    if (email.isEmpty) {
+      return null;
+    }
+    if (!email.contains('@')) {
+      return 'E-mail invalido.';
+    }
+    return null;
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _OnboardingOption {
+  const _OnboardingOption({required this.value, required this.label});
+
+  final String value;
+  final String label;
+}
+
+class _AccessQuotaOption {
+  const _AccessQuotaOption({
+    required this.key,
+    required this.label,
+    required this.defaultQuota,
+  });
+
+  final String key;
+  final String label;
+  final int defaultQuota;
+}
+
+class _CnpjStatusSnapshot {
+  const _CnpjStatusSnapshot({
+    required this.availabilityLabel,
+    required this.contractTypeLabel,
+    required this.message,
+    required this.canSubmit,
+    required this.contactLabel,
+  });
+
+  factory _CnpjStatusSnapshot.fromMap(Map<String, dynamic> map) {
+    final contact = _asMap(map['commercialContact']);
+    final contactParts = [
+      _asText(contact['name']),
+      _asText(contact['emailMasked']),
+      _asText(contact['phoneMasked']),
+    ].where((item) => item.isNotEmpty).toList();
+
+    return _CnpjStatusSnapshot(
+      availabilityLabel: _asText(
+        map['availabilityLabel'],
+        fallback: 'Status consultado',
+      ),
+      contractTypeLabel: _asText(
+        map['contractTypeLabel'],
+        fallback: 'Tipo de contrato',
+      ),
+      message: _asText(map['message']),
+      canSubmit: _asBool(map['canSubmit']),
+      contactLabel: contactParts.isEmpty
+          ? ''
+          : 'Contato comercial: ${contactParts.join(' | ')}',
+    );
+  }
+
+  final String availabilityLabel;
+  final String contractTypeLabel;
+  final String message;
+  final bool canSubmit;
+  final String contactLabel;
+}
+
+class _OnboardingResultSnapshot {
+  const _OnboardingResultSnapshot({
+    required this.immediateRelease,
+    required this.summary,
+  });
+
+  factory _OnboardingResultSnapshot.fromMap(Map<String, dynamic> map) {
+    final request = _asMap(map['request']);
+    final rootCompany = _asMap(map['tenantRootCompany']);
+    final security = _asMap(map['security']);
+    final requestStatus = _asText(request['statusLabel']);
+    final rootId = _asText(rootCompany['publicId']);
+    final rootStatus = _asText(rootCompany['statusLabel']);
+    final reviewEmail = _asText(security['reviewNotificationEmail']);
+    final released = _asBool(security['immediateRelease']);
+    final parts = <String>[
+      if (requestStatus.isNotEmpty) 'Solicitacao: $requestStatus',
+      if (rootId.isNotEmpty) 'Empresa raiz: $rootId',
+      if (rootStatus.isNotEmpty) 'Status: $rootStatus',
+      if (reviewEmail.isNotEmpty) 'Analise: $reviewEmail',
+    ];
+
+    return _OnboardingResultSnapshot(
+      immediateRelease: released,
+      summary: parts.isEmpty
+          ? 'Registro recebido pelo backend.'
+          : parts.join(' | '),
+    );
+  }
+
+  final bool immediateRelease;
+  final String summary;
+}
+
+const _fallbackCompanyTypes = [
+  _OnboardingOption(value: 'SERVICE_PROVIDER', label: 'Prestadora de servicos'),
+  _OnboardingOption(
+    value: 'CONDOMINIUM_MANAGER',
+    label: 'Administradora ou condominio',
+  ),
+  _OnboardingOption(value: 'CORPORATE_CLIENT', label: 'Cliente corporativo'),
+  _OnboardingOption(value: 'CONSULTING', label: 'Consultoria'),
+  _OnboardingOption(value: 'TECHNOLOGY', label: 'Tecnologia ou SaaS'),
+  _OnboardingOption(value: 'OTHER', label: 'Outro'),
+];
+
+const _fallbackCompanySizes = [
+  _OnboardingOption(value: 'MEI', label: 'MEI'),
+  _OnboardingOption(value: 'MICRO', label: 'Microempresa'),
+  _OnboardingOption(value: 'SMALL', label: 'Pequena empresa'),
+  _OnboardingOption(value: 'MEDIUM', label: 'Media empresa'),
+  _OnboardingOption(value: 'LARGE', label: 'Grande empresa'),
+  _OnboardingOption(value: 'ENTERPRISE', label: 'Enterprise'),
+];
+
+const _fallbackAccessLevels = [
+  _AccessQuotaOption(key: 'ADMIN', label: 'Administrador', defaultQuota: 1),
+  _AccessQuotaOption(key: 'EXECUTIVE', label: 'Alta gestao', defaultQuota: 1),
+  _AccessQuotaOption(key: 'LEGAL', label: 'Juridico', defaultQuota: 0),
+  _AccessQuotaOption(key: 'HR', label: 'RH estrategico', defaultQuota: 1),
+  _AccessQuotaOption(
+    key: 'OPERATIONS',
+    label: 'Operacao autorizada',
+    defaultQuota: 3,
+  ),
+];
+
+List<_OnboardingOption> _readOptions(
+  Object? value,
+  List<_OnboardingOption> fallback,
+) {
+  if (value is! List) {
+    return fallback;
+  }
+
+  final options = [
+    for (final item in value)
+      if (item is Map)
+        _OnboardingOption(
+          value: _asText(item['value']),
+          label: _asText(item['label']),
+        ),
+  ].where((item) => item.value.isNotEmpty && item.label.isNotEmpty).toList();
+
+  return options.isEmpty ? fallback : options;
+}
+
+List<_AccessQuotaOption> _readAccessLevels(
+  Object? value,
+  List<_AccessQuotaOption> fallback,
+) {
+  if (value is! List) {
+    return fallback;
+  }
+
+  final options = [
+    for (final item in value)
+      if (item is Map)
+        _AccessQuotaOption(
+          key: _asText(item['key']),
+          label: _asText(item['label']),
+          defaultQuota: _asInt(item['defaultQuota']),
+        ),
+  ].where((item) => item.key.isNotEmpty && item.label.isNotEmpty).toList();
+
+  return options.isEmpty ? fallback : options;
+}
+
+String _valueOrFirst(String current, List<_OnboardingOption> options) {
+  if (options.any((option) => option.value == current)) {
+    return current;
+  }
+  return options.first.value;
+}
+
+Map<String, dynamic> _asMap(Object? value) {
+  if (value is Map) {
+    return value.cast<String, dynamic>();
+  }
+  return const {};
+}
+
+String _asText(Object? value, {String fallback = ''}) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? fallback : text;
+}
+
+int _asInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return int.tryParse('${value ?? ''}') ?? 0;
+}
+
+bool _asBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  return value?.toString().toLowerCase() == 'true';
+}
+
+String _digitsOnly(String value) {
+  return value.replaceAll(RegExp(r'\D'), '');
+}
+
+void _putIfNotBlank(Map<String, dynamic> body, String key, String value) {
+  final normalized = value.trim();
+  if (normalized.isNotEmpty) {
+    body[key] = normalized;
   }
 }
 
