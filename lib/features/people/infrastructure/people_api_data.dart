@@ -70,6 +70,14 @@ class _PeopleApiRepository {
     await _apiClient.deleteMap('anexos/$publicId');
   }
 
+  Future<void> createCalendarEntry(Map<String, dynamic> body) async {
+    await _apiClient.postMap('agenda', body: body);
+  }
+
+  Future<void> cancelCalendarEntry(String publicId) async {
+    await _apiClient.deleteMap('agenda/$publicId');
+  }
+
   Future<_PeopleRuntimeData> loadWorkspaceData() async {
     final session = await _apiClient.ensureDevelopmentSession();
     final peopleEnvelope = await _apiClient.getMap(
@@ -143,6 +151,10 @@ class _PeopleApiRepository {
       'anexos',
       query: {'personPublicId': publicId},
     );
+    final calendarEntriesFuture = _safeItems(
+      'agenda',
+      query: {'personPublicId': publicId},
+    );
 
     return _PeopleApiBundle(
       detail: await detailFuture,
@@ -150,6 +162,7 @@ class _PeopleApiRepository {
       occurrences: await occurrencesFuture,
       tags: await tagsFuture,
       attachments: await attachmentsFuture,
+      calendarEntries: await calendarEntriesFuture,
     );
   }
 
@@ -262,6 +275,7 @@ class _PeopleApiBundle {
     required this.occurrences,
     required this.tags,
     required this.attachments,
+    required this.calendarEntries,
   });
 
   final Map<String, dynamic> detail;
@@ -269,6 +283,7 @@ class _PeopleApiBundle {
   final List<Map<String, dynamic>> occurrences;
   final List<Map<String, dynamic>> tags;
   final List<Map<String, dynamic>> attachments;
+  final List<Map<String, dynamic>> calendarEntries;
 }
 
 class _EmploymentLinkLookupData {
@@ -423,6 +438,9 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
       .where((attachment) => attachment['canView'] != false)
       .map(_attachmentFromApi)
       .toList(growable: false);
+  final calendarEntries = bundle.calendarEntries
+      .map(_calendarEntryFromApi)
+      .toList(growable: false);
 
   return _EntityItem(
     publicId: publicId,
@@ -445,10 +463,16 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
       'Ocorrencias carregadas: $occurrenceCount',
       'Tags visiveis: ${tags.length}',
       'Anexos visiveis: ${attachments.length}',
+      'Agenda: ${calendarEntries.length} itens',
     ],
     attachments: attachments,
     sensitiveNotes: tags,
-    personProfile: _personProfileFromApi(person, links, occurrences),
+    personProfile: _personProfileFromApi(
+      person,
+      links,
+      occurrences,
+      calendarEntries,
+    ),
   );
 }
 
@@ -456,6 +480,7 @@ _PersonProfileData _personProfileFromApi(
   Map<String, dynamic> person,
   List<Map<String, dynamic>> links,
   List<_OccurrenceRecord> occurrences,
+  List<_CalendarEntryRecord> calendarEntries,
 ) {
   final currentLink = _currentApiLink(links);
   final roleTitle = _apiRoleTitle(currentLink);
@@ -548,6 +573,7 @@ _PersonProfileData _personProfileFromApi(
       notes: _apiText(person['notes']),
     ),
     occurrences: occurrences,
+    calendarEntries: calendarEntries,
   );
 }
 
@@ -638,6 +664,40 @@ _OccurrenceRecord _occurrenceFromApi(Map<String, dynamic> occurrence) {
     status: _apiText(occurrence['status'], fallback: 'ACTIVE'),
     attachmentCount: _apiInt(occurrence['attachmentCount']),
     showInExecutivePanel: occurrence['showInExecutivePanel'] == true,
+  );
+}
+
+_CalendarEntryRecord _calendarEntryFromApi(Map<String, dynamic> entry) {
+  final notification = _apiMap(entry['notification']);
+  return _CalendarEntryRecord(
+    publicId: _apiText(entry['publicId']),
+    kind: _apiText(entry['kind'], fallback: 'REMINDER'),
+    kindLabel: _apiText(entry['kindLabel'], fallback: 'Lembrete'),
+    status: _apiText(entry['status'], fallback: 'SCHEDULED'),
+    statusLabel: _apiText(entry['statusLabel'], fallback: 'Agendado'),
+    priority: _apiText(entry['priority'], fallback: 'NORMAL'),
+    priorityLabel: _apiText(entry['priorityLabel'], fallback: 'Normal'),
+    title: _apiText(entry['title'], fallback: 'Lembrete sem titulo'),
+    description: _apiText(entry['description']),
+    startsAt:
+        _apiDate(entry['startsAt']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+    startsAtLabel: _apiText(entry['startsAtLabel']),
+    notificationPolicy: _apiText(notification['policy']),
+    notificationPolicyLabel: _apiText(
+      notification['policyLabel'],
+      fallback: 'No dia',
+    ),
+    notificationScheduledAt: _apiDate(notification['scheduledAt']),
+    notificationScheduledAtLabel: _apiText(
+      notification['scheduledAtLabel'],
+      fallback: 'nao agendada',
+    ),
+    notificationChannelsLabel: _apiText(
+      notification['channelsLabel'],
+      fallback: 'No app',
+    ),
+    canEdit: entry['canEdit'] == true,
+    canCancel: entry['canCancel'] == true,
   );
 }
 
