@@ -477,6 +477,26 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
       final records = await recordsRequest;
       final calendarEntries = await calendarEntriesRequest;
       final nonBusinessDays = await nonBusinessDaysRequest;
+      await Future.wait([
+        VisualIdentityLocalStore.instance.loadForType(
+          entityType: VisualEntityType.company,
+        ),
+        VisualIdentityLocalStore.instance.loadForType(
+          entityType: VisualEntityType.client,
+        ),
+        VisualIdentityLocalStore.instance.loadForType(
+          entityType: VisualEntityType.contract,
+        ),
+        VisualIdentityLocalStore.instance.loadForType(
+          entityType: VisualEntityType.user,
+        ),
+        VisualIdentityLocalStore.instance.loadForType(
+          entityType: VisualEntityType.group,
+        ),
+        VisualIdentityLocalStore.instance.loadForType(
+          entityType: VisualEntityType.category,
+        ),
+      ]);
       if (!mounted) {
         return;
       }

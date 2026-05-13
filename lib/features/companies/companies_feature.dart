@@ -136,6 +136,17 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
     );
   }
 
+  Future<void> _openEditVisualIdentityDialog(_EntityItem item) async {
+    final changed = await _editVisualIdentityForItem(
+      context: context,
+      item: item,
+      projectItems: _runtimeData.data.items,
+    );
+    if (changed && mounted) {
+      await _loadCompanies();
+    }
+  }
+
   Future<void> _removeCompany(_EntityItem item) async {
     final confirmed = await _confirmEntityAction(
       context: context,
@@ -180,6 +191,9 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
       onEdit: (item) {
         _openEditCompanyDialog(item);
       },
+      onEditVisualIdentity: (item) {
+        _openEditVisualIdentityDialog(item);
+      },
       onRemove: (item) {
         _removeCompany(item);
       },
@@ -203,6 +217,7 @@ class _CompaniesRedesignedWorkspace extends StatelessWidget {
     required this.onRefresh,
     required this.onCreate,
     required this.onEdit,
+    required this.onEditVisualIdentity,
     required this.onRemove,
   });
 
@@ -220,6 +235,7 @@ class _CompaniesRedesignedWorkspace extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onCreate;
   final ValueChanged<_EntityItem> onEdit;
+  final ValueChanged<_EntityItem> onEditVisualIdentity;
   final ValueChanged<_EntityItem> onRemove;
 
   @override
@@ -285,6 +301,8 @@ class _CompaniesRedesignedWorkspace extends StatelessWidget {
                   viewerProfile: viewerProfile,
                   isLoading: isLoading,
                   onEdit: () => onEdit(selectedItem),
+                  onEditVisualIdentity: () =>
+                      onEditVisualIdentity(selectedItem),
                   onRemove: () => onRemove(selectedItem),
                 ),
               );
@@ -760,6 +778,7 @@ class _CompanyProfilePanel extends StatelessWidget {
     required this.viewerProfile,
     required this.isLoading,
     required this.onEdit,
+    required this.onEditVisualIdentity,
     required this.onRemove,
   });
 
@@ -767,6 +786,7 @@ class _CompanyProfilePanel extends StatelessWidget {
   final _ViewerAccessProfile viewerProfile;
   final bool isLoading;
   final VoidCallback onEdit;
+  final VoidCallback onEditVisualIdentity;
   final VoidCallback onRemove;
 
   @override
@@ -860,6 +880,11 @@ class _CompanyProfilePanel extends StatelessWidget {
                   onPressed: isLoading ? null : onEdit,
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Editar'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: isLoading ? null : onEditVisualIdentity,
+                  icon: const Icon(Icons.palette_outlined),
+                  label: const Text('Visual'),
                 ),
                 OutlinedButton.icon(
                   onPressed: isLoading ? null : onRemove,

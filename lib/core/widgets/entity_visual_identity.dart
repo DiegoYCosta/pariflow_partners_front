@@ -278,6 +278,280 @@ class _VisualIdentityLegendChip extends StatelessWidget {
   }
 }
 
+class _VisualIdentityPickerResult {
+  const _VisualIdentityPickerResult.save(this.identity) : reset = false;
+  const _VisualIdentityPickerResult.reset() : identity = null, reset = true;
+
+  final EntityVisualIdentity? identity;
+  final bool reset;
+}
+
+class _VisualIdentityPickerDialog extends StatefulWidget {
+  const _VisualIdentityPickerDialog({
+    required this.currentIdentity,
+    required this.entityLabel,
+    required this.existingIdentities,
+  });
+
+  final EntityVisualIdentity currentIdentity;
+  final String entityLabel;
+  final List<EntityVisualIdentity> existingIdentities;
+
+  @override
+  State<_VisualIdentityPickerDialog> createState() =>
+      _VisualIdentityPickerDialogState();
+}
+
+class _VisualIdentityPickerDialogState
+    extends State<_VisualIdentityPickerDialog> {
+  late EntityVisualIdentity _selectedIdentity;
+  late final List<EntityVisualIdentity> _suggestions;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIdentity = widget.currentIdentity.copyWith(isCustom: true);
+    _suggestions = VisualIdentityGenerator.suggestionsForEntity(
+      projectId: widget.currentIdentity.projectId,
+      entityType: widget.currentIdentity.entityType,
+      entityId: widget.currentIdentity.entityId,
+      displayName: widget.entityLabel,
+      count: 10,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final warning = _visualIdentityWarning(
+      identity: _selectedIdentity,
+      existingIdentities: widget.existingIdentities,
+    );
+
+    return AlertDialog(
+      title: const Text('Identidade visual'),
+      content: SizedBox(
+        width: min(MediaQuery.sizeOf(context).width - 48, 620),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _EntityBadge(
+                identity: _selectedIdentity,
+                label: widget.entityLabel,
+                typeLabel: _selectedIdentity.typeLabel,
+                size: 28,
+                maxWidth: 520,
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _Tag(
+                    label: _visualShapeLabel(_selectedIdentity.shape),
+                    icon: Icons.category_outlined,
+                    color: _selectedIdentity.primaryColor,
+                    background: _selectedIdentity.primaryColor.withValues(
+                      alpha: 0.10,
+                    ),
+                  ),
+                  _Tag(
+                    label: _visualPatternLabel(_selectedIdentity.pattern),
+                    icon: Icons.texture_outlined,
+                    color: _slateColor,
+                    background: _slateColor.withValues(alpha: 0.10),
+                  ),
+                  _Tag(
+                    label: visualIdentityColorToHex(
+                      _selectedIdentity.primaryColor,
+                    ),
+                    icon: Icons.palette_outlined,
+                    color: _selectedIdentity.primaryColor,
+                    background: _selectedIdentity.primaryColor.withValues(
+                      alpha: 0.10,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text('Opcoes', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 10),
+              _VisualIdentityPicker(
+                selectedIdentity: _selectedIdentity,
+                suggestions: _suggestions,
+                onChanged: (identity) {
+                  setState(() {
+                    _selectedIdentity = identity.copyWith(isCustom: true);
+                  });
+                },
+              ),
+              if (warning != null) ...[
+                const SizedBox(height: 14),
+                _VisualIdentityNotice(message: warning),
+              ],
+              const SizedBox(height: 14),
+              Text(
+                'A personalizacao fica salva neste dispositivo ate o backend expor visual_identities.',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: _mutedColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(
+            context,
+          ).pop(const _VisualIdentityPickerResult.reset()),
+          child: const Text('Automatico'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(
+            context,
+          ).pop(_VisualIdentityPickerResult.save(_selectedIdentity)),
+          child: const Text('Salvar visual'),
+        ),
+      ],
+    );
+  }
+}
+
+class _VisualIdentityPicker extends StatelessWidget {
+  const _VisualIdentityPicker({
+    required this.selectedIdentity,
+    required this.suggestions,
+    required this.onChanged,
+  });
+
+  final EntityVisualIdentity selectedIdentity;
+  final List<EntityVisualIdentity> suggestions;
+  final ValueChanged<EntityVisualIdentity> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (final identity in suggestions)
+          _VisualIdentityOption(
+            identity: identity,
+            selected: _sameVisualIdentityChoice(identity, selectedIdentity),
+            onTap: () => onChanged(identity),
+          ),
+      ],
+    );
+  }
+}
+
+class _VisualIdentityOption extends StatelessWidget {
+  const _VisualIdentityOption({
+    required this.identity,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final EntityVisualIdentity identity;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = identity.primaryColor;
+    final label = visualIdentityColorToHex(color);
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 92,
+            height: 78,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? color.withValues(alpha: 0.13)
+                  : Colors.white.withValues(alpha: 0.86),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? color : _lineColor,
+                width: selected ? 1.6 : 1,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _EntityMarker(
+                  identity: identity,
+                  size: 32,
+                  selected: selected,
+                  semanticLabel: label,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VisualIdentityNotice extends StatelessWidget {
+  const _VisualIdentityNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _amberColor.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _amberColor.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 18, color: _amberColor),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: _inkColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EntityMarkerPainter extends CustomPainter {
   const _EntityMarkerPainter({required this.identity, required this.selected});
 
@@ -483,6 +757,60 @@ class _EntityMarkerPainter extends CustomPainter {
   }
 }
 
+Future<bool> _editVisualIdentityForItem({
+  required BuildContext context,
+  required _EntityItem item,
+  required List<_EntityItem> projectItems,
+}) async {
+  final currentIdentity = _visualIdentityForEntityItem(item);
+  final result = await showDialog<_VisualIdentityPickerResult>(
+    context: context,
+    builder: (context) => _VisualIdentityPickerDialog(
+      currentIdentity: currentIdentity,
+      entityLabel: item.title,
+      existingIdentities: _visualIdentitiesForEntityItems(projectItems),
+    ),
+  );
+
+  if (result == null) {
+    return false;
+  }
+
+  if (result.reset) {
+    await VisualIdentityLocalStore.instance.remove(
+      projectId: currentIdentity.projectId,
+      entityType: currentIdentity.entityType,
+      entityId: currentIdentity.entityId,
+    );
+  } else if (result.identity case final identity?) {
+    await VisualIdentityLocalStore.instance.save(
+      identity.copyWith(
+        projectId: currentIdentity.projectId,
+        entityType: currentIdentity.entityType,
+        entityId: currentIdentity.entityId,
+        shape: VisualIdentityGenerator.shapeForType(currentIdentity.entityType),
+        pattern: VisualIdentityGenerator.patternForType(
+          currentIdentity.entityType,
+        ),
+        isCustom: true,
+      ),
+    );
+  }
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.reset
+              ? 'Identidade visual automatica restaurada.'
+              : 'Identidade visual salva neste dispositivo.',
+        ),
+      ),
+    );
+  }
+  return true;
+}
+
 EntityVisualIdentity _visualIdentityForEntityItem(_EntityItem item) {
   return item.visualIdentity ??
       VisualIdentityGenerator.forEntity(
@@ -490,6 +818,12 @@ EntityVisualIdentity _visualIdentityForEntityItem(_EntityItem item) {
         entityId: item.publicId,
         displayName: item.title,
       );
+}
+
+List<EntityVisualIdentity> _visualIdentitiesForEntityItems(
+  List<_EntityItem> items,
+) {
+  return [for (final item in items) _visualIdentityForEntityItem(item)];
 }
 
 EntityVisualIdentity _visualIdentityForContractPosition(
@@ -503,8 +837,17 @@ EntityVisualIdentity _visualIdentityForContractPosition(
 }
 
 EntityVisualIdentity _visualIdentityForNetworkNode(_NetworkGraphNode node) {
+  final entityType = _visualEntityTypeForNetworkLane(node.lane);
+  final cachedIdentity = VisualIdentityLocalStore.instance.cached(
+    entityType: entityType,
+    entityId: node.publicId,
+  );
+  if (cachedIdentity != null) {
+    return cachedIdentity;
+  }
+
   return VisualIdentityGenerator.forEntity(
-    entityType: _visualEntityTypeForNetworkLane(node.lane),
+    entityType: entityType,
     entityId: node.publicId,
     displayName: node.displayName,
   );
@@ -519,18 +862,28 @@ EntityVisualIdentity _visualIdentityForNetworkLane(_NetworkGraphLane lane) {
 }
 
 EntityVisualIdentity _visualIdentityForTimelineLink(_TimelineRecordLink link) {
+  final entityType = _visualEntityTypeForTimelineLink(link.entityType);
+  final entityId = link.entityPublicId.isEmpty
+      ? '${link.entityType}:${link.labelSnapshot}'
+      : link.entityPublicId;
+  final cachedIdentity = VisualIdentityLocalStore.instance.cached(
+    entityType: entityType,
+    entityId: entityId,
+  );
+  if (cachedIdentity != null) {
+    return cachedIdentity;
+  }
+
   return VisualIdentityGenerator.forEntity(
-    entityType: _visualEntityTypeForTimelineLink(link.entityType),
-    entityId: link.entityPublicId.isEmpty
-        ? '${link.entityType}:${link.labelSnapshot}'
-        : link.entityPublicId,
+    entityType: entityType,
+    entityId: entityId,
     displayName: link.labelSnapshot,
   );
 }
 
 VisualEntityType _visualEntityTypeForNetworkLane(_NetworkGraphLane lane) {
   return switch (lane) {
-    _NetworkGraphLane.rootCompany => VisualEntityType.group,
+    _NetworkGraphLane.rootCompany => VisualEntityType.company,
     _NetworkGraphLane.clientCompany => VisualEntityType.client,
     _NetworkGraphLane.contract => VisualEntityType.contract,
     _NetworkGraphLane.position => VisualEntityType.position,
@@ -583,4 +936,87 @@ List<_VisualIdentityLegendEntry> _legendEntriesForEntityItems(
             count: count,
           ),
   ];
+}
+
+bool _sameVisualIdentityChoice(
+  EntityVisualIdentity first,
+  EntityVisualIdentity second,
+) {
+  if (first.shape != second.shape ||
+      first.pattern != second.pattern ||
+      first.primaryColor != second.primaryColor ||
+      first.secondaryColors.length != second.secondaryColors.length) {
+    return false;
+  }
+  for (var index = 0; index < first.secondaryColors.length; index += 1) {
+    if (first.secondaryColors[index] != second.secondaryColors[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+String? _visualIdentityWarning({
+  required EntityVisualIdentity identity,
+  required List<EntityVisualIdentity> existingIdentities,
+}) {
+  final contrastOnPaper = visualIdentityContrastRatio(
+    identity.primaryColor,
+    _paperColor,
+  );
+  if (contrastOnPaper < 2.6) {
+    return 'Contraste baixo no tema claro. Escolha uma opcao mais escura.';
+  }
+
+  for (final existing in existingIdentities) {
+    if (existing.entityId == identity.entityId ||
+        existing.entityType != identity.entityType) {
+      continue;
+    }
+
+    if (existing.primaryColor == identity.primaryColor) {
+      return 'Cor ja usada por outra entidade deste tipo.';
+    }
+
+    if (_visuallyCloseColors(existing.primaryColor, identity.primaryColor)) {
+      return 'Cor muito parecida com outra entidade deste tipo.';
+    }
+  }
+
+  return null;
+}
+
+bool _visuallyCloseColors(Color first, Color second) {
+  final firstHsl = HSLColor.fromColor(first);
+  final secondHsl = HSLColor.fromColor(second);
+  final hueDelta = (firstHsl.hue - secondHsl.hue).abs();
+  final circularHueDelta = min(hueDelta, 360 - hueDelta);
+  final saturationDelta = (firstHsl.saturation - secondHsl.saturation).abs();
+  final lightnessDelta = (firstHsl.lightness - secondHsl.lightness).abs();
+  return circularHueDelta < 8 &&
+      saturationDelta < 0.10 &&
+      lightnessDelta < 0.10;
+}
+
+String _visualShapeLabel(VisualShape shape) {
+  return switch (shape) {
+    VisualShape.hexagon => 'Hexagono',
+    VisualShape.pentagon => 'Pentagono',
+    VisualShape.flatDiamond => 'Losango',
+    VisualShape.square => 'Quadrado',
+    VisualShape.circle => 'Circulo',
+    VisualShape.triangle => 'Triangulo',
+    VisualShape.shield => 'Escudo',
+  };
+}
+
+String _visualPatternLabel(VisualPattern pattern) {
+  return switch (pattern) {
+    VisualPattern.solid => 'Solido',
+    VisualPattern.dots => 'Pontilhado',
+    VisualPattern.gradient => 'Gradiente',
+    VisualPattern.organicBlobs => 'Organico',
+    VisualPattern.waves => 'Ondas',
+    VisualPattern.mosaic => 'Mosaico',
+  };
 }

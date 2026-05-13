@@ -29,8 +29,17 @@ class _EntityWorkspaceApiRepository {
       'contratos',
       query: const {'page': '1', 'perPage': '100'},
     );
+    final visualIdentities = await VisualIdentityLocalStore.instance
+        .loadForType(entityType: VisualEntityType.company);
     final items = companies
-        .map((company) => _providerCompanyItemFromApi(company, contracts))
+        .map(
+          (company) => _providerCompanyItemFromApi(
+            company,
+            contracts,
+            visualIdentityOverride:
+                visualIdentities[_apiText(company['publicId'])],
+          ),
+        )
         .toList(growable: false);
 
     return _EntityWorkspaceRuntimeData.live(
@@ -81,8 +90,17 @@ class _EntityWorkspaceApiRepository {
       'contratos',
       query: const {'page': '1', 'perPage': '100'},
     );
+    final visualIdentities = await VisualIdentityLocalStore.instance
+        .loadForType(entityType: VisualEntityType.client);
     final items = clients
-        .map((client) => _clientCompanyItemFromApi(client, contracts))
+        .map(
+          (client) => _clientCompanyItemFromApi(
+            client,
+            contracts,
+            visualIdentityOverride:
+                visualIdentities[_apiText(client['publicId'])],
+          ),
+        )
         .toList(growable: false);
 
     return _EntityWorkspaceRuntimeData.live(
@@ -129,7 +147,17 @@ class _EntityWorkspaceApiRepository {
       );
     }
 
-    final items = contracts.map(_contractItemFromApi).toList(growable: false);
+    final visualIdentities = await VisualIdentityLocalStore.instance
+        .loadForType(entityType: VisualEntityType.contract);
+    final items = contracts
+        .map(
+          (contract) => _contractItemFromApi(
+            contract,
+            visualIdentityOverride:
+                visualIdentities[_apiText(contract['publicId'])],
+          ),
+        )
+        .toList(growable: false);
 
     return _EntityWorkspaceRuntimeData.live(
       _EntityWorkspaceData(
@@ -471,8 +499,9 @@ Map<String, String?> _entityListQuery(String search) {
 
 _EntityItem _providerCompanyItemFromApi(
   Map<String, dynamic> company,
-  List<Map<String, dynamic>> contracts,
-) {
+  List<Map<String, dynamic>> contracts, {
+  EntityVisualIdentity? visualIdentityOverride,
+}) {
   final publicId = _apiText(company['publicId']);
   final legalName = _apiText(
     company['legalName'],
@@ -540,18 +569,21 @@ _EntityItem _providerCompanyItemFromApi(
       'Atualizado em: ${_apiLongDate(company['updatedAt'])}',
     ],
     providerCompanySnapshot: snapshot,
-    visualIdentity: VisualIdentityGenerator.forEntity(
-      entityType: VisualEntityType.company,
-      entityId: publicId,
-      displayName: title,
-    ),
+    visualIdentity:
+        visualIdentityOverride ??
+        VisualIdentityGenerator.forEntity(
+          entityType: VisualEntityType.company,
+          entityId: publicId,
+          displayName: title,
+        ),
   );
 }
 
 _EntityItem _clientCompanyItemFromApi(
   Map<String, dynamic> client,
-  List<Map<String, dynamic>> contracts,
-) {
+  List<Map<String, dynamic>> contracts, {
+  EntityVisualIdentity? visualIdentityOverride,
+}) {
   final publicId = _apiText(client['publicId']);
   final name = _apiText(client['name'], fallback: 'Cliente sem nome');
   final clientType = _apiText(client['clientType'], fallback: 'CLIENTE');
@@ -614,15 +646,20 @@ _EntityItem _clientCompanyItemFromApi(
       'Proximo backend: detalhe de cliente com prestadoras ativas, historicas e pessoas impactadas.',
     ],
     clientCompanySnapshot: snapshot,
-    visualIdentity: VisualIdentityGenerator.forEntity(
-      entityType: VisualEntityType.client,
-      entityId: publicId,
-      displayName: name,
-    ),
+    visualIdentity:
+        visualIdentityOverride ??
+        VisualIdentityGenerator.forEntity(
+          entityType: VisualEntityType.client,
+          entityId: publicId,
+          displayName: name,
+        ),
   );
 }
 
-_EntityItem _contractItemFromApi(Map<String, dynamic> contract) {
+_EntityItem _contractItemFromApi(
+  Map<String, dynamic> contract, {
+  EntityVisualIdentity? visualIdentityOverride,
+}) {
   final publicId = _apiText(contract['publicId']);
   final provider = _apiMap(contract['providerCompany']);
   final client = _apiMap(contract['clientCompany']);
@@ -698,11 +735,13 @@ _EntityItem _contractItemFromApi(Map<String, dynamic> contract) {
     attachments: documents,
     contractSnapshot: snapshot,
     contractPositions: positions,
-    visualIdentity: VisualIdentityGenerator.forEntity(
-      entityType: VisualEntityType.contract,
-      entityId: publicId,
-      displayName: modelName,
-    ),
+    visualIdentity:
+        visualIdentityOverride ??
+        VisualIdentityGenerator.forEntity(
+          entityType: VisualEntityType.contract,
+          entityId: publicId,
+          displayName: modelName,
+        ),
   );
 }
 

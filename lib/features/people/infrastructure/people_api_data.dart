@@ -94,8 +94,18 @@ class _PeopleApiRepository {
       );
     }
 
+    final visualIdentities = await VisualIdentityLocalStore.instance
+        .loadForType(entityType: VisualEntityType.user);
     final bundles = await Future.wait(people.map(_loadPersonBundle));
-    final items = bundles.map(_entityItemFromApi).toList(growable: false);
+    final items = bundles
+        .map(
+          (bundle) => _entityItemFromApi(
+            bundle,
+            visualIdentityOverride:
+                visualIdentities[_apiText(bundle.detail['publicId'])],
+          ),
+        )
+        .toList(growable: false);
 
     return _PeopleRuntimeData.live(
       _EntityWorkspaceData(
@@ -395,7 +405,10 @@ _EmploymentPositionOption _employmentPositionOptionFromApi(
   );
 }
 
-_EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
+_EntityItem _entityItemFromApi(
+  _PeopleApiBundle bundle, {
+  EntityVisualIdentity? visualIdentityOverride,
+}) {
   final person = bundle.detail;
   final links = bundle.links.isNotEmpty
       ? bundle.links
@@ -473,11 +486,13 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
       occurrences,
       calendarEntries,
     ),
-    visualIdentity: VisualIdentityGenerator.forEntity(
-      entityType: VisualEntityType.user,
-      entityId: publicId,
-      displayName: name,
-    ),
+    visualIdentity:
+        visualIdentityOverride ??
+        VisualIdentityGenerator.forEntity(
+          entityType: VisualEntityType.user,
+          entityId: publicId,
+          displayName: name,
+        ),
   );
 }
 

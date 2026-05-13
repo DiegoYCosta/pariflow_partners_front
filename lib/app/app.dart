@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../core/api/api_client.dart';
 import '../features/auth/auth_gate.dart';
 import '../firebase_options.dart';
+import '../shared/infrastructure/visual_identity_local_store.dart';
 import '../shared/models/visual_identity.dart';
 import '../widgets/high_tech_light_waves.dart';
 

@@ -33,6 +33,24 @@ class _NetworkApiRepository {
       },
     );
 
+    await Future.wait([
+      VisualIdentityLocalStore.instance.loadForType(
+        entityType: VisualEntityType.company,
+      ),
+      VisualIdentityLocalStore.instance.loadForType(
+        entityType: VisualEntityType.client,
+      ),
+      VisualIdentityLocalStore.instance.loadForType(
+        entityType: VisualEntityType.contract,
+      ),
+      VisualIdentityLocalStore.instance.loadForType(
+        entityType: VisualEntityType.position,
+      ),
+      VisualIdentityLocalStore.instance.loadForType(
+        entityType: VisualEntityType.user,
+      ),
+    ]);
+
     return _NetworkGraphPayload.fromMap(data);
   }
 }

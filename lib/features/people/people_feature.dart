@@ -131,6 +131,17 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
     );
   }
 
+  Future<void> _openEditVisualIdentityDialog(_EntityItem item) async {
+    final changed = await _editVisualIdentityForItem(
+      context: context,
+      item: item,
+      projectItems: _runtimeData.data.items,
+    );
+    if (changed && mounted) {
+      await _loadPeopleData();
+    }
+  }
+
   Future<void> _removePerson(_EntityItem item) async {
     final confirmed = await _confirmAction(
       title: 'Remover pessoa',
@@ -496,6 +507,13 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                         : () => _openEditPersonDialog(selectedItem),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Editar'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _runtimeData.isLoading || selectedItem == null
+                        ? null
+                        : () => _openEditVisualIdentityDialog(selectedItem),
+                    icon: const Icon(Icons.palette_outlined),
+                    label: const Text('Visual'),
                   ),
                   OutlinedButton.icon(
                     onPressed: _runtimeData.isLoading || selectedItem == null

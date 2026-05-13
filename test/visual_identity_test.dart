@@ -69,4 +69,38 @@ void main() {
     expect(identity.pattern, VisualPattern.organicBlobs);
     expect({identity.primaryColor, ...identity.secondaryColors}, hasLength(3));
   });
+
+  test('suggestions keep fixed shape and pattern for entity type', () {
+    final suggestions = VisualIdentityGenerator.suggestionsForEntity(
+      entityType: VisualEntityType.contract,
+      entityId: 'contract-001',
+      count: 5,
+    );
+
+    expect(suggestions, hasLength(5));
+    expect(
+      suggestions.every(
+        (identity) => identity.shape == VisualShape.flatDiamond,
+      ),
+      isTrue,
+    );
+    expect(
+      suggestions.every((identity) => identity.pattern == VisualPattern.dots),
+      isTrue,
+    );
+    expect(suggestions.every((identity) => identity.isCustom), isTrue);
+  });
+
+  test('serializes and restores custom visual identities', () {
+    final identity = VisualIdentityGenerator.forVariant(
+      entityType: VisualEntityType.client,
+      entityId: 'client-001',
+      variantIndex: 12,
+    );
+
+    final restored = EntityVisualIdentity.tryFromJson(identity.toJson());
+
+    expect(restored, identity);
+    expect(restored!.isCustom, isTrue);
+  });
 }

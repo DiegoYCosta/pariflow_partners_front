@@ -559,6 +559,17 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
     );
   }
 
+  Future<void> _openEditVisualIdentityDialog(_EntityItem item) async {
+    final changed = await _editVisualIdentityForItem(
+      context: context,
+      item: item,
+      projectItems: _runtimeData.data.items,
+    );
+    if (changed && mounted) {
+      await _loadContracts();
+    }
+  }
+
   Future<void> _removeContract(_EntityItem item) async {
     final confirmed = await _confirmContractAction(
       title: 'Inativar contrato',
@@ -622,6 +633,9 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
           onEdit: selectedItem == null
               ? null
               : () => _openEditContractDialog(selectedItem),
+          onEditVisualIdentity: selectedItem == null
+              ? null
+              : () => _openEditVisualIdentityDialog(selectedItem),
           onRemove: selectedItem == null
               ? null
               : () => _removeContract(selectedItem),

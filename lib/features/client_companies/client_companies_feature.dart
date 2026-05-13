@@ -137,6 +137,17 @@ class _ClientCompaniesWorkspaceState extends State<_ClientCompaniesWorkspace> {
     );
   }
 
+  Future<void> _openEditVisualIdentityDialog(_EntityItem item) async {
+    final changed = await _editVisualIdentityForItem(
+      context: context,
+      item: item,
+      projectItems: _runtimeData.data.items,
+    );
+    if (changed && mounted) {
+      await _loadClientCompanies();
+    }
+  }
+
   Future<void> _removeClient(_EntityItem item) async {
     final confirmed = await _confirmEntityAction(
       context: context,
@@ -197,6 +208,9 @@ class _ClientCompaniesWorkspaceState extends State<_ClientCompaniesWorkspace> {
           onEdit: selectedItem == null
               ? null
               : () => _openEditClientDialog(selectedItem),
+          onEditVisualIdentity: selectedItem == null
+              ? null
+              : () => _openEditVisualIdentityDialog(selectedItem),
           onRemove: selectedItem == null
               ? null
               : () => _removeClient(selectedItem),

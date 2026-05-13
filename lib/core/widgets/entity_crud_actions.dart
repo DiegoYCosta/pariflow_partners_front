@@ -9,6 +9,7 @@ class _EntityCrudActionsPanel extends StatelessWidget {
     required this.removeLabel,
     required this.isLoading,
     required this.onEdit,
+    this.onEditVisualIdentity,
     required this.onRemove,
   });
 
@@ -19,6 +20,7 @@ class _EntityCrudActionsPanel extends StatelessWidget {
   final String removeLabel;
   final bool isLoading;
   final VoidCallback? onEdit;
+  final VoidCallback? onEditVisualIdentity;
   final VoidCallback? onRemove;
 
   @override
@@ -71,6 +73,12 @@ class _EntityCrudActionsPanel extends StatelessWidget {
                 icon: const Icon(Icons.edit_outlined),
                 label: Text(editLabel),
               ),
+              if (onEditVisualIdentity != null)
+                OutlinedButton.icon(
+                  onPressed: isLoading ? null : onEditVisualIdentity,
+                  icon: const Icon(Icons.palette_outlined),
+                  label: const Text('Visual'),
+                ),
               OutlinedButton.icon(
                 onPressed: isLoading ? null : onRemove,
                 icon: const Icon(Icons.archive_outlined),
