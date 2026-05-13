@@ -191,6 +191,8 @@ class _VisualIdentityLegendEntry {
     required this.label,
     this.count,
     this.selected = false,
+    this.showMarker = true,
+    this.useIdentityColor = true,
     this.onTap,
   });
 
@@ -198,6 +200,8 @@ class _VisualIdentityLegendEntry {
   final String label;
   final int? count;
   final bool selected;
+  final bool showMarker;
+  final bool useIdentityColor;
   final VoidCallback? onTap;
 }
 
@@ -214,7 +218,11 @@ class _VisualIdentityLegendChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = entry.identity.primaryColor;
+    final color = entry.useIdentityColor
+        ? entry.identity.primaryColor
+        : entry.selected
+        ? _tealColor
+        : _mutedColor;
     final label = entry.count == null
         ? entry.label
         : '${entry.label} ${entry.count}';
@@ -227,31 +235,41 @@ class _VisualIdentityLegendChip extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: entry.selected
-            ? color.withValues(alpha: 0.15)
-            : color.withValues(alpha: 0.08),
+            ? color.withValues(alpha: 0.13)
+            : color.withValues(alpha: entry.useIdentityColor ? 0.08 : 0.05),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: color.withValues(alpha: entry.selected ? 0.44 : 0.18),
+          color: color.withValues(
+            alpha: entry.selected
+                ? 0.44
+                : entry.useIdentityColor
+                ? 0.18
+                : 0.16,
+          ),
           width: entry.selected ? 1.3 : 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _EntityMarker(
-            identity: entry.identity,
-            size: dense ? 15 : 17,
-            selected: entry.selected,
-            semanticLabel: entry.label,
-          ),
-          SizedBox(width: dense ? 6 : 7),
+          if (entry.showMarker) ...[
+            _EntityMarker(
+              identity: entry.identity,
+              size: dense ? 15 : 17,
+              selected: entry.selected,
+              semanticLabel: entry.label,
+            ),
+            SizedBox(width: dense ? 6 : 7),
+          ],
           Flexible(
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: color,
+                color: entry.useIdentityColor || entry.selected
+                    ? color
+                    : _inkColor,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -826,6 +844,20 @@ List<EntityVisualIdentity> _visualIdentitiesForEntityItems(
   return [for (final item in items) _visualIdentityForEntityItem(item)];
 }
 
+EntityVisualIdentity _genericVisualIdentityForEntityType({
+  required VisualEntityType entityType,
+  required String entityId,
+}) {
+  return EntityVisualIdentity(
+    entityType: entityType,
+    entityId: entityId,
+    shape: VisualIdentityGenerator.shapeForType(entityType),
+    primaryColor: _mutedColor,
+    pattern: VisualPattern.solid,
+    variantIndex: 0,
+  );
+}
+
 EntityVisualIdentity _visualIdentityForContractPosition(
   _ContractPositionRecord position,
 ) {
@@ -854,10 +886,9 @@ EntityVisualIdentity _visualIdentityForNetworkNode(_NetworkGraphNode node) {
 }
 
 EntityVisualIdentity _visualIdentityForNetworkLane(_NetworkGraphLane lane) {
-  return VisualIdentityGenerator.forEntity(
+  return _genericVisualIdentityForEntityType(
     entityType: _visualEntityTypeForNetworkLane(lane),
     entityId: lane.name,
-    displayName: _laneLabel(lane),
   );
 }
 
@@ -925,7 +956,7 @@ List<_VisualIdentityLegendEntry> _legendEntriesForEntityItems(
   return [
     for (final type in order)
       if (countsByType[type] case final count?)
-        if (VisualIdentityGenerator.forEntity(
+        if (_genericVisualIdentityForEntityType(
               entityType: type,
               entityId: type.name,
             )
@@ -934,6 +965,8 @@ List<_VisualIdentityLegendEntry> _legendEntriesForEntityItems(
             identity: identity,
             label: identity.typeLabel,
             count: count,
+            showMarker: false,
+            useIdentityColor: false,
           ),
   ];
 }

@@ -192,6 +192,8 @@ class _RelationalNetworkWorkspaceBodyState
           label: _laneLabel(lane),
           count: counts[lane] ?? 0,
           selected: _selectedLaneForDetails == lane,
+          showMarker: false,
+          useIdentityColor: false,
           onTap: () {
             setState(() {
               _selectedLaneForDetails = _selectedLaneForDetails == lane
@@ -6069,7 +6071,7 @@ class _RelationalLaneButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _laneColor(lane);
+    final color = selected && !hidden ? _tealColor : _mutedColor;
     final visualIdentity = _visualIdentityForNetworkLane(lane);
     final iconHeight = hidden ? 34.0 : 52.0;
     return Material(

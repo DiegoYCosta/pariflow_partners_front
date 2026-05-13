@@ -310,13 +310,15 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
     return [
       for (final type in visibleTypes)
         _VisualIdentityLegendEntry(
-          identity: VisualIdentityGenerator.forEntity(
+          identity: _genericVisualIdentityForEntityType(
             entityType: _visualEntityTypeForTimelineLink(type),
             entityId: type,
           ),
           label: _timelineLinkTypeLabels[type] ?? type,
           count: _timelineLinkCount(type),
           selected: _entityType == type,
+          showMarker: false,
+          useIdentityColor: false,
           onTap: () {
             setState(() {
               _entityType = _entityType == type ? '' : type;
