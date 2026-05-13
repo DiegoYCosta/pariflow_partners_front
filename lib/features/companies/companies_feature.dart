@@ -622,6 +622,7 @@ class _CompanyDirectoryTile extends StatelessWidget {
     final snapshot = item.providerCompanySnapshot;
     final document =
         snapshot?.document ?? _companyRelationValue(item, 'Documento');
+    final visualIdentity = _visualIdentityForEntityItem(item);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -673,6 +674,17 @@ class _CompanyDirectoryTile extends StatelessWidget {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: _EntityMarker(
+                                identity: visualIdentity,
+                                size: 26,
+                                selected: selected,
+                                semanticLabel:
+                                    '${visualIdentity.typeLabel}: ${item.title}',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 item.title,
@@ -706,8 +718,13 @@ class _CompanyDirectoryTile extends StatelessWidget {
                           children: [
                             _CompanyMiniTag(
                               label: item.status,
-                              icon: item.icon,
-                              color: item.color,
+                              leading: _EntityMarker(
+                                identity: visualIdentity,
+                                size: 15,
+                                semanticLabel:
+                                    '${visualIdentity.typeLabel}: ${item.title}',
+                              ),
+                              color: visualIdentity.primaryColor,
                             ),
                             if (document.trim().isNotEmpty)
                               _CompanyMiniTag(
@@ -749,6 +766,7 @@ class _CompanyProfilePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final snapshot = item.providerCompanySnapshot;
+    final visualIdentity = _visualIdentityForEntityItem(item);
     final legalName = _companyFirstText(snapshot?.legalName, item.title);
     final tradeName = _companyFirstText(snapshot?.tradeName, '');
     final document = _companyFirstText(
@@ -778,8 +796,13 @@ class _CompanyProfilePanel extends StatelessWidget {
                   children: [
                     _CompanyMiniTag(
                       label: item.status,
-                      icon: item.icon,
-                      color: item.color,
+                      leading: _EntityMarker(
+                        identity: visualIdentity,
+                        size: 15,
+                        semanticLabel:
+                            '${visualIdentity.typeLabel}: ${item.title}',
+                      ),
+                      color: visualIdentity.primaryColor,
                     ),
                     _CompanyMiniTag(
                       label: item.publicId,
@@ -789,7 +812,27 @@ class _CompanyProfilePanel extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Text(legalName, style: theme.textTheme.headlineSmall),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _EntityMarker(
+                        identity: visualIdentity,
+                        size: 34,
+                        semanticLabel:
+                            '${visualIdentity.typeLabel}: $legalName',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        legalName,
+                        style: theme.textTheme.headlineSmall,
+                      ),
+                    ),
+                  ],
+                ),
                 if (tradeName.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
@@ -1349,12 +1392,14 @@ class _CompanyProtectedItem extends StatelessWidget {
 class _CompanyMiniTag extends StatelessWidget {
   const _CompanyMiniTag({
     required this.label,
-    required this.icon,
     required this.color,
+    this.icon,
+    this.leading,
   });
 
   final String label;
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final Color color;
 
   @override
@@ -1368,7 +1413,7 @@ class _CompanyMiniTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: color),
+          leading ?? Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 190),

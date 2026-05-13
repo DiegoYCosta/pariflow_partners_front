@@ -540,6 +540,11 @@ _EntityItem _providerCompanyItemFromApi(
       'Atualizado em: ${_apiLongDate(company['updatedAt'])}',
     ],
     providerCompanySnapshot: snapshot,
+    visualIdentity: VisualIdentityGenerator.forEntity(
+      entityType: VisualEntityType.company,
+      entityId: publicId,
+      displayName: title,
+    ),
   );
 }
 
@@ -609,6 +614,11 @@ _EntityItem _clientCompanyItemFromApi(
       'Proximo backend: detalhe de cliente com prestadoras ativas, historicas e pessoas impactadas.',
     ],
     clientCompanySnapshot: snapshot,
+    visualIdentity: VisualIdentityGenerator.forEntity(
+      entityType: VisualEntityType.client,
+      entityId: publicId,
+      displayName: name,
+    ),
   );
 }
 
@@ -688,6 +698,11 @@ _EntityItem _contractItemFromApi(Map<String, dynamic> contract) {
     attachments: documents,
     contractSnapshot: snapshot,
     contractPositions: positions,
+    visualIdentity: VisualIdentityGenerator.forEntity(
+      entityType: VisualEntityType.contract,
+      entityId: publicId,
+      displayName: modelName,
+    ),
   );
 }
 

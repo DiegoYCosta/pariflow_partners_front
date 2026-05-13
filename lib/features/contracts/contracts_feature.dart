@@ -1004,8 +1004,8 @@ class _ContractPositionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusColor = _entityStatusColor(position.status);
     final inactive = position.status.toUpperCase() == 'INACTIVE';
+    final visualIdentity = _visualIdentityForContractPosition(position);
     final meta = [
       if (position.location.isNotEmpty) position.location,
       if (position.shift.isNotEmpty) position.shift,
@@ -1027,7 +1027,11 @@ class _ContractPositionTile extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.work_outline_rounded, color: statusColor),
+              _EntityMarker(
+                identity: visualIdentity,
+                size: 24,
+                semanticLabel: '${visualIdentity.typeLabel}: ${position.name}',
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -1074,9 +1078,14 @@ class _ContractPositionTile extends StatelessWidget {
             children: [
               _Tag(
                 label: _entityStatusLabel(position.status),
-                icon: Icons.verified_outlined,
-                color: statusColor,
-                background: statusColor.withValues(alpha: 0.12),
+                leading: _EntityMarker(
+                  identity: visualIdentity,
+                  size: 16,
+                  semanticLabel:
+                      '${visualIdentity.typeLabel}: ${position.name}',
+                ),
+                color: visualIdentity.primaryColor,
+                background: visualIdentity.primaryColor.withValues(alpha: 0.12),
               ),
               _Tag(
                 label: position.publicId,

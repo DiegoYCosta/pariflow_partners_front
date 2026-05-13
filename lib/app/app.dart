@@ -10,10 +10,12 @@ import 'package:flutter/services.dart';
 import '../core/api/api_client.dart';
 import '../features/auth/auth_gate.dart';
 import '../firebase_options.dart';
+import '../shared/models/visual_identity.dart';
 import '../widgets/high_tech_light_waves.dart';
 
 part '../core/widgets/primitives.dart';
 part '../core/widgets/sprite_mold_icon.dart';
+part '../core/widgets/entity_visual_identity.dart';
 part '../shared/models/attachment_record.dart';
 part '../shared/models/entity_crud_snapshots.dart';
 part '../shared/models/network_graph_payload.dart';

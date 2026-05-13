@@ -14,7 +14,8 @@ backend, deploy AWS e smoke tests.
 4. [Calendario compartilhado, lembretes e relatorios](calendario-compartilhado-e-relatorios.md)
 5. [Contrato relacional de Network](relational-graph-contract.md)
 6. [Design system CRM](new-ui-design-system.md)
-7. [Icones e moldes](icones-moldes.md)
+7. [Sistema visual de cores e formas](sistema-visual-de-cores-e-formas.md)
+8. [Icones e moldes](icones-moldes.md)
 
 ## Fontes de Verdade
 

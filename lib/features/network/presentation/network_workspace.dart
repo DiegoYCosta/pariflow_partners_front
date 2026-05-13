@@ -4283,19 +4283,15 @@ class _NetworkReportTableRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final laneColor = _laneColor(node.lane);
+    final visualIdentity = _visualIdentityForNetworkNode(node);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: laneColor.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(_iconForLane(node.lane), color: laneColor, size: 21),
+          _EntityMarker(
+            identity: visualIdentity,
+            size: 38,
+            semanticLabel: '${visualIdentity.typeLabel}: ${node.displayName}',
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -6035,6 +6031,7 @@ class _RelationalLaneButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _laneColor(lane);
+    final visualIdentity = _visualIdentityForNetworkLane(lane);
     final iconHeight = hidden ? 34.0 : 52.0;
     return Material(
       color: Colors.transparent,
@@ -6075,7 +6072,12 @@ class _RelationalLaneButton extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(_iconForLane(lane), color: color, size: 15),
+                            _EntityMarker(
+                              identity: visualIdentity,
+                              size: 15,
+                              semanticLabel:
+                                  '${visualIdentity.typeLabel}: ${_laneLabel(lane)}',
+                            ),
                             const SizedBox(width: 3),
                             Text(
                               _laneNumber(lane),
@@ -6279,36 +6281,31 @@ class _RelationalNodeAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final laneColor = _laneColor(node.lane);
+    final visualIdentity = _visualIdentityForNetworkNode(node);
     if (node.lane == _NetworkGraphLane.employee) {
-      return Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: laneColor.withValues(alpha: 0.10),
-          shape: BoxShape.circle,
-          border: Border.all(color: laneColor.withValues(alpha: 0.24)),
-        ),
+      return Stack(
         alignment: Alignment.center,
-        child: Text(
-          _initialsFor(node.displayName),
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: laneColor,
-            fontWeight: FontWeight.w800,
+        children: [
+          _EntityMarker(
+            identity: visualIdentity,
+            size: 50,
+            semanticLabel: '${visualIdentity.typeLabel}: ${node.displayName}',
           ),
-        ),
+          Text(
+            _initialsFor(node.displayName),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       );
     }
 
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: laneColor.withValues(alpha: 0.10),
-        shape: BoxShape.circle,
-        border: Border.all(color: laneColor.withValues(alpha: 0.24)),
-      ),
-      child: Icon(_iconForLane(node.lane), color: laneColor, size: 29),
+    return _EntityMarker(
+      identity: visualIdentity,
+      size: 50,
+      semanticLabel: '${visualIdentity.typeLabel}: ${node.displayName}',
     );
   }
 }
@@ -6748,6 +6745,7 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final laneColor = _laneColor(node.lane);
+    final visualIdentity = _visualIdentityForNetworkNode(node);
     final fields = _detailFieldsFor(node);
     final cta = node.detailSnapshot.cta;
     final employeeNode = node.lane == _NetworkGraphLane.employee;
@@ -6816,26 +6814,27 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 112,
-                      height: 112,
-                      decoration: BoxDecoration(
-                        color: laneColor.withValues(alpha: 0.10),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: laneColor, width: 2),
-                      ),
+                    Stack(
                       alignment: Alignment.center,
-                      child: node.lane == _NetworkGraphLane.employee
-                          ? Text(
-                              _initialsFor(node.displayName),
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(color: laneColor, fontSize: 32),
-                            )
-                          : Icon(
-                              _iconForLane(node.lane),
-                              color: laneColor,
-                              size: 48,
-                            ),
+                      children: [
+                        _EntityMarker(
+                          identity: visualIdentity,
+                          size: 112,
+                          selected: true,
+                          semanticLabel:
+                              '${visualIdentity.typeLabel}: ${node.displayName}',
+                        ),
+                        if (node.lane == _NetworkGraphLane.employee)
+                          Text(
+                            _initialsFor(node.displayName),
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                      ],
                     ),
                     const SizedBox(width: 20),
                     Expanded(

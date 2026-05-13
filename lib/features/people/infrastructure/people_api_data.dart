@@ -473,6 +473,11 @@ _EntityItem _entityItemFromApi(_PeopleApiBundle bundle) {
       occurrences,
       calendarEntries,
     ),
+    visualIdentity: VisualIdentityGenerator.forEntity(
+      entityType: VisualEntityType.user,
+      entityId: publicId,
+      displayName: name,
+    ),
   );
 }
 

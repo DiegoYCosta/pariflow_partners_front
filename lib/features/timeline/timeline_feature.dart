@@ -1063,12 +1063,11 @@ class _TimelineRecordTile extends StatelessWidget {
                     runSpacing: 6,
                     children: [
                       for (final link in record.links.take(5))
-                        _Tag(
-                          label:
-                              '${link.entityTypeLabel}: ${link.labelSnapshot}',
-                          icon: Icons.link_rounded,
-                          color: _deepTealColor,
-                          background: _deepTealColor.withValues(alpha: 0.08),
+                        _EntityChip(
+                          identity: _visualIdentityForTimelineLink(link),
+                          label: link.labelSnapshot,
+                          typeLabel: link.entityTypeLabel,
+                          maxWidth: 240,
                         ),
                       if (record.links.length > 5)
                         _Tag(
@@ -1353,11 +1352,11 @@ class _TimelineRecordDetailsDialog extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     for (final link in record.links)
-                      _Tag(
-                        label: '${link.entityTypeLabel}: ${link.labelSnapshot}',
-                        icon: Icons.link_rounded,
-                        color: _deepTealColor,
-                        background: _deepTealColor.withValues(alpha: 0.08),
+                      _EntityChip(
+                        identity: _visualIdentityForTimelineLink(link),
+                        label: link.labelSnapshot,
+                        typeLabel: link.entityTypeLabel,
+                        maxWidth: 260,
                       ),
                   ],
                 ),

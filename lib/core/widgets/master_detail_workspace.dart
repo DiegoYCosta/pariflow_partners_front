@@ -527,6 +527,7 @@ class _EntityDetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final visualIdentity = _visualIdentityForEntityItem(item);
     final visibleNotes = [...item.sensitiveNotes]
       ..retainWhere((note) => note.accessPolicy.canViewerRead(viewerProfile))
       ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
@@ -545,6 +546,13 @@ class _EntityDetailCard extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text('Preview do detalhe', style: theme.textTheme.titleLarge),
+            _EntityBadge(
+              identity: visualIdentity,
+              label: item.title,
+              typeLabel: visualIdentity.typeLabel,
+              size: 22,
+              maxWidth: 260,
+            ),
             _Tag(
               label: item.publicId,
               icon: Icons.tag_outlined,
@@ -1039,6 +1047,7 @@ class _EntityListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final visualIdentity = _visualIdentityForEntityItem(item);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1055,12 +1064,24 @@ class _EntityListTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.title, style: theme.textTheme.titleMedium),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: _EntityMarker(
+                      identity: visualIdentity,
+                      size: 24,
+                      selected: selected,
+                      semanticLabel:
+                          '${visualIdentity.typeLabel}: ${item.title}',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(item.title, style: theme.textTheme.titleMedium),
+                  ),
+                  const SizedBox(width: 10),
                   _Tag(
                     label: item.status,
                     icon: item.icon,
@@ -1136,6 +1157,7 @@ class _EntityItem {
     this.clientCompanySnapshot,
     this.contractSnapshot,
     this.contractPositions = const [],
+    this.visualIdentity,
   });
 
   final String publicId;
@@ -1154,4 +1176,5 @@ class _EntityItem {
   final _ClientCompanyCrudSnapshot? clientCompanySnapshot;
   final _ContractCrudSnapshot? contractSnapshot;
   final List<_ContractPositionRecord> contractPositions;
+  final EntityVisualIdentity? visualIdentity;
 }
