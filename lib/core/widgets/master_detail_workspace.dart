@@ -199,6 +199,13 @@ class _EntityWorkspace extends StatelessWidget {
                     ),
                 ],
               ),
+              if (data.items.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _VisualIdentityLegend(
+                  entries: _legendEntriesForEntityItems(data.items),
+                  dense: true,
+                ),
+              ],
               const SizedBox(height: 20),
               Container(
                 width: double.infinity,

@@ -175,6 +175,35 @@ class _RelationalNetworkWorkspaceBodyState
 
   _NetworkGraphPayload get _payload => _runtimeData.payload;
 
+  List<_VisualIdentityLegendEntry> _networkVisualLegendEntries(
+    List<_NetworkGraphNode> nodes,
+  ) {
+    final counts = <_NetworkGraphLane, int>{
+      for (final lane in _payload.lanes) lane: 0,
+    };
+    for (final node in nodes) {
+      counts[node.lane] = (counts[node.lane] ?? 0) + 1;
+    }
+
+    return [
+      for (final lane in _payload.lanes)
+        _VisualIdentityLegendEntry(
+          identity: _visualIdentityForNetworkLane(lane),
+          label: _laneLabel(lane),
+          count: counts[lane] ?? 0,
+          selected: _selectedLaneForDetails == lane,
+          onTap: () {
+            setState(() {
+              _selectedLaneForDetails = _selectedLaneForDetails == lane
+                  ? null
+                  : lane;
+              _showDetailPanel = true;
+            });
+          },
+        ),
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -680,6 +709,16 @@ class _RelationalNetworkWorkspaceBodyState
                   padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
                   child: _NetworkManagementMenuBar(
                     onOpenReport: _openManagementReport,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _VisualIdentityLegend(
+                      entries: _networkVisualLegendEntries(view.nodes),
+                      dense: true,
+                    ),
                   ),
                 ),
                 Padding(

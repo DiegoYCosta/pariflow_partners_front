@@ -17,6 +17,7 @@ class _EntityMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     final label =
         semanticLabel ?? '${identity.typeLabel} ${identity.entityId}'.trim();
+    final markerSize = size * 0.90;
     return Semantics(
       label: label,
       image: true,
@@ -25,10 +26,19 @@ class _EntityMarker extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: CustomPaint(
-            painter: _EntityMarkerPainter(
-              identity: identity,
-              selected: selected,
+          child: Center(
+            child: Opacity(
+              opacity: selected ? 0.94 : 0.90,
+              child: SizedBox(
+                width: markerSize,
+                height: markerSize,
+                child: CustomPaint(
+                  painter: _EntityMarkerPainter(
+                    identity: identity,
+                    selected: selected,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -136,6 +146,132 @@ class _EntityChip extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VisualIdentityLegend extends StatelessWidget {
+  const _VisualIdentityLegend({
+    required this.entries,
+    this.maxEntryWidth = 190,
+    this.dense = false,
+  });
+
+  final List<_VisualIdentityLegendEntry> entries;
+  final double maxEntryWidth;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: dense ? 8 : 10,
+      runSpacing: dense ? 8 : 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final entry in entries)
+          _VisualIdentityLegendChip(
+            entry: entry,
+            maxWidth: maxEntryWidth,
+            dense: dense,
+          ),
+      ],
+    );
+  }
+}
+
+class _VisualIdentityLegendEntry {
+  const _VisualIdentityLegendEntry({
+    required this.identity,
+    required this.label,
+    this.count,
+    this.selected = false,
+    this.onTap,
+  });
+
+  final EntityVisualIdentity identity;
+  final String label;
+  final int? count;
+  final bool selected;
+  final VoidCallback? onTap;
+}
+
+class _VisualIdentityLegendChip extends StatelessWidget {
+  const _VisualIdentityLegendChip({
+    required this.entry,
+    required this.maxWidth,
+    required this.dense,
+  });
+
+  final _VisualIdentityLegendEntry entry;
+  final double maxWidth;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = entry.identity.primaryColor;
+    final label = entry.count == null
+        ? entry.label
+        : '${entry.label} ${entry.count}';
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 9 : 11,
+        vertical: dense ? 7 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: entry.selected
+            ? color.withValues(alpha: 0.15)
+            : color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: color.withValues(alpha: entry.selected ? 0.44 : 0.18),
+          width: entry.selected ? 1.3 : 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _EntityMarker(
+            identity: entry.identity,
+            size: dense ? 15 : 17,
+            selected: entry.selected,
+            semanticLabel: entry.label,
+          ),
+          SizedBox(width: dense ? 6 : 7),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (entry.onTap == null) {
+      return Tooltip(message: entry.label, child: content);
+    }
+
+    return Tooltip(
+      message: entry.label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: entry.onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: content,
         ),
       ),
     );
@@ -412,4 +548,39 @@ VisualEntityType _visualEntityTypeForTimelineLink(String type) {
     'CITY' || 'OTHER' => VisualEntityType.category,
     _ => VisualEntityType.category,
   };
+}
+
+List<_VisualIdentityLegendEntry> _legendEntriesForEntityItems(
+  List<_EntityItem> items,
+) {
+  final countsByType = <VisualEntityType, int>{};
+  for (final item in items) {
+    final identity = _visualIdentityForEntityItem(item);
+    countsByType[identity.entityType] =
+        (countsByType[identity.entityType] ?? 0) + 1;
+  }
+
+  final order = [
+    VisualEntityType.company,
+    VisualEntityType.client,
+    VisualEntityType.contract,
+    VisualEntityType.position,
+    VisualEntityType.user,
+    VisualEntityType.group,
+    VisualEntityType.category,
+  ];
+  return [
+    for (final type in order)
+      if (countsByType[type] case final count?)
+        if (VisualIdentityGenerator.forEntity(
+              entityType: type,
+              entityId: type.name,
+            )
+            case final identity)
+          _VisualIdentityLegendEntry(
+            identity: identity,
+            label: identity.typeLabel,
+            count: count,
+          ),
+  ];
 }

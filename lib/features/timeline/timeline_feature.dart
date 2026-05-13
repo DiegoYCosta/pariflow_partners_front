@@ -255,9 +255,14 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
             unawaited(_load());
           },
         ),
+        _VisualIdentityLegend(
+          entries: _timelineVisualFilterEntries(),
+          maxEntryWidth: 180,
+          dense: true,
+        ),
         FilterChip(
           selected: _monthOnly,
-          avatar: const Icon(Icons.calendar_view_month_outlined, size: 18),
+          avatar: const Icon(Icons.calendar_view_month_outlined, size: 16),
           label: const Text('Sem data especifica'),
           onSelected: (value) {
             setState(() => _monthOnly = value);
@@ -266,7 +271,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
         ),
         FilterChip(
           selected: _rangeMode,
-          avatar: const Icon(Icons.date_range_outlined, size: 18),
+          avatar: const Icon(Icons.date_range_outlined, size: 16),
           label: const Text('Selecionar periodo'),
           onSelected: (value) {
             setState(() {
@@ -289,6 +294,44 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
             },
           ),
       ],
+    );
+  }
+
+  List<_VisualIdentityLegendEntry> _timelineVisualFilterEntries() {
+    const visibleTypes = [
+      'PROVIDER_COMPANY',
+      'CLIENT_COMPANY',
+      'CONTRACT',
+      'PERSON',
+      'GROUP',
+      'OTHER',
+    ];
+
+    return [
+      for (final type in visibleTypes)
+        _VisualIdentityLegendEntry(
+          identity: VisualIdentityGenerator.forEntity(
+            entityType: _visualEntityTypeForTimelineLink(type),
+            entityId: type,
+          ),
+          label: _timelineLinkTypeLabels[type] ?? type,
+          count: _timelineLinkCount(type),
+          selected: _entityType == type,
+          onTap: () {
+            setState(() {
+              _entityType = _entityType == type ? '' : type;
+            });
+            unawaited(_load());
+          },
+        ),
+    ];
+  }
+
+  int _timelineLinkCount(String type) {
+    return _records.fold<int>(
+      0,
+      (total, record) =>
+          total + record.links.where((link) => link.entityType == type).length,
     );
   }
 

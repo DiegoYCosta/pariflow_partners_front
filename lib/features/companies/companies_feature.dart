@@ -484,6 +484,13 @@ class _CompaniesCommandHeader extends StatelessWidget {
                 ),
             ],
           ),
+          if (data.items.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _VisualIdentityLegend(
+              entries: _legendEntriesForEntityItems(data.items),
+              dense: true,
+            ),
+          ],
         ],
       ),
     );
@@ -1413,7 +1420,7 @@ class _CompanyMiniTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          leading ?? Icon(icon, size: 15, color: color),
+          leading ?? Icon(icon, size: 14, color: color.withValues(alpha: 0.90)),
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 190),
