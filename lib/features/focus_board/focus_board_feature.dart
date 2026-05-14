@@ -1314,6 +1314,30 @@ class _FocusBoardNotesController extends ChangeNotifier {
     return removed;
   }
 
+  Future<void> keepDraft({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    if (!current.isCreator(viewerProfile) ||
+        !current.isDraft ||
+        current.isClosed) {
+      return;
+    }
+    _notes[index] = current.copyWith(
+      isDraft: false,
+      clearUpdatedAt: true,
+      clearLastEditedAt: true,
+    );
+    notifyListeners();
+    await _persistNotes();
+  }
+
   Future<void> restoreDiscardedDraft(_FocusBoardNote note) async {
     await ensureLoaded();
     if (_notes.any((entry) => entry.id == note.id)) {

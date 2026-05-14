@@ -1427,7 +1427,7 @@ class _FocusBoardHubPanel extends StatefulWidget {
 class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   final Set<String> _selectedNoteIds = <String>{};
   bool _creatingQuickNote = false;
-  bool _cardsHidden = false;
+  final bool _cardsHidden = false;
   String? _autofocusNoteId;
   String? _attentionNoteId;
   int _attentionPulse = 0;
@@ -1632,6 +1632,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       onToggleAssignment: _toggleAssignmentCompletion,
       onUpdateText: _updateNoteText,
       onDiscardDraft: _discardDraft,
+      onKeepDraft: _keepDraft,
       onEditNote: _openEditNoteDialog,
       onTrashNote: _confirmMoveToTrash,
       onArchiveNote: _confirmMoveToArchive,
@@ -1737,32 +1738,9 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             FilledButton.icon(
-              onPressed: _creatingQuickNote ? null : _createSimpleNote,
+              onPressed: _createSimpleNote,
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('Nota'),
-            ),
-            IconButton.outlined(
-              tooltip: 'Prioridades urgentes',
-              onPressed: () => widget.notesController.setStatusFilter(
-                _FocusBoardNoteStatusFilter.pending,
-              ),
-              icon: Badge.count(
-                count: widget.notesController.urgentCount,
-                isLabelVisible: widget.notesController.urgentCount > 0,
-                backgroundColor: const Color(0xFFD81F2A),
-                child: const Icon(Icons.priority_high_rounded),
-              ),
-            ),
-            IconButton.outlined(
-              tooltip: _cardsHidden
-                  ? 'Mostrar cards de mensagens e compromissos'
-                  : 'Ocultar cards de mensagens e compromissos',
-              onPressed: () => setState(() => _cardsHidden = !_cardsHidden),
-              icon: Icon(
-                _cardsHidden
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-              ),
             ),
             _FocusBoardStatusFilterButton(controller: widget.notesController),
             IconButton.outlined(
@@ -1831,34 +1809,11 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       child: Row(
         children: [
           FilledButton.icon(
-            onPressed: _creatingQuickNote ? null : _createSimpleNote,
+            onPressed: _createSimpleNote,
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Nota'),
           ),
           const SizedBox(width: 6),
-          IconButton.outlined(
-            tooltip: 'Prioridades urgentes',
-            onPressed: () => widget.notesController.setStatusFilter(
-              _FocusBoardNoteStatusFilter.pending,
-            ),
-            icon: Badge.count(
-              count: widget.notesController.urgentCount,
-              isLabelVisible: widget.notesController.urgentCount > 0,
-              backgroundColor: const Color(0xFFD81F2A),
-              child: const Icon(Icons.priority_high_rounded),
-            ),
-          ),
-          IconButton.outlined(
-            tooltip: _cardsHidden
-                ? 'Mostrar cards de mensagens e compromissos'
-                : 'Ocultar cards de mensagens e compromissos',
-            onPressed: () => setState(() => _cardsHidden = !_cardsHidden),
-            icon: Icon(
-              _cardsHidden
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-            ),
-          ),
           _FocusBoardStatusFilterButton(controller: widget.notesController),
           IconButton.outlined(
             tooltip: widget.notesController.activeFilter.showTrash
@@ -2017,20 +1972,12 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   Future<void> _createSimpleNote() async {
-    if (_creatingQuickNote) {
-      return;
-    }
     final pendingDraft = _recentUntouchedQuickNote();
     if (pendingDraft != null) {
-      FocusManager.instance.primaryFocus?.unfocus();
-      await Future<void>.delayed(const Duration(milliseconds: 140));
-      if (!mounted) {
-        return;
-      }
-      final stillPendingDraft = _recentUntouchedQuickNote();
-      if (stillPendingDraft != null) {
-        _pulseExistingDraft(stillPendingDraft.id);
-      }
+      _pulseExistingDraft(pendingDraft.id);
+      return;
+    }
+    if (_creatingQuickNote) {
       return;
     }
     setState(() => _creatingQuickNote = true);
@@ -2203,6 +2150,13 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
           },
         ),
       ),
+    );
+  }
+
+  Future<void> _keepDraft(_FocusBoardNote note) async {
+    await widget.notesController.keepDraft(
+      id: note.id,
+      viewerProfile: widget.viewerProfile,
     );
   }
 
@@ -2852,6 +2806,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.onToggleAssignment,
     required this.onUpdateText,
     required this.onDiscardDraft,
+    required this.onKeepDraft,
     required this.onEditNote,
     required this.onTrashNote,
     required this.onArchiveNote,
@@ -2883,6 +2838,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
   )
   onUpdateText;
   final Future<void> Function(_FocusBoardNote) onDiscardDraft;
+  final Future<void> Function(_FocusBoardNote) onKeepDraft;
   final ValueChanged<_FocusBoardNote> onEditNote;
   final Future<void> Function(_FocusBoardNote) onTrashNote;
   final Future<void> Function(_FocusBoardNote) onArchiveNote;
@@ -3001,6 +2957,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
             onUpdateText: (title, description) =>
                 onUpdateText(note, title, description),
             onDiscardDraft: () => onDiscardDraft(note),
+            onKeepDraft: () => onKeepDraft(note),
             onEdit: note.isCreator(viewerProfile) && !note.isClosed
                 ? () => onEditNote(note)
                 : null,
@@ -3218,6 +3175,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
     required this.onToggleAssignment,
     required this.onUpdateText,
     required this.onDiscardDraft,
+    required this.onKeepDraft,
     required this.onTrash,
     required this.onShowAudit,
     this.onEdit,
@@ -3246,6 +3204,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
   )
   onUpdateText;
   final Future<void> Function() onDiscardDraft;
+  final Future<void> Function() onKeepDraft;
   final VoidCallback? onEdit;
   final Future<void> Function() onTrash;
   final Future<void> Function()? onArchive;
@@ -3266,6 +3225,7 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
   late final FocusNode _titleFocusNode;
   late final FocusNode _descriptionFocusNode;
   late final AnimationController _attentionController;
+  DateTime? _lastInsidePointerDownAt;
   bool _hovered = false;
   bool _dirty = false;
   bool _savingEdit = false;
@@ -3376,223 +3336,231 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
     };
     return Transform.translate(
       offset: Offset(attentionPan, 0),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: InkWell(
-          onTap: widget.selectionMode ? widget.onTap : null,
-          onLongPress: widget.onLongPress,
-          borderRadius: BorderRadius.circular(8),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: attentionActive ? null : baseColor,
-              gradient: attentionActive
-                  ? LinearGradient(
-                      begin: Alignment(-1 + attentionValue * 2, -0.6),
-                      end: Alignment(1 + attentionValue * 2, 0.8),
-                      colors: [
-                        baseColor,
-                        _amberColor.withValues(alpha: 0.20 * attentionGlow),
-                        _tealColor.withValues(alpha: 0.16 * attentionGlow),
-                        baseColor,
-                      ],
-                    )
-                  : null,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: widget.selected
-                    ? _deepTealColor
-                    : attentionActive
-                    ? _amberColor.withValues(alpha: 0.44)
-                    : priorityColor.withValues(alpha: 0.22),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: attentionActive
-                      ? _amberColor.withValues(alpha: 0.12 * attentionGlow)
-                      : _inkColor.withValues(alpha: 0.05),
-                  blurRadius: attentionActive ? 24 : 14,
-                  offset: const Offset(0, 7),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _FocusBoardPriorityBadge(priority: note.priority),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _editableTitle(context, note),
-                          if (note.description.trim().isNotEmpty ||
-                              _canEditInline(note)) ...[
-                            const SizedBox(height: 4),
-                            _editableDescription(context, note),
-                          ],
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _lastInsidePointerDownAt = DateTime.now(),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: InkWell(
+            onTap: widget.selectionMode ? widget.onTap : null,
+            onLongPress: widget.onLongPress,
+            borderRadius: BorderRadius.circular(8),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: attentionActive ? null : baseColor,
+                gradient: attentionActive
+                    ? LinearGradient(
+                        begin: Alignment(-1 + attentionValue * 2, -0.6),
+                        end: Alignment(1 + attentionValue * 2, 0.8),
+                        colors: [
+                          baseColor,
+                          _amberColor.withValues(alpha: 0.20 * attentionGlow),
+                          _tealColor.withValues(alpha: 0.16 * attentionGlow),
+                          baseColor,
                         ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    if (_dirty)
-                      IconButton.filledTonal(
-                        tooltip: 'Salvar edicao',
-                        onPressed: _savingEdit
-                            ? null
-                            : () => unawaited(_saveEdits()),
-                        icon: const Icon(Icons.check_rounded),
-                      ),
-                    SizedBox.square(
-                      dimension: checkButtonSize,
-                      child: IconButton(
-                        tooltip: note.completedByOwner
-                            ? 'Marcar como pendente'
-                            : 'Marcar como concluido',
-                        onPressed: note.isClosed ? null : widget.onToggleOwner,
-                        iconSize: checkIconSize,
-                        padding: EdgeInsets.zero,
-                        constraints: BoxConstraints.tight(
-                          Size.square(checkButtonSize),
-                        ),
-                        icon: Icon(
-                          note.completedByOwner
-                              ? Icons.check_circle_rounded
-                              : Icons.check_circle_outline_rounded,
-                          color: note.completedByOwner
-                              ? _tealColor
-                              : _mutedColor,
-                        ),
-                      ),
-                    ),
-                    AnimatedOpacity(
-                      opacity: _hovered || widget.selectionMode ? 1 : 0.28,
-                      duration: const Duration(milliseconds: 120),
-                      child: _FocusBoardNoteMenu(
-                        note: note,
-                        onEdit: widget.onEdit,
-                        onTrash: () => unawaited(widget.onTrash()),
-                        onArchive: widget.onArchive == null
-                            ? null
-                            : () => unawaited(widget.onArchive!()),
-                        onDeletePermanently: widget.onDeletePermanently == null
-                            ? null
-                            : () => unawaited(widget.onDeletePermanently!()),
-                        onRestore: widget.onRestore == null
-                            ? null
-                            : () => unawaited(widget.onRestore!()),
-                        onShowAudit: widget.onShowAudit,
-                        onReplicate: widget.onReplicate == null
-                            ? null
-                            : () => unawaited(widget.onReplicate!()),
-                        onClose: widget.onClose == null
-                            ? null
-                            : () => unawaited(widget.onClose!()),
-                      ),
-                    ),
-                  ],
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: widget.selected
+                      ? _deepTealColor
+                      : attentionActive
+                      ? _amberColor.withValues(alpha: 0.44)
+                      : priorityColor.withValues(alpha: 0.22),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _FocusBoardMiniChip(
-                      icon: Icons.event_outlined,
-                      label: _focusBoardShortDateLabel(note.dueAt),
-                      color: _slateColor,
-                    ),
-                    _FocusBoardMiniChip(
-                      icon: Icons.circle,
-                      label: state.label,
-                      color: state.color,
-                    ),
-                    if (_hovered || widget.selectionMode)
-                      _FocusBoardMiniChip(
-                        icon:
-                            note.visibility == _FocusBoardNoteVisibility.private
-                            ? Icons.lock_outline_rounded
-                            : Icons.visibility_outlined,
-                        label: note.visibility.label,
-                        color: _mutedColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: attentionActive
+                        ? _amberColor.withValues(alpha: 0.12 * attentionGlow)
+                        : _inkColor.withValues(alpha: 0.05),
+                    blurRadius: attentionActive ? 24 : 14,
+                    offset: const Offset(0, 7),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _FocusBoardPriorityBadge(priority: note.priority),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _editableTitle(context, note),
+                            if (note.description.trim().isNotEmpty ||
+                                _canEditInline(note)) ...[
+                              const SizedBox(height: 4),
+                              _editableDescription(context, note),
+                            ],
+                          ],
+                        ),
                       ),
-                    if (note.isClosed)
-                      _FocusBoardMiniChip(
-                        icon: Icons.lock_clock_outlined,
-                        label: 'Encerrada',
-                        color: _tealColor,
+                      const SizedBox(width: 6),
+                      if (_dirty)
+                        IconButton.filledTonal(
+                          tooltip: 'Salvar edição',
+                          onPressed: _savingEdit
+                              ? null
+                              : () => unawaited(_saveEdits()),
+                          icon: const Icon(Icons.check_rounded),
+                        ),
+                      SizedBox.square(
+                        dimension: checkButtonSize,
+                        child: IconButton(
+                          tooltip: note.completedByOwner
+                              ? 'Marcar como pendente'
+                              : 'Marcar como concluído',
+                          onPressed: note.isClosed
+                              ? null
+                              : widget.onToggleOwner,
+                          iconSize: checkIconSize,
+                          padding: EdgeInsets.zero,
+                          constraints: BoxConstraints.tight(
+                            Size.square(checkButtonSize),
+                          ),
+                          icon: Icon(
+                            note.completedByOwner
+                                ? Icons.check_circle_rounded
+                                : Icons.check_circle_outline_rounded,
+                            color: note.completedByOwner
+                                ? _tealColor
+                                : _mutedColor,
+                          ),
+                        ),
                       ),
-                    if ((_hovered || widget.selectionMode) &&
-                        note.companyLabel.trim().isNotEmpty)
-                      _FocusBoardMiniChip(
-                        icon: Icons.apartment_rounded,
-                        label: note.companyLabel,
-                        color: _slateColor,
+                      AnimatedOpacity(
+                        opacity: _hovered || widget.selectionMode ? 1 : 0.28,
+                        duration: const Duration(milliseconds: 120),
+                        child: _FocusBoardNoteMenu(
+                          note: note,
+                          onEdit: widget.onEdit,
+                          onTrash: () => unawaited(widget.onTrash()),
+                          onArchive: widget.onArchive == null
+                              ? null
+                              : () => unawaited(widget.onArchive!()),
+                          onDeletePermanently:
+                              widget.onDeletePermanently == null
+                              ? null
+                              : () => unawaited(widget.onDeletePermanently!()),
+                          onRestore: widget.onRestore == null
+                              ? null
+                              : () => unawaited(widget.onRestore!()),
+                          onShowAudit: widget.onShowAudit,
+                          onReplicate: widget.onReplicate == null
+                              ? null
+                              : () => unawaited(widget.onReplicate!()),
+                          onClose: widget.onClose == null
+                              ? null
+                              : () => unawaited(widget.onClose!()),
+                        ),
                       ),
-                    if (note.hasAssignments)
-                      _FocusBoardMiniChip(
-                        icon: Icons.eco_outlined,
-                        label:
-                            '${note.completedAssignmentCount}/${note.assignments.length}',
-                        color: _tealColor,
-                      ),
-                    if (note.hasMultipleAssignments &&
-                        note.viewerAssigned(widget.viewerProfile))
-                      _FocusBoardMiniChip(
-                        icon: Icons.assignment_outlined,
-                        label: 'voce junto',
-                        color: _deepTealColor,
-                      ),
-                  ],
-                ),
-                if (note.assignments.isNotEmpty &&
-                    (_hovered || widget.selectionMode)) ...[
-                  const SizedBox(height: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      for (final assignment in note.assignments)
-                        FilterChip(
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          label: Text(
-                            '${assignment.label} (${assignment.type.label})',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          selected: assignment.completed,
-                          onSelected: note.isClosed || !note.replicasEnabled
-                              ? null
-                              : (_) => widget.onToggleAssignment(assignment),
-                          avatar: Icon(
-                            assignment.completed
-                                ? Icons.check_rounded
-                                : Icons.eco_outlined,
-                            size: 16,
-                          ),
+                      _FocusBoardMiniChip(
+                        icon: Icons.event_outlined,
+                        label: _focusBoardShortDateLabel(note.dueAt),
+                        color: _slateColor,
+                      ),
+                      _FocusBoardMiniChip(
+                        icon: Icons.circle,
+                        label: state.label,
+                        color: state.color,
+                      ),
+                      if (_hovered || widget.selectionMode)
+                        _FocusBoardMiniChip(
+                          icon:
+                              note.visibility ==
+                                  _FocusBoardNoteVisibility.private
+                              ? Icons.lock_outline_rounded
+                              : Icons.visibility_outlined,
+                          label: note.visibility.label,
+                          color: _mutedColor,
+                        ),
+                      if (note.isClosed)
+                        _FocusBoardMiniChip(
+                          icon: Icons.lock_clock_outlined,
+                          label: 'Encerrada',
+                          color: _tealColor,
+                        ),
+                      if ((_hovered || widget.selectionMode) &&
+                          note.companyLabel.trim().isNotEmpty)
+                        _FocusBoardMiniChip(
+                          icon: Icons.apartment_rounded,
+                          label: note.companyLabel,
+                          color: _slateColor,
+                        ),
+                      if (note.hasAssignments)
+                        _FocusBoardMiniChip(
+                          icon: Icons.eco_outlined,
+                          label:
+                              '${note.completedAssignmentCount}/${note.assignments.length}',
+                          color: _tealColor,
+                        ),
+                      if (note.hasMultipleAssignments &&
+                          note.viewerAssigned(widget.viewerProfile))
+                        _FocusBoardMiniChip(
+                          icon: Icons.assignment_outlined,
+                          label: 'voce junto',
+                          color: _deepTealColor,
                         ),
                     ],
                   ),
-                ],
-                const SizedBox(height: 8),
-                Text(
-                  _noteMetaLabel(note),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: _mutedColor,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
+                  if (note.assignments.isNotEmpty &&
+                      (_hovered || widget.selectionMode)) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final assignment in note.assignments)
+                          FilterChip(
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            label: Text(
+                              '${assignment.label} (${assignment.type.label})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            selected: assignment.completed,
+                            onSelected: note.isClosed || !note.replicasEnabled
+                                ? null
+                                : (_) => widget.onToggleAssignment(assignment),
+                            avatar: Icon(
+                              assignment.completed
+                                  ? Icons.check_rounded
+                                  : Icons.eco_outlined,
+                              size: 16,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    _noteMetaLabel(note),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: _mutedColor,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -3713,6 +3681,10 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
         return;
       }
       if (widget.note.isDraft && _draftTextIsEmpty) {
+        if (_recentInsideInteraction()) {
+          unawaited(_keepDraft());
+          return;
+        }
         unawaited(_discardDraft());
         return;
       }
@@ -3785,6 +3757,32 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
         setState(() => _savingEdit = false);
       }
     }
+  }
+
+  Future<void> _keepDraft() async {
+    if (_savingEdit) {
+      return;
+    }
+    setState(() => _savingEdit = true);
+    try {
+      await widget.onKeepDraft();
+      if (mounted) {
+        setState(() => _dirty = false);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _savingEdit = false);
+      }
+    }
+  }
+
+  bool _recentInsideInteraction() {
+    final lastInsidePointerDownAt = _lastInsidePointerDownAt;
+    if (lastInsidePointerDownAt == null) {
+      return false;
+    }
+    return DateTime.now().difference(lastInsidePointerDownAt) <
+        const Duration(milliseconds: 600);
   }
 
   String _boundedText(String value) {
