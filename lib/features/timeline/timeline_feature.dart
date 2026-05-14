@@ -58,7 +58,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
     super.initState();
     final now = DateTime.now();
     _month = DateTime(now.year, now.month);
-    unawaited(_load());
+    unawaited(_loadPreferencesAndTimeline());
   }
 
   @override
@@ -257,6 +257,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
           values: {'': 'Todas', ..._timelineCategories},
           onChanged: (value) {
             setState(() => _category = value ?? '');
+            unawaited(_saveTimelinePreferences());
             unawaited(_load());
           },
         ),
@@ -266,6 +267,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
           values: {'': 'Todos', ..._timelineLinkTypeLabels},
           onChanged: (value) {
             setState(() => _entityType = value ?? '');
+            unawaited(_saveTimelinePreferences());
             unawaited(_load());
           },
         ),
@@ -280,6 +282,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
           label: const Text('Sem data especifica'),
           onSelected: (value) {
             setState(() => _monthOnly = value);
+            unawaited(_saveTimelinePreferences());
             unawaited(_load());
           },
         ),
@@ -337,6 +340,7 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
             setState(() {
               _entityType = _entityType == type ? '' : type;
             });
+            unawaited(_saveTimelinePreferences());
             unawaited(_load());
           },
         ),
@@ -462,6 +466,40 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
         ],
       ),
     );
+  }
+
+  Future<void> _loadPreferencesAndTimeline() async {
+    try {
+      final preferences = await _repository.loadCalendarPreferences();
+      final timelineFilters = _apiMap(preferences['timelineFilters']);
+      if (mounted) {
+        setState(() {
+          _category = _apiText(timelineFilters['category']);
+          _entityType = _apiText(timelineFilters['entityType']);
+          _monthOnly = _apiText(timelineFilters['monthOnly']) == 'true';
+        });
+      }
+    } on ApiException {
+      // Preferencias nao podem impedir a Timeline de carregar dados reais.
+    } finally {
+      if (mounted) {
+        await _load();
+      }
+    }
+  }
+
+  Future<void> _saveTimelinePreferences() async {
+    try {
+      await _repository.updateCalendarPreferences({
+        'timelineFilters': {
+          if (_category.isNotEmpty) 'category': _category,
+          if (_entityType.isNotEmpty) 'entityType': _entityType,
+          'monthOnly': _monthOnly ? 'true' : 'false',
+        },
+      });
+    } on ApiException {
+      // Falha de preferencia salva nao deve bloquear o uso da Timeline.
+    }
   }
 
   Future<void> _load() async {
@@ -2241,6 +2279,16 @@ class _TimelineApiRepository {
     return _apiMapList(
       data['items'],
     ).map(_timelineNonBusinessDayFromApi).toList();
+  }
+
+  Future<Map<String, dynamic>> loadCalendarPreferences() async {
+    await _apiClient.ensureDevelopmentSession();
+    final data = await _apiClient.getMap('auth/preferences/calendar');
+    return _apiMap(data['preferences']);
+  }
+
+  Future<void> updateCalendarPreferences(Map<String, dynamic> body) async {
+    await _apiClient.patchMap('auth/preferences/calendar', body: body);
   }
 
   Future<void> createRecord(Map<String, dynamic> body) async {

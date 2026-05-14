@@ -46,6 +46,11 @@ class ApiClient {
     }
   }
 
+  Future<SessionSnapshot> reloadSession() async {
+    _clearSession();
+    return ensureDevelopmentSession();
+  }
+
   Future<SessionSnapshot> _loadDevelopmentSession() async {
     if (await _tryRefreshSession()) {
       return _session!;
@@ -341,11 +346,16 @@ class SessionSnapshot {
     required this.userName,
     required this.tenantRootCompanyPublicId,
     required this.tenantRootCompanyName,
+    required this.tenantRootCompanyCnpj,
+    required this.tenantRootCompanyStatus,
     required this.expiresInSeconds,
     required this.refreshExpiresInSeconds,
     required this.securityContext,
     required this.profiles,
     required this.audienceGroups,
+    required this.canViewSensitive,
+    required this.canDownloadAttachments,
+    required this.canSoftDeleteAttachment,
   });
 
   factory SessionSnapshot.fromMap(Map<String, dynamic> map) {
@@ -356,6 +366,8 @@ class SessionSnapshot {
     final tenantName =
         '${tenantRootCompany['tradeName'] ?? tenantRootCompany['legalName'] ?? ''}'
             .trim();
+    final capabilities =
+        (map['capabilities'] as Map?)?.cast<String, dynamic>() ?? const {};
 
     return SessionSnapshot(
       accessToken: '${map['accessToken'] ?? ''}',
@@ -364,6 +376,8 @@ class SessionSnapshot {
       tenantRootCompanyPublicId: '${tenantRootCompany['publicId'] ?? ''}'
           .trim(),
       tenantRootCompanyName: tenantName,
+      tenantRootCompanyCnpj: '${tenantRootCompany['cnpj'] ?? ''}'.trim(),
+      tenantRootCompanyStatus: '${tenantRootCompany['status'] ?? ''}'.trim(),
       expiresInSeconds: _intFromMap(map['expiresInSeconds'], fallback: 600),
       refreshExpiresInSeconds: _intFromMap(
         map['refreshExpiresInSeconds'],
@@ -378,6 +392,9 @@ class SessionSnapshot {
         for (final group in (map['audienceGroups'] as List? ?? const []))
           '$group',
       ],
+      canViewSensitive: capabilities['canViewSensitive'] == true,
+      canDownloadAttachments: capabilities['canDownloadAttachments'] == true,
+      canSoftDeleteAttachment: capabilities['canSoftDeleteAttachment'] == true,
     );
   }
 
@@ -386,11 +403,16 @@ class SessionSnapshot {
   final String userName;
   final String tenantRootCompanyPublicId;
   final String tenantRootCompanyName;
+  final String tenantRootCompanyCnpj;
+  final String tenantRootCompanyStatus;
   final int expiresInSeconds;
   final int refreshExpiresInSeconds;
   final String securityContext;
   final List<String> profiles;
   final List<String> audienceGroups;
+  final bool canViewSensitive;
+  final bool canDownloadAttachments;
+  final bool canSoftDeleteAttachment;
 
   String get tenantRootCompanyLabel {
     final parts = [

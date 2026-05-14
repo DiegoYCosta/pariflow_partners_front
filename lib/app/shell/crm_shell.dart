@@ -3669,7 +3669,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                   return;
                 }
                 setState(() => _calendarOverdueWindow = value);
-                unawaited(_saveCalendarOverdueWindow(value));
+                unawaited(_saveCalendarPreferences());
                 unawaited(_loadSharedCalendar());
               },
             ),
@@ -3694,6 +3694,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                           _calendarFilters = {..._calendarFilters}
                             ..remove(filter.key);
                         });
+                        unawaited(_saveCalendarPreferences());
                         unawaited(_loadSharedCalendar());
                       },
                     ),
@@ -3789,10 +3790,20 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   }
 
   Future<void> _loadCalendarPreferencesAndCalendar() async {
-    final preferences = await SharedPreferences.getInstance();
-    final stored = preferences.getString(_calendarOverdueWindowStorageKey);
-    if (stored != null && _calendarOverdueWindowOptions.contains(stored)) {
-      _calendarOverdueWindow = stored;
+    try {
+      final data = await _calendarApi.getMap('auth/preferences/calendar');
+      final preferences = _apiMap(data['preferences']);
+      final overdueWindow = _apiText(preferences['overdueWindow']);
+      if (_calendarOverdueWindowOptions.contains(overdueWindow)) {
+        _calendarOverdueWindow = overdueWindow;
+      }
+      _calendarFilters = _calendarPreferenceStringMap(preferences['filters']);
+    } on ApiException {
+      final preferences = await SharedPreferences.getInstance();
+      final stored = preferences.getString(_calendarOverdueWindowStorageKey);
+      if (stored != null && _calendarOverdueWindowOptions.contains(stored)) {
+        _calendarOverdueWindow = stored;
+      }
     }
     if (mounted) {
       setState(() {});
@@ -3800,9 +3811,31 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     }
   }
 
-  Future<void> _saveCalendarOverdueWindow(String value) async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_calendarOverdueWindowStorageKey, value);
+  Future<void> _saveCalendarPreferences() async {
+    try {
+      await _calendarApi.patchMap(
+        'auth/preferences/calendar',
+        body: {
+          'defaultView': 'MONTH',
+          'overdueWindow': _calendarOverdueWindow,
+          'filters': _calendarFilters,
+        },
+      );
+    } on ApiException {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        _calendarOverdueWindowStorageKey,
+        _calendarOverdueWindow,
+      );
+    }
+  }
+
+  Map<String, String> _calendarPreferenceStringMap(Object? value) {
+    final raw = _apiMap(value);
+    return {
+      for (final entry in raw.entries)
+        if (_apiText(entry.value).isNotEmpty) entry.key: _apiText(entry.value),
+    };
   }
 
   Duration? get _calendarOverdueDuration => switch (_calendarOverdueWindow) {
@@ -3960,6 +3993,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     setState(() {
       _calendarFilters = result;
     });
+    unawaited(_saveCalendarPreferences());
     unawaited(_loadSharedCalendar());
   }
 

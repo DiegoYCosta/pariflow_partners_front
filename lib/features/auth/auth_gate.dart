@@ -98,6 +98,7 @@ class _BackendSessionGate extends StatefulWidget {
 
 class _BackendSessionGateState extends State<_BackendSessionGate> {
   late Future<SessionSnapshot> _sessionLoad;
+  bool _contextConfirmed = false;
 
   @override
   void initState() {
@@ -107,7 +108,8 @@ class _BackendSessionGateState extends State<_BackendSessionGate> {
 
   void _retry() {
     setState(() {
-      _sessionLoad = ApiClient().ensureDevelopmentSession();
+      _contextConfirmed = false;
+      _sessionLoad = ApiClient().reloadSession();
     });
   }
 
@@ -144,6 +146,15 @@ class _BackendSessionGateState extends State<_BackendSessionGate> {
           return _CompanyAccessRequiredScreen(
             brand: widget.brand,
             session: session,
+            onRetry: _retry,
+          );
+        }
+
+        if (!_contextConfirmed) {
+          return _CompanyContextSelectionScreen(
+            brand: widget.brand,
+            session: session,
+            onConfirm: () => setState(() => _contextConfirmed = true),
             onRetry: _retry,
           );
         }
@@ -1925,6 +1936,206 @@ class _SessionUnavailableScreen extends StatelessWidget {
   }
 }
 
+class _CompanyContextSelectionScreen extends StatelessWidget {
+  const _CompanyContextSelectionScreen({
+    required this.brand,
+    required this.session,
+    required this.onConfirm,
+    required this.onRetry,
+  });
+
+  final AuthGateBrandConfig brand;
+  final SessionSnapshot session;
+  final VoidCallback onConfirm;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 760;
+    final profileLabel = session.profiles.isEmpty
+        ? session.securityContext
+        : session.profiles.join(' / ');
+    return Scaffold(
+      backgroundColor: brand.paperColor,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 16 : 28,
+              vertical: 24,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFDCE5E0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: brand.deepTealColor.withValues(alpha: 0.08),
+                      blurRadius: 30,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.domain_verification_outlined,
+                            color: brand.deepTealColor,
+                            size: 30,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Selecionar empresa vinculada',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(color: brand.deepTealColor),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Confirme o contexto aprovado para abrir o aplicativo.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(color: brand.mutedColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _CompanyContextInfoTile(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Usuario',
+                        value: '${session.userName} | ${session.userPublicId}',
+                      ),
+                      const SizedBox(height: 10),
+                      _CompanyContextInfoTile(
+                        icon: Icons.business_outlined,
+                        label: 'Empresa',
+                        value: [
+                          session.tenantRootCompanyName,
+                          if (session.tenantRootCompanyCnpj.isNotEmpty)
+                            session.tenantRootCompanyCnpj,
+                          if (session.tenantRootCompanyStatus.isNotEmpty)
+                            session.tenantRootCompanyStatus,
+                        ].where((value) => value.isNotEmpty).join(' | '),
+                      ),
+                      const SizedBox(height: 10),
+                      _CompanyContextInfoTile(
+                        icon: Icons.admin_panel_settings_outlined,
+                        label: 'Nivel de acesso',
+                        value: profileLabel,
+                      ),
+                      const SizedBox(height: 10),
+                      _CompanyContextInfoTile(
+                        icon: Icons.policy_outlined,
+                        label: 'Capacidades',
+                        value: [
+                          if (session.canViewSensitive) 'sensivel',
+                          if (session.canDownloadAttachments) 'download',
+                          if (session.canSoftDeleteAttachment) 'remocao logica',
+                          if (!session.canViewSensitive &&
+                              !session.canDownloadAttachments &&
+                              !session.canSoftDeleteAttachment)
+                            'leitura operacional',
+                        ].join(' | '),
+                      ),
+                      const SizedBox(height: 18),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => unawaited(ApiClient().logout()),
+                            icon: const Icon(Icons.logout_rounded),
+                            label: const Text('Sair'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: onRetry,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Revalidar'),
+                          ),
+                          FilledButton.icon(
+                            onPressed: onConfirm,
+                            icon: const Icon(Icons.login_rounded),
+                            label: const Text('Entrar'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompanyContextInfoTile extends StatelessWidget {
+  const _CompanyContextInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDCE5E0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(icon, size: 21),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CompanyAccessRequiredScreen extends StatefulWidget {
   const _CompanyAccessRequiredScreen({
     required this.brand,
@@ -1946,23 +2157,36 @@ class _CompanyAccessRequiredScreenState
   final _api = ApiClient();
   final _formKey = GlobalKey<FormState>();
   final _cnpj = TextEditingController();
+  final _companyName = TextEditingController();
   final _requesterDocument = TextEditingController();
   final _requesterName = TextEditingController();
+  final _requesterRole = TextEditingController();
   final _requesterEmail = TextEditingController();
   final _requesterPhone = TextEditingController();
   final _notes = TextEditingController();
   String _accessLevel = 'OPERATIONS';
   bool _acceptedTerms = false;
   bool _submitting = false;
+  bool _loadingContext = false;
   String? _message;
+  var _accessDocuments = <Map<String, dynamic>>[];
 
   AuthGateBrandConfig get _brand => widget.brand;
 
   @override
+  void initState() {
+    super.initState();
+    _requesterName.text = widget.session.userName;
+    unawaited(_loadAccessContext());
+  }
+
+  @override
   void dispose() {
     _cnpj.dispose();
+    _companyName.dispose();
     _requesterDocument.dispose();
     _requesterName.dispose();
+    _requesterRole.dispose();
     _requesterEmail.dispose();
     _requesterPhone.dispose();
     _notes.dispose();
@@ -2054,6 +2278,15 @@ class _CompanyAccessRequiredScreenState
                               : 'Informe 14 digitos.',
                         ),
                         const SizedBox(height: 10),
+                        _accessTextField(
+                          controller: _companyName,
+                          label: 'Nome da empresa',
+                          icon: Icons.business_center_outlined,
+                          validator: (value) => (value ?? '').trim().isEmpty
+                              ? 'Informe a empresa.'
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
                           initialValue: _accessLevel,
                           isExpanded: true,
@@ -2098,6 +2331,15 @@ class _CompanyAccessRequiredScreenState
                           icon: Icons.person_outline_rounded,
                           validator: (value) => (value ?? '').trim().isEmpty
                               ? 'Informe o nome.'
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                        _accessTextField(
+                          controller: _requesterRole,
+                          label: 'Cargo ou relacao com a empresa',
+                          icon: Icons.assignment_ind_outlined,
+                          validator: (value) => (value ?? '').trim().isEmpty
+                              ? 'Informe o vinculo.'
                               : null,
                         ),
                         const SizedBox(height: 10),
@@ -2150,6 +2392,22 @@ class _CompanyAccessRequiredScreenState
                         if (_message != null) ...[
                           const SizedBox(height: 8),
                           _AccessInfoBox(text: _message!),
+                        ],
+                        if (_loadingContext) ...[
+                          const SizedBox(height: 12),
+                          const LinearProgressIndicator(minHeight: 2),
+                        ] else if (_accessDocuments.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Documentos desta etapa',
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 8),
+                          for (final item in _accessDocuments.take(3)) ...[
+                            _CompanyAccessDocumentTile(item: item),
+                            const SizedBox(height: 8),
+                          ],
                         ],
                         const SizedBox(height: 16),
                         Wrap(
@@ -2255,9 +2513,11 @@ class _CompanyAccessRequiredScreenState
     try {
       final body = <String, dynamic>{
         'cnpj': _digitsOnly(_cnpj.text),
+        'companyName': _companyName.text.trim(),
         'requesterDocument': _digitsOnly(_requesterDocument.text),
         'requestedAccessLevel': _accessLevel,
         'requesterName': _requesterName.text.trim(),
+        'requesterRole': _requesterRole.text.trim(),
       };
       _putIfNotBlank(body, 'requesterEmail', _requesterEmail.text);
       _putIfNotBlank(body, 'requesterPhone', _requesterPhone.text);
@@ -2270,6 +2530,7 @@ class _CompanyAccessRequiredScreenState
         _message =
             '${result['message'] ?? 'Solicitacao registrada para analise.'}';
       });
+      await _loadAccessContext();
     } on ApiException catch (error) {
       if (!mounted) {
         return;
@@ -2282,6 +2543,89 @@ class _CompanyAccessRequiredScreenState
         setState(() => _submitting = false);
       }
     }
+  }
+
+  Future<void> _loadAccessContext() async {
+    setState(() => _loadingContext = true);
+    try {
+      final data = await _api.getMap('auth/access-context');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _accessDocuments = [
+          for (final item in (data['documents'] as List? ?? const []))
+            if (item is Map) item.cast<String, dynamic>(),
+        ];
+      });
+    } on ApiException catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _accessDocuments = const [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingContext = false);
+      }
+    }
+  }
+}
+
+class _CompanyAccessDocumentTile extends StatelessWidget {
+  const _CompanyAccessDocumentTile({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = '${item['status'] ?? 'PENDING'}';
+    final cnpj = '${item['cnpj'] ?? ''}';
+    final companyName = '${item['companyName'] ?? ''}';
+    final level = '${item['requestedAccessLevel'] ?? ''}';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDCE5E0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.description_outlined, size: 21),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    [
+                      companyName,
+                      cnpj,
+                    ].where((value) => value.isNotEmpty).join(' | '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    [
+                      status,
+                      level,
+                    ].where((value) => value.isNotEmpty).join(' | '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
