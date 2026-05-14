@@ -438,6 +438,10 @@ class _FocusBoardNote {
 
   bool get hasMultipleAssignments => assignments.length > 1;
 
+  bool get isManualReplica {
+    return audit.any((entry) => entry.action == 'replica gerada');
+  }
+
   int get completedAssignmentCount {
     return assignments.where((assignment) => assignment.completed).length;
   }
@@ -740,8 +744,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
   final List<_FocusBoardFilterProfile> _filterProfiles = [];
   bool _loaded = false;
   bool _loading = false;
-  _FocusBoardNoteStatusFilter _statusFilter =
-      _FocusBoardNoteStatusFilter.pending;
+  _FocusBoardNoteStatusFilter _statusFilter = _FocusBoardNoteStatusFilter.all;
   _FocusBoardNoteSort _sort = _FocusBoardNoteSort.editedOrCreatedAt;
   _FocusBoardFilterProfile _activeFilter = _FocusBoardFilterProfile.generic;
 
@@ -1394,7 +1397,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
 
   Future<void> resetFilters() async {
     _activeFilter = _FocusBoardFilterProfile.generic;
-    _statusFilter = _FocusBoardNoteStatusFilter.pending;
+    _statusFilter = _FocusBoardNoteStatusFilter.all;
     notifyListeners();
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_activeProfileStorageKey, _activeFilter.id);
@@ -1719,7 +1722,9 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
                           widget.extent - delta.delta.dx,
                         ),
                       ),
-                      Expanded(child: board),
+                      Expanded(
+                        child: _FocusBoardDockedVerticalFit(child: board),
+                      ),
                     ],
                   )
                 : Column(
@@ -1973,6 +1978,40 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
         ),
       );
     }
+  }
+}
+
+class _FocusBoardDockedVerticalFit extends StatelessWidget {
+  const _FocusBoardDockedVerticalFit({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.maxHeight.isFinite || constraints.maxHeight >= 720) {
+          return child;
+        }
+        final scale = (constraints.maxHeight / 720).clamp(0.56, 1.0).toDouble();
+        return ClipRect(
+          child: Align(
+            alignment: Alignment.topLeft,
+            widthFactor: 1,
+            heightFactor: 1,
+            child: Transform.scale(
+              scale: scale,
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: constraints.maxWidth / scale,
+                height: constraints.maxHeight / scale,
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

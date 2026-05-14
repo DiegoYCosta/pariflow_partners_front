@@ -1427,6 +1427,9 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   bool _creatingQuickNote = false;
   bool _cardsHidden = false;
   String? _autofocusNoteId;
+  String? _attentionNoteId;
+  int _attentionPulse = 0;
+  Timer? _attentionTimer;
 
   @override
   void initState() {
@@ -1441,6 +1444,12 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       unawaited(widget.notesController.ensureLoaded());
       _selectedNoteIds.clear();
     }
+  }
+
+  @override
+  void dispose() {
+    _attentionTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -1499,13 +1508,20 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       decoration: const BoxDecoration(color: _paperColor),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final footerHeight = constraints.maxHeight.isFinite
-              ? (constraints.maxHeight * 0.37).clamp(260.0, 360.0).toDouble()
-              : 320.0;
+          final availableHeight = constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : 720.0;
+          final tightHeight = availableHeight < 640;
+          final footerHeight = tightHeight
+              ? (availableHeight * 0.30).clamp(132.0, 220.0).toDouble()
+              : (availableHeight * 0.37).clamp(240.0, 360.0).toDouble();
+          final headerPadding = tightHeight
+              ? const EdgeInsets.fromLTRB(8, 6, 8, 6)
+              : const EdgeInsets.fromLTRB(10, 8, 10, 8);
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                padding: headerPadding,
                 child: _buildHeader(context, compact: true),
               ),
               const Divider(height: 1, color: _lineColor),
@@ -1577,6 +1593,8 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       viewerProfile: widget.viewerProfile,
       cardsHidden: _cardsHidden,
       autofocusNoteId: _autofocusNoteId,
+      attentionNoteId: _attentionNoteId,
+      attentionPulse: _attentionPulse,
       onAddNote: _createSimpleNote,
       onTapNote: _handleNoteTap,
       onLongPressNote: _handleNoteLongPress,
@@ -1891,6 +1909,11 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     if (_creatingQuickNote) {
       return;
     }
+    final pendingDraft = _recentUntouchedQuickNote();
+    if (pendingDraft != null) {
+      _pulseExistingDraft(pendingDraft.id);
+      return;
+    }
     setState(() => _creatingQuickNote = true);
     final note = await widget.notesController.createSimpleNote(
       viewerProfile: widget.viewerProfile,
@@ -1902,6 +1925,52 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     if (mounted) {
       setState(() => _creatingQuickNote = false);
     }
+  }
+
+  _FocusBoardNote? _recentUntouchedQuickNote() {
+    final now = DateTime.now();
+    for (final note in widget.notesController.notes) {
+      if (!note.isCreator(widget.viewerProfile) ||
+          now.difference(note.createdAt) >=
+              const Duration(milliseconds: 5500)) {
+        continue;
+      }
+      if (_noteIsUntouchedQuickDraft(note)) {
+        return note;
+      }
+    }
+    return null;
+  }
+
+  bool _noteIsUntouchedQuickDraft(_FocusBoardNote note) {
+    return note.title.trim() == 'Nova nota' &&
+        note.description.trim().isEmpty &&
+        note.lastEditedAt == null &&
+        note.companyLabel.trim().isEmpty &&
+        note.priority == _FocusBoardNotePriority.normal &&
+        note.visibility == _FocusBoardNoteVisibility.private &&
+        !note.completedByOwner &&
+        !note.inTrash &&
+        !note.hasAssignments;
+  }
+
+  void _pulseExistingDraft(String noteId) {
+    _attentionTimer?.cancel();
+    setState(() {
+      _autofocusNoteId = noteId;
+      _attentionNoteId = noteId;
+      _attentionPulse += 1;
+    });
+    _attentionTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        if (_attentionNoteId == noteId) {
+          _attentionNoteId = null;
+        }
+      });
+    });
   }
 
   Future<void> _openEditNoteDialog(_FocusBoardNote note) async {
@@ -1981,14 +2050,13 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   Future<void> _confirmMoveToTrash(_FocusBoardNote note) async {
-    if (!note.isComplete) {
+    final warning = _trashWarningFor(note);
+    if (warning != null) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Mover recado incompleto?'),
-          content: const Text(
-            'Este recado ainda nao foi concluido. Deseja enviar para a lixeira mesmo assim?',
-          ),
+          title: const Text('Mover recado para lixeira?'),
+          content: Text(warning),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -2010,6 +2078,29 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       id: note.id,
       viewerProfile: widget.viewerProfile,
     );
+  }
+
+  String? _trashWarningFor(_FocusBoardNote note) {
+    final pendingAssignments = note.assignments
+        .where((assignment) => !assignment.completed)
+        .map((assignment) => assignment.label)
+        .toList(growable: false);
+    final hasUserContent =
+        (note.title.trim().isNotEmpty && note.title.trim() != 'Nova nota') ||
+        note.description.trim().isNotEmpty;
+    final warnings = <String>[];
+    if (hasUserContent && !note.isComplete) {
+      warnings.add('o recado tem conteudo e ainda nao foi concluido');
+    }
+    if (pendingAssignments.isNotEmpty) {
+      warnings.add(
+        'ha replicas pendentes para: ${pendingAssignments.take(4).join(', ')}',
+      );
+    }
+    if (warnings.isEmpty) {
+      return null;
+    }
+    return 'Antes de mover para a lixeira, confirme se deseja continuar: ${warnings.join('; ')}.';
   }
 
   Future<void> _restoreNote(_FocusBoardNote note) async {
@@ -2046,14 +2137,18 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     final notes = widget.notesController.notes
         .where((note) => _selectedNoteIds.contains(note.id))
         .toList(growable: false);
-    final hasIncomplete = notes.any((note) => !note.isComplete);
-    if (hasIncomplete) {
+    final warnings = [
+      for (final note in notes)
+        if (_trashWarningFor(note) != null)
+          '${note.title}: ${_trashWarningFor(note)!}',
+    ];
+    if (warnings.isNotEmpty) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Mover selecao para lixeira?'),
-          content: const Text(
-            'A selecao contem recados incompletos. Deseja continuar?',
+          content: Text(
+            'A selecao contem pendencias:\n\n${warnings.take(4).join('\n\n')}\n\nDeseja continuar?',
           ),
           actions: [
             TextButton(
@@ -2396,6 +2491,8 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.viewerProfile,
     required this.cardsHidden,
     required this.autofocusNoteId,
+    required this.attentionNoteId,
+    required this.attentionPulse,
     required this.onAddNote,
     required this.onTapNote,
     required this.onLongPressNote,
@@ -2416,6 +2513,8 @@ class _FocusBoardNotesStage extends StatelessWidget {
   final _ViewerAccessProfile viewerProfile;
   final bool cardsHidden;
   final String? autofocusNoteId;
+  final String? attentionNoteId;
+  final int attentionPulse;
   final VoidCallback onAddNote;
   final ValueChanged<_FocusBoardNote> onTapNote;
   final ValueChanged<_FocusBoardNote> onLongPressNote;
@@ -2491,16 +2590,17 @@ class _FocusBoardNotesStage extends StatelessWidget {
         itemBuilder: (context, index) {
           final note = notes[index];
           return Align(
-            alignment: index.isEven
-                ? Alignment.centerLeft
-                : Alignment.centerRight,
+            alignment: note.isManualReplica
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
             child: FractionallySizedBox(
-              widthFactor: index % 3 == 0 ? 0.92 : 0.82,
+              widthFactor: note.isManualReplica ? 0.82 : 0.94,
               child: _FocusBoardNoteTile(
                 key: ValueKey(note.id),
                 note: note,
                 viewerProfile: viewerProfile,
                 autofocusTitle: note.id == autofocusNoteId,
+                attentionPulse: note.id == attentionNoteId ? attentionPulse : 0,
                 selected: selectedNoteIds.contains(note.id),
                 selectionMode: selectedNoteIds.isNotEmpty,
                 onTap: () => onTapNote(note),
@@ -2616,6 +2716,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
     required this.note,
     required this.viewerProfile,
     required this.autofocusTitle,
+    required this.attentionPulse,
     required this.selected,
     required this.selectionMode,
     required this.onTap,
@@ -2634,6 +2735,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
   final _FocusBoardNote note;
   final _ViewerAccessProfile viewerProfile;
   final bool autofocusTitle;
+  final int attentionPulse;
   final bool selected;
   final bool selectionMode;
   final VoidCallback onTap;
@@ -2652,12 +2754,17 @@ class _FocusBoardNoteTile extends StatefulWidget {
   State<_FocusBoardNoteTile> createState() => _FocusBoardNoteTileState();
 }
 
-class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
+class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late final FocusNode _titleFocusNode;
   late final FocusNode _descriptionFocusNode;
+  late final AnimationController _attentionController;
   bool _hovered = false;
+  bool _dirty = false;
+  bool _discardDialogOpen = false;
+  bool _savingEdit = false;
 
   @override
   void initState() {
@@ -2668,6 +2775,13 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
     );
     _titleFocusNode = FocusNode()..addListener(_commitWhenFocusLeaves);
     _descriptionFocusNode = FocusNode()..addListener(_commitWhenFocusLeaves);
+    _attentionController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 3))
+          ..addListener(() {
+            if (mounted) {
+              setState(() {});
+            }
+          });
     if (widget.autofocusTitle) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_canEditInline(widget.note)) {
@@ -2685,16 +2799,33 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
   @override
   void didUpdateWidget(covariant _FocusBoardNoteTile oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.attentionPulse > 0 &&
+        widget.attentionPulse != oldWidget.attentionPulse) {
+      _attentionController.forward(from: 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_canEditInline(widget.note)) {
+          return;
+        }
+        _titleFocusNode.requestFocus();
+        _titleController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _titleController.text.length,
+        );
+      });
+    }
     if (oldWidget.note.id != widget.note.id) {
       _titleController.text = widget.note.title;
       _descriptionController.text = widget.note.description;
+      _dirty = false;
       return;
     }
-    if (!_titleFocusNode.hasFocus &&
+    if (!_dirty &&
+        !_titleFocusNode.hasFocus &&
         _titleController.text != widget.note.title) {
       _titleController.text = widget.note.title;
     }
-    if (!_descriptionFocusNode.hasFocus &&
+    if (!_dirty &&
+        !_descriptionFocusNode.hasFocus &&
         _descriptionController.text != widget.note.description) {
       _descriptionController.text = widget.note.description;
     }
@@ -2704,6 +2835,7 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
   void dispose() {
     _titleFocusNode.removeListener(_commitWhenFocusLeaves);
     _descriptionFocusNode.removeListener(_commitWhenFocusLeaves);
+    _attentionController.dispose();
     _titleFocusNode.dispose();
     _descriptionFocusNode.dispose();
     _titleController.dispose();
@@ -2716,177 +2848,214 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
     final note = widget.note;
     final priorityColor = note.priority.color;
     final state = note.completionState;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: InkWell(
-        onTap: widget.selectionMode ? widget.onTap : null,
-        onLongPress: widget.onLongPress,
-        borderRadius: BorderRadius.circular(8),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: widget.selected
-                ? _deepTealColor.withValues(alpha: 0.08)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: widget.selected
-                  ? _deepTealColor
-                  : priorityColor.withValues(alpha: 0.22),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: _inkColor.withValues(alpha: 0.05),
-                blurRadius: 14,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _FocusBoardPriorityBadge(priority: note.priority),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _editableTitle(context, note),
-                        if (note.description.trim().isNotEmpty ||
-                            _canEditInline(note)) ...[
-                          const SizedBox(height: 4),
-                          _editableDescription(context, note),
-                        ],
+    final attentionValue = _attentionController.value;
+    final attentionActive =
+        attentionValue > 0 && attentionValue < 1 && widget.attentionPulse > 0;
+    final attentionGlow = attentionActive
+        ? sin(attentionValue * pi).abs()
+        : 0.0;
+    final attentionPan = attentionActive
+        ? sin(attentionValue * pi * 9) * (1 - attentionValue) * 3
+        : 0.0;
+    final baseColor = widget.selected
+        ? _deepTealColor.withValues(alpha: 0.08)
+        : Colors.white;
+    return Transform.translate(
+      offset: Offset(attentionPan, 0),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: InkWell(
+          onTap: widget.selectionMode ? widget.onTap : null,
+          onLongPress: widget.onLongPress,
+          borderRadius: BorderRadius.circular(8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: attentionActive ? null : baseColor,
+              gradient: attentionActive
+                  ? LinearGradient(
+                      begin: Alignment(-1 + attentionValue * 2, -0.6),
+                      end: Alignment(1 + attentionValue * 2, 0.8),
+                      colors: [
+                        baseColor,
+                        _amberColor.withValues(alpha: 0.20 * attentionGlow),
+                        _tealColor.withValues(alpha: 0.16 * attentionGlow),
+                        baseColor,
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    tooltip: note.completedByOwner
-                        ? 'Marcar como pendente'
-                        : 'Marcar como concluido',
-                    onPressed: note.isClosed ? null : widget.onToggleOwner,
-                    icon: Icon(
-                      note.completedByOwner
-                          ? Icons.check_circle_rounded
-                          : Icons.check_circle_outline_rounded,
-                      color: note.completedByOwner ? _tealColor : _mutedColor,
-                    ),
-                  ),
-                  AnimatedOpacity(
-                    opacity: _hovered || widget.selectionMode ? 1 : 0.28,
-                    duration: const Duration(milliseconds: 120),
-                    child: _FocusBoardNoteMenu(
-                      note: note,
-                      onEdit: widget.onEdit,
-                      onTrash: widget.onTrash,
-                      onRestore: widget.onRestore,
-                      onShowAudit: widget.onShowAudit,
-                      onReplicate: widget.onReplicate,
-                      onClose: widget.onClose,
-                    ),
-                  ),
-                ],
+                    )
+                  : null,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: widget.selected
+                    ? _deepTealColor
+                    : attentionActive
+                    ? _amberColor.withValues(alpha: 0.44)
+                    : priorityColor.withValues(alpha: 0.22),
               ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _FocusBoardMiniChip(
-                    icon: Icons.event_outlined,
-                    label: _focusBoardShortDateLabel(note.dueAt),
-                    color: _slateColor,
-                  ),
-                  _FocusBoardMiniChip(
-                    icon: Icons.circle,
-                    label: state.label,
-                    color: state.color,
-                  ),
-                  if (_hovered || widget.selectionMode)
-                    _FocusBoardMiniChip(
-                      icon: note.visibility == _FocusBoardNoteVisibility.private
-                          ? Icons.lock_outline_rounded
-                          : Icons.visibility_outlined,
-                      label: note.visibility.label,
-                      color: _mutedColor,
+              boxShadow: [
+                BoxShadow(
+                  color: attentionActive
+                      ? _amberColor.withValues(alpha: 0.12 * attentionGlow)
+                      : _inkColor.withValues(alpha: 0.05),
+                  blurRadius: attentionActive ? 24 : 14,
+                  offset: const Offset(0, 7),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FocusBoardPriorityBadge(priority: note.priority),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _editableTitle(context, note),
+                          if (note.description.trim().isNotEmpty ||
+                              _canEditInline(note)) ...[
+                            const SizedBox(height: 4),
+                            _editableDescription(context, note),
+                          ],
+                        ],
+                      ),
                     ),
-                  if (note.isClosed)
-                    _FocusBoardMiniChip(
-                      icon: Icons.lock_clock_outlined,
-                      label: 'Encerrada',
-                      color: _tealColor,
+                    const SizedBox(width: 6),
+                    if (_dirty)
+                      IconButton.filledTonal(
+                        tooltip: 'Salvar edicao',
+                        onPressed: _saveEdits,
+                        icon: const Icon(Icons.check_rounded),
+                      ),
+                    IconButton(
+                      tooltip: note.completedByOwner
+                          ? 'Marcar como pendente'
+                          : 'Marcar como concluido',
+                      onPressed: note.isClosed ? null : widget.onToggleOwner,
+                      icon: Icon(
+                        note.completedByOwner
+                            ? Icons.check_circle_rounded
+                            : Icons.check_circle_outline_rounded,
+                        color: note.completedByOwner ? _tealColor : _mutedColor,
+                      ),
                     ),
-                  if ((_hovered || widget.selectionMode) &&
-                      note.companyLabel.trim().isNotEmpty)
-                    _FocusBoardMiniChip(
-                      icon: Icons.apartment_rounded,
-                      label: note.companyLabel,
-                      color: _slateColor,
+                    AnimatedOpacity(
+                      opacity: _hovered || widget.selectionMode ? 1 : 0.28,
+                      duration: const Duration(milliseconds: 120),
+                      child: _FocusBoardNoteMenu(
+                        note: note,
+                        onEdit: widget.onEdit,
+                        onTrash: widget.onTrash,
+                        onRestore: widget.onRestore,
+                        onShowAudit: widget.onShowAudit,
+                        onReplicate: widget.onReplicate,
+                        onClose: widget.onClose,
+                      ),
                     ),
-                  if (note.hasAssignments)
-                    _FocusBoardMiniChip(
-                      icon: Icons.eco_outlined,
-                      label:
-                          '${note.completedAssignmentCount}/${note.assignments.length}',
-                      color: _tealColor,
-                    ),
-                  if (note.hasMultipleAssignments &&
-                      note.viewerAssigned(widget.viewerProfile))
-                    _FocusBoardMiniChip(
-                      icon: Icons.assignment_outlined,
-                      label: 'voce junto',
-                      color: _deepTealColor,
-                    ),
-                ],
-              ),
-              if (note.assignments.isNotEmpty &&
-                  (_hovered || widget.selectionMode)) ...[
-                const SizedBox(height: 8),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    for (final assignment in note.assignments)
-                      FilterChip(
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        label: Text(
-                          '${assignment.label} (${assignment.type.label})',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        selected: assignment.completed,
-                        onSelected: note.isClosed || !note.replicasEnabled
-                            ? null
-                            : (_) => widget.onToggleAssignment(assignment),
-                        avatar: Icon(
-                          assignment.completed
-                              ? Icons.check_rounded
-                              : Icons.eco_outlined,
-                          size: 16,
-                        ),
+                    _FocusBoardMiniChip(
+                      icon: Icons.event_outlined,
+                      label: _focusBoardShortDateLabel(note.dueAt),
+                      color: _slateColor,
+                    ),
+                    _FocusBoardMiniChip(
+                      icon: Icons.circle,
+                      label: state.label,
+                      color: state.color,
+                    ),
+                    if (_hovered || widget.selectionMode)
+                      _FocusBoardMiniChip(
+                        icon:
+                            note.visibility == _FocusBoardNoteVisibility.private
+                            ? Icons.lock_outline_rounded
+                            : Icons.visibility_outlined,
+                        label: note.visibility.label,
+                        color: _mutedColor,
+                      ),
+                    if (note.isClosed)
+                      _FocusBoardMiniChip(
+                        icon: Icons.lock_clock_outlined,
+                        label: 'Encerrada',
+                        color: _tealColor,
+                      ),
+                    if ((_hovered || widget.selectionMode) &&
+                        note.companyLabel.trim().isNotEmpty)
+                      _FocusBoardMiniChip(
+                        icon: Icons.apartment_rounded,
+                        label: note.companyLabel,
+                        color: _slateColor,
+                      ),
+                    if (note.hasAssignments)
+                      _FocusBoardMiniChip(
+                        icon: Icons.eco_outlined,
+                        label:
+                            '${note.completedAssignmentCount}/${note.assignments.length}',
+                        color: _tealColor,
+                      ),
+                    if (note.hasMultipleAssignments &&
+                        note.viewerAssigned(widget.viewerProfile))
+                      _FocusBoardMiniChip(
+                        icon: Icons.assignment_outlined,
+                        label: 'voce junto',
+                        color: _deepTealColor,
                       ),
                   ],
                 ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                _noteMetaLabel(note),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: _mutedColor,
-                  height: 1.2,
-                  fontWeight: FontWeight.w700,
+                if (note.assignments.isNotEmpty &&
+                    (_hovered || widget.selectionMode)) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final assignment in note.assignments)
+                        FilterChip(
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          label: Text(
+                            '${assignment.label} (${assignment.type.label})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          selected: assignment.completed,
+                          onSelected: note.isClosed || !note.replicasEnabled
+                              ? null
+                              : (_) => widget.onToggleAssignment(assignment),
+                          avatar: Icon(
+                            assignment.completed
+                                ? Icons.check_rounded
+                                : Icons.eco_outlined,
+                            size: 16,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  _noteMetaLabel(note),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: _mutedColor,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -2894,9 +3063,12 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
   }
 
   Widget _editableTitle(BuildContext context, _FocusBoardNote note) {
+    final textDecoration = note.isComplete ? TextDecoration.lineThrough : null;
     final style = Theme.of(context).textTheme.titleSmall?.copyWith(
       color: _inkColor,
       fontWeight: FontWeight.w900,
+      decoration: textDecoration,
+      decorationThickness: 2,
     );
     if (!_canEditInline(note)) {
       return Text(
@@ -2906,26 +3078,36 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
         style: style,
       );
     }
-    return TextField(
-      controller: _titleController,
-      focusNode: _titleFocusNode,
-      maxLines: 1,
-      textInputAction: TextInputAction.done,
-      onSubmitted: (_) => _commitText(),
-      decoration: const InputDecoration(
-        isDense: true,
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.zero,
+    return Tooltip(
+      message: 'Digite o conteudo do recado aqui.',
+      child: TextField(
+        controller: _titleController,
+        focusNode: _titleFocusNode,
+        maxLines: 1,
+        textInputAction: TextInputAction.done,
+        onChanged: _handleTextChanged,
+        onSubmitted: (_) => _saveEdits(),
+        decoration: InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          hintText: widget.autofocusTitle
+              ? 'Digite o conteudo do recado aqui'
+              : null,
+          contentPadding: EdgeInsets.zero,
+        ),
+        style: style,
       ),
-      style: style,
     );
   }
 
   Widget _editableDescription(BuildContext context, _FocusBoardNote note) {
+    final textDecoration = note.isComplete ? TextDecoration.lineThrough : null;
     final style = Theme.of(context).textTheme.bodySmall?.copyWith(
       color: _inkColor,
       height: 1.25,
       fontWeight: FontWeight.w600,
+      decoration: textDecoration,
+      decorationThickness: 1.8,
     );
     if (!_canEditInline(note)) {
       return Text(
@@ -2935,19 +3117,24 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
         style: style,
       );
     }
-    return TextField(
-      controller: _descriptionController,
-      focusNode: _descriptionFocusNode,
-      minLines: 1,
-      maxLines: 3,
-      textInputAction: TextInputAction.newline,
-      decoration: const InputDecoration(
-        isDense: true,
-        border: InputBorder.none,
-        hintText: 'Adicionar texto',
-        contentPadding: EdgeInsets.zero,
+    return Tooltip(
+      message: 'Digite o conteúdo aqui.',
+      child: TextField(
+        controller: _descriptionController,
+        focusNode: _descriptionFocusNode,
+        minLines: 1,
+        maxLines: 3,
+        textInputAction: TextInputAction.done,
+        onChanged: _handleTextChanged,
+        onSubmitted: (_) => _saveEdits(),
+        decoration: const InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          hintText: 'Adicionar texto',
+          contentPadding: EdgeInsets.zero,
+        ),
+        style: style,
       ),
-      style: style,
     );
   }
 
@@ -2958,13 +3145,82 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile> {
   }
 
   void _commitWhenFocusLeaves() {
-    if (!_titleFocusNode.hasFocus && !_descriptionFocusNode.hasFocus) {
-      _commitText();
+    if (!_titleFocusNode.hasFocus &&
+        !_descriptionFocusNode.hasFocus &&
+        _dirty &&
+        !_savingEdit) {
+      Future<void>.delayed(const Duration(milliseconds: 90), () {
+        if (mounted &&
+            !_titleFocusNode.hasFocus &&
+            !_descriptionFocusNode.hasFocus &&
+            _dirty &&
+            !_savingEdit) {
+          unawaited(_confirmDiscardEdits());
+        }
+      });
     }
   }
 
-  void _commitText() {
+  void _handleTextChanged(String _) {
+    final dirty =
+        _titleController.text != widget.note.title ||
+        _descriptionController.text != widget.note.description;
+    if (dirty != _dirty) {
+      setState(() => _dirty = dirty);
+    }
+  }
+
+  void _saveEdits() {
+    if (!_dirty) {
+      return;
+    }
+    _savingEdit = true;
     widget.onUpdateText(_titleController.text, _descriptionController.text);
+    setState(() => _dirty = false);
+    _titleFocusNode.unfocus();
+    _descriptionFocusNode.unfocus();
+    _savingEdit = false;
+  }
+
+  Future<void> _confirmDiscardEdits() async {
+    if (_discardDialogOpen || !_dirty) {
+      return;
+    }
+    _discardDialogOpen = true;
+    final discard = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.15),
+      builder: (context) => AlertDialog(
+        title: const Text('Descartar edição?'),
+        content: const Text(
+          'Ha alterações não salvas no recado. Sair agora vai descartar as informações não-salvas',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Continuar editando'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+            label: const Text('Descartar'),
+          ),
+        ],
+      ),
+    );
+    _discardDialogOpen = false;
+    if (!mounted || !_dirty) {
+      return;
+    }
+    if (discard == true) {
+      setState(() {
+        _titleController.text = widget.note.title;
+        _descriptionController.text = widget.note.description;
+        _dirty = false;
+      });
+      return;
+    }
+    _titleFocusNode.requestFocus();
   }
 
   String _noteMetaLabel(_FocusBoardNote note) {
@@ -3166,7 +3422,7 @@ class _FocusBoardFixedFooter extends StatelessWidget {
             _FocusBoardFooterHeader(
               icon: Icons.notifications_none_rounded,
               title: 'Calendario Hoje',
-              actionLabel: 'Adicionar',
+              actionLabel: 'Lembrete',
               actionIcon: Icons.add_rounded,
               onAction: onAddCalendarEntry,
             ),
@@ -3194,8 +3450,8 @@ class _FocusBoardFixedFooter extends StatelessWidget {
             const SizedBox(height: 10),
             _FocusBoardFooterHeader(
               icon: Icons.check_circle_outline_rounded,
-              title: 'Tarefas (${notesController.pendingCount})',
-              actionLabel: 'Adicionar',
+              title: 'Recados (${visibleNotes.length})',
+              actionLabel: 'Recado',
               actionIcon: Icons.add_rounded,
               onAction: onAddNote,
             ),
@@ -3208,7 +3464,7 @@ class _FocusBoardFixedFooter extends StatelessWidget {
             else if (taskPreview.isEmpty)
               const _FocusBoardFooterEmpty(
                 icon: Icons.task_alt_rounded,
-                text: 'Sem notas pendentes neste filtro.',
+                text: 'Sem recados neste filtro.',
               )
             else
               for (final note in taskPreview) ...[

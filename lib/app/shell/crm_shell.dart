@@ -2968,6 +2968,18 @@ class _CrmProfileSettingsDialog extends StatefulWidget {
 }
 
 class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
+  static const _calendarOverdueWindowStorageKey =
+      'pariflow.calendar.overdue_window.v1';
+  static const _calendarOverdueWindowOptions = <String>[
+    'Nao mostrar',
+    '12 horas',
+    '24 horas',
+    '3 dias',
+    '7 dias',
+    '15 dias',
+    '30 dias',
+  ];
+
   final _profileApi = ApiClient();
   final _onboardingApi = ApiClient();
   final _calendarApi = ApiClient();
@@ -2991,6 +3003,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
   bool _linkWhatsapp = false;
   final bool _linkEmail = true;
   bool _linkSms = false;
+  String _calendarOverdueWindow = 'Nao mostrar';
   late DateTime _calendarMonth;
   var _calendarEntries = <Map<String, dynamic>>[];
   var _calendarNonBusinessDays = <Map<String, dynamic>>[];
@@ -3015,7 +3028,7 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     final now = DateTime.now();
     _calendarMonth = DateTime(now.year, now.month);
     unawaited(_loadCurrentUserProfile());
-    unawaited(_loadSharedCalendar());
+    unawaited(_loadCalendarPreferencesAndCalendar());
     unawaited(_loadOnboardingRequests());
   }
 
@@ -3646,6 +3659,27 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            _settingsDropdown(
+              label: 'Mostrar compromissos vencidos recentes',
+              value: _calendarOverdueWindow,
+              values: _calendarOverdueWindowOptions,
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() => _calendarOverdueWindow = value);
+                unawaited(_saveCalendarOverdueWindow(value));
+                unawaited(_loadSharedCalendar());
+              },
+            ),
+            Text(
+              'Inclui compromissos vencidos nesse intervalo quando ainda nao estiverem concluidos.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _mutedColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             if (activeFilters.isNotEmpty) ...[
               const SizedBox(height: 10),
               Wrap(
@@ -3754,6 +3788,33 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     );
   }
 
+  Future<void> _loadCalendarPreferencesAndCalendar() async {
+    final preferences = await SharedPreferences.getInstance();
+    final stored = preferences.getString(_calendarOverdueWindowStorageKey);
+    if (stored != null && _calendarOverdueWindowOptions.contains(stored)) {
+      _calendarOverdueWindow = stored;
+    }
+    if (mounted) {
+      setState(() {});
+      await _loadSharedCalendar();
+    }
+  }
+
+  Future<void> _saveCalendarOverdueWindow(String value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_calendarOverdueWindowStorageKey, value);
+  }
+
+  Duration? get _calendarOverdueDuration => switch (_calendarOverdueWindow) {
+    '12 horas' => const Duration(hours: 12),
+    '24 horas' => const Duration(days: 1),
+    '3 dias' => const Duration(days: 3),
+    '7 dias' => const Duration(days: 7),
+    '15 dias' => const Duration(days: 15),
+    '30 dias' => const Duration(days: 30),
+    _ => null,
+  };
+
   Future<void> _loadSharedCalendar() async {
     if (_loadingCalendar) {
       return;
@@ -3761,8 +3822,16 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
 
     final firstDay = DateTime(_calendarMonth.year, _calendarMonth.month);
     final lastDay = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+    final now = DateTime.now();
+    final overdueDuration = _calendarOverdueDuration;
+    final overdueStart = overdueDuration == null
+        ? firstDay
+        : now.subtract(overdueDuration);
+    final queryStart = overdueStart.isBefore(firstDay)
+        ? overdueStart
+        : firstDay;
     final query = <String, String?>{
-      'startsAtFrom': _dateQuery(firstDay),
+      'startsAtFrom': _dateQuery(queryStart),
       'startsAtTo': _dateQuery(lastDay),
       ..._calendarFilters,
     };
@@ -3797,7 +3866,13 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
       }
 
       setState(() {
-        _calendarEntries = _apiMapList(results[0]['items']);
+        _calendarEntries = _filterCalendarEntriesByOverdueWindow(
+          _apiMapList(results[0]['items']),
+          firstDay: firstDay,
+          lastDay: lastDay,
+          now: now,
+          overdueDuration: overdueDuration,
+        );
         _calendarNonBusinessDays = _apiMapList(results[1]['items']);
       });
     } on ApiException catch (error) {
@@ -3812,6 +3887,63 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
         setState(() => _loadingCalendar = false);
       }
     }
+  }
+
+  List<Map<String, dynamic>> _filterCalendarEntriesByOverdueWindow(
+    List<Map<String, dynamic>> entries, {
+    required DateTime firstDay,
+    required DateTime lastDay,
+    required DateTime now,
+    required Duration? overdueDuration,
+  }) {
+    return [
+      for (final entry in entries)
+        if (_calendarEntryBelongsInCurrentView(
+          entry,
+          firstDay: firstDay,
+          lastDay: lastDay,
+          now: now,
+          overdueDuration: overdueDuration,
+        ))
+          entry,
+    ];
+  }
+
+  bool _calendarEntryBelongsInCurrentView(
+    Map<String, dynamic> entry, {
+    required DateTime firstDay,
+    required DateTime lastDay,
+    required DateTime now,
+    required Duration? overdueDuration,
+  }) {
+    final startsAt = _calendarOccurrenceDate(entry);
+    if (startsAt == null) {
+      return true;
+    }
+    final monthEnd = DateTime(
+      lastDay.year,
+      lastDay.month,
+      lastDay.day,
+      23,
+      59,
+      59,
+    );
+    final inDisplayedMonth =
+        !startsAt.isBefore(firstDay) && !startsAt.isAfter(monthEnd);
+    if (inDisplayedMonth) {
+      return true;
+    }
+    if (overdueDuration == null ||
+        !_calendarEntryIsOpen(entry) ||
+        !startsAt.isBefore(now)) {
+      return false;
+    }
+    return now.difference(startsAt) <= overdueDuration;
+  }
+
+  bool _calendarEntryIsOpen(Map<String, dynamic> entry) {
+    final status = _apiText(entry['status']).toUpperCase();
+    return status != 'CANCELED' && status != 'COMPLETED';
   }
 
   Future<void> _openCalendarFilters() async {
