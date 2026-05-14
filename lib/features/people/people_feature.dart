@@ -1634,6 +1634,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       onDiscardDraft: _discardDraft,
       onEditNote: _openEditNoteDialog,
       onTrashNote: _confirmMoveToTrash,
+      onArchiveNote: _confirmMoveToArchive,
       onRestoreNote: _restoreNote,
       onShowAudit: _showAudit,
       onReplicateNote: _replicateNote,
@@ -1780,6 +1781,22 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
               ),
             ),
             IconButton.outlined(
+              tooltip: widget.notesController.activeFilter.showArchive
+                  ? 'Sair das notas arquivadas'
+                  : 'Ver notas arquivadas (${widget.notesController.archiveCount})',
+              onPressed: _toggleArchiveView,
+              icon: Badge.count(
+                count: widget.notesController.archiveCount,
+                isLabelVisible: widget.notesController.archiveCount > 0,
+                child: Icon(
+                  Icons.archive_outlined,
+                  color: widget.notesController.activeFilter.showArchive
+                      ? _tealColor
+                      : null,
+                ),
+              ),
+            ),
+            IconButton.outlined(
               tooltip: 'Filtros e perfis salvos',
               onPressed: _openFilterDialog,
               icon: const _FocusBoardEyeFilterIcon(),
@@ -1853,6 +1870,22 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
               child: Icon(
                 Icons.recycling_rounded,
                 color: widget.notesController.activeFilter.showTrash
+                    ? _tealColor
+                    : null,
+              ),
+            ),
+          ),
+          IconButton.outlined(
+            tooltip: widget.notesController.activeFilter.showArchive
+                ? 'Sair das notas arquivadas'
+                : 'Ver notas arquivadas (${widget.notesController.archiveCount})',
+            onPressed: _toggleArchiveView,
+            icon: Badge.count(
+              count: widget.notesController.archiveCount,
+              isLabelVisible: widget.notesController.archiveCount > 0,
+              child: Icon(
+                Icons.archive_outlined,
+                color: widget.notesController.activeFilter.showArchive
                     ? _tealColor
                     : null,
               ),
@@ -2210,6 +2243,39 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     );
   }
 
+  Future<void> _confirmMoveToArchive(_FocusBoardNote note) async {
+    final warning = _threadPendingWarningFor(note, includeSingle: true);
+    if (warning != null) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Arquivar nota?'),
+          content: Text(
+            'Antes de mover para os arquivados, confirme se deseja continuar: $warning.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Voltar'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(Icons.archive_outlined, size: 18),
+              label: const Text('Arquivar'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) {
+        return;
+      }
+    }
+    await widget.notesController.moveToArchive(
+      id: note.id,
+      viewerProfile: widget.viewerProfile,
+    );
+  }
+
   String? _trashWarningFor(_FocusBoardNote note) {
     final pendingAssignments = note.assignments
         .where((assignment) => !assignment.completed)
@@ -2227,13 +2293,39 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
         'ha replicas pendentes para: ${pendingAssignments.take(4).join(', ')}',
       );
     }
+    final threadWarning = _threadPendingWarningFor(note, includeSingle: false);
+    if (threadWarning != null) {
+      warnings.add(threadWarning);
+    }
     if (warnings.isEmpty) {
       return null;
     }
     return 'Antes de mover para a lixeira, confirme se deseja continuar: ${warnings.join('; ')}.';
   }
 
+  String? _threadPendingWarningFor(
+    _FocusBoardNote note, {
+    required bool includeSingle,
+  }) {
+    final linked = widget.notesController.threadNotes(note.id);
+    final pendingCount = linked.where((entry) => !entry.isComplete).length;
+    if (pendingCount == 0 || (!includeSingle && linked.length <= 1)) {
+      return null;
+    }
+    if (linked.length <= 1) {
+      return 'a nota ainda esta sem check de concluido';
+    }
+    return 'o encadeamento vinculado tem ${linked.length} notas e $pendingCount ainda estao sem check de concluido';
+  }
+
   Future<void> _restoreNote(_FocusBoardNote note) async {
+    if (note.inArchive && !note.inTrash) {
+      await widget.notesController.restoreFromArchive(
+        id: note.id,
+        viewerProfile: widget.viewerProfile,
+      );
+      return;
+    }
     await widget.notesController.restoreFromTrash(
       id: note.id,
       viewerProfile: widget.viewerProfile,
@@ -2241,6 +2333,32 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   Future<void> _closeNote(_FocusBoardNote note) async {
+    final warning = _threadPendingWarningFor(note, includeSingle: false);
+    if (warning != null) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Encerrar encadeamento?'),
+          content: Text(
+            'Esta acao marca a nota e suas respostas como concluidas. $warning. Deseja continuar?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Voltar'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+              label: const Text('Encerrar'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) {
+        return;
+      }
+    }
     await widget.notesController.closeNote(
       id: note.id,
       viewerProfile: widget.viewerProfile,
@@ -2311,6 +2429,20 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
         id: showTrash ? 'trash-view' : 'generic',
         name: showTrash ? 'Lixeira' : 'Perfil generico',
         showTrash: showTrash,
+        showArchive: false,
+      ),
+    );
+  }
+
+  Future<void> _toggleArchiveView() async {
+    final active = widget.notesController.activeFilter;
+    final showArchive = !active.showArchive;
+    await widget.notesController.setActiveFilter(
+      active.copyWith(
+        id: showArchive ? 'archive-view' : 'generic',
+        name: showArchive ? 'Arquivadas' : 'Perfil generico',
+        showTrash: false,
+        showArchive: showArchive,
       ),
     );
   }
@@ -2632,6 +2764,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.onDiscardDraft,
     required this.onEditNote,
     required this.onTrashNote,
+    required this.onArchiveNote,
     required this.onRestoreNote,
     required this.onShowAudit,
     required this.onReplicateNote,
@@ -2660,11 +2793,12 @@ class _FocusBoardNotesStage extends StatelessWidget {
   onUpdateText;
   final Future<void> Function(_FocusBoardNote) onDiscardDraft;
   final ValueChanged<_FocusBoardNote> onEditNote;
-  final ValueChanged<_FocusBoardNote> onTrashNote;
-  final ValueChanged<_FocusBoardNote> onRestoreNote;
+  final Future<void> Function(_FocusBoardNote) onTrashNote;
+  final Future<void> Function(_FocusBoardNote) onArchiveNote;
+  final Future<void> Function(_FocusBoardNote) onRestoreNote;
   final ValueChanged<_FocusBoardNote> onShowAudit;
-  final ValueChanged<_FocusBoardNote> onReplicateNote;
-  final ValueChanged<_FocusBoardNote> onCloseNote;
+  final Future<void> Function(_FocusBoardNote) onReplicateNote;
+  final Future<void> Function(_FocusBoardNote) onCloseNote;
 
   @override
   Widget build(BuildContext context) {
@@ -2719,6 +2853,22 @@ class _FocusBoardNotesStage extends StatelessWidget {
       );
     }
 
+    final notesById = {for (final note in notes) note.id: note};
+    int depthFor(_FocusBoardNote note) {
+      var depth = 0;
+      var current = note;
+      final visited = <String>{note.id};
+      while (current.parentNoteId.isNotEmpty && depth < 2) {
+        final parent = notesById[current.parentNoteId];
+        if (parent == null || !visited.add(parent.id)) {
+          break;
+        }
+        depth += 1;
+        current = parent;
+      }
+      return depth;
+    }
+
     return _FocusBoardPaperCanvas(
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(14, 18, 14, 22),
@@ -2726,40 +2876,84 @@ class _FocusBoardNotesStage extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final note = notes[index];
+          final threadDepth = depthFor(note);
+          final tile = _FocusBoardNoteTile(
+            key: ValueKey(note.id),
+            note: note,
+            viewerProfile: viewerProfile,
+            threadDepth: threadDepth,
+            grandchildMaxLength: threadDepth >= 2 ? 15 : null,
+            autofocusTitle: note.id == autofocusNoteId,
+            attentionPulse: note.id == attentionNoteId ? attentionPulse : 0,
+            selected: selectedNoteIds.contains(note.id),
+            selectionMode: selectedNoteIds.isNotEmpty,
+            onTap: () => onTapNote(note),
+            onLongPress: () => onLongPressNote(note),
+            onToggleOwner: () => onToggleOwner(note),
+            onToggleAssignment: (assignment) =>
+                onToggleAssignment(note, assignment),
+            onUpdateText: (title, description) =>
+                onUpdateText(note, title, description),
+            onDiscardDraft: () => onDiscardDraft(note),
+            onEdit: note.isCreator(viewerProfile) && !note.isClosed
+                ? () => onEditNote(note)
+                : null,
+            onTrash: () => onTrashNote(note),
+            onArchive: !note.inTrash && !note.inArchive
+                ? () => onArchiveNote(note)
+                : null,
+            onRestore: note.inTrash || note.inArchive
+                ? () => onRestoreNote(note)
+                : null,
+            onShowAudit: () => onShowAudit(note),
+            onReplicate:
+                note.replicasEnabled && !note.isClosed && threadDepth < 2
+                ? () => onReplicateNote(note)
+                : null,
+            onClose: note.isCreator(viewerProfile) && !note.isClosed
+                ? () => onCloseNote(note)
+                : null,
+          );
+          final swipeable =
+              !note.inTrash && !note.inArchive && selectedNoteIds.isEmpty;
+          final child = swipeable
+              ? Dismissible(
+                  key: ValueKey('swipe-${note.id}'),
+                  direction: DismissDirection.horizontal,
+                  confirmDismiss: (direction) async {
+                    if (direction == DismissDirection.startToEnd) {
+                      await onTrashNote(note);
+                    } else if (direction == DismissDirection.endToStart) {
+                      await onArchiveNote(note);
+                    }
+                    return false;
+                  },
+                  background: const _FocusBoardSwipeBackground(
+                    icon: Icons.recycling_rounded,
+                    label: 'Lixeira',
+                    alignment: Alignment.centerLeft,
+                    color: Color(0xFFD81F2A),
+                  ),
+                  secondaryBackground: const _FocusBoardSwipeBackground(
+                    icon: Icons.archive_outlined,
+                    label: 'Arquivar',
+                    alignment: Alignment.centerRight,
+                    color: _deepTealColor,
+                  ),
+                  child: tile,
+                )
+              : tile;
           return Align(
-            alignment: note.isManualReplica
-                ? Alignment.centerRight
-                : Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: note.isManualReplica ? 0.82 : 0.94,
-              child: _FocusBoardNoteTile(
-                key: ValueKey(note.id),
-                note: note,
-                viewerProfile: viewerProfile,
-                autofocusTitle: note.id == autofocusNoteId,
-                attentionPulse: note.id == attentionNoteId ? attentionPulse : 0,
-                selected: selectedNoteIds.contains(note.id),
-                selectionMode: selectedNoteIds.isNotEmpty,
-                onTap: () => onTapNote(note),
-                onLongPress: () => onLongPressNote(note),
-                onToggleOwner: () => onToggleOwner(note),
-                onToggleAssignment: (assignment) =>
-                    onToggleAssignment(note, assignment),
-                onUpdateText: (title, description) =>
-                    onUpdateText(note, title, description),
-                onDiscardDraft: () => onDiscardDraft(note),
-                onEdit: note.isCreator(viewerProfile) && !note.isClosed
-                    ? () => onEditNote(note)
-                    : null,
-                onTrash: () => onTrashNote(note),
-                onRestore: note.inTrash ? () => onRestoreNote(note) : null,
-                onShowAudit: () => onShowAudit(note),
-                onReplicate: note.replicasEnabled && !note.isClosed
-                    ? () => onReplicateNote(note)
-                    : null,
-                onClose: note.isCreator(viewerProfile) && !note.isClosed
-                    ? () => onCloseNote(note)
-                    : null,
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: EdgeInsets.only(left: threadDepth * 16.0),
+              child: FractionallySizedBox(
+                widthFactor: switch (threadDepth) {
+                  0 => 0.96,
+                  1 => 0.88,
+                  _ => 0.80,
+                },
+                child: child,
               ),
             ),
           );
@@ -2848,11 +3042,59 @@ class _FocusBoardCardsHiddenState extends StatelessWidget {
   }
 }
 
+class _FocusBoardSwipeBackground extends StatelessWidget {
+  const _FocusBoardSwipeBackground({
+    required this.icon,
+    required this.label,
+    required this.alignment,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Alignment alignment;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final alignLeft = alignment == Alignment.centerLeft;
+    return Container(
+      alignment: alignment,
+      padding: EdgeInsets.only(
+        left: alignLeft ? 18 : 0,
+        right: alignLeft ? 0 : 18,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (alignLeft) Icon(icon, color: color),
+          if (alignLeft) const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (!alignLeft) const SizedBox(width: 6),
+          if (!alignLeft) Icon(icon, color: color),
+        ],
+      ),
+    );
+  }
+}
+
 class _FocusBoardNoteTile extends StatefulWidget {
   const _FocusBoardNoteTile({
     super.key,
     required this.note,
     required this.viewerProfile,
+    required this.threadDepth,
+    required this.grandchildMaxLength,
     required this.autofocusTitle,
     required this.attentionPulse,
     required this.selected,
@@ -2866,6 +3108,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
     required this.onTrash,
     required this.onShowAudit,
     this.onEdit,
+    this.onArchive,
     this.onRestore,
     this.onReplicate,
     this.onClose,
@@ -2873,6 +3116,8 @@ class _FocusBoardNoteTile extends StatefulWidget {
 
   final _FocusBoardNote note;
   final _ViewerAccessProfile viewerProfile;
+  final int threadDepth;
+  final int? grandchildMaxLength;
   final bool autofocusTitle;
   final int attentionPulse;
   final bool selected;
@@ -2888,11 +3133,12 @@ class _FocusBoardNoteTile extends StatefulWidget {
   onUpdateText;
   final Future<void> Function() onDiscardDraft;
   final VoidCallback? onEdit;
-  final VoidCallback onTrash;
-  final VoidCallback? onRestore;
+  final Future<void> Function() onTrash;
+  final Future<void> Function()? onArchive;
+  final Future<void> Function()? onRestore;
   final VoidCallback onShowAudit;
-  final VoidCallback? onReplicate;
-  final VoidCallback? onClose;
+  final Future<void> Function()? onReplicate;
+  final Future<void> Function()? onClose;
 
   @override
   State<_FocusBoardNoteTile> createState() => _FocusBoardNoteTileState();
@@ -3003,6 +3249,16 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
     final baseColor = widget.selected
         ? _deepTealColor.withValues(alpha: 0.08)
         : Colors.white;
+    final checkButtonSize = switch (widget.threadDepth) {
+      0 => 40.0,
+      1 => 34.0,
+      _ => 30.0,
+    };
+    final checkIconSize = switch (widget.threadDepth) {
+      0 => 24.0,
+      1 => 20.0,
+      _ => 17.0,
+    };
     return Transform.translate(
       offset: Offset(attentionPan, 0),
       child: MouseRegion(
@@ -3077,16 +3333,26 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
                             : () => unawaited(_saveEdits()),
                         icon: const Icon(Icons.check_rounded),
                       ),
-                    IconButton(
-                      tooltip: note.completedByOwner
-                          ? 'Marcar como pendente'
-                          : 'Marcar como concluido',
-                      onPressed: note.isClosed ? null : widget.onToggleOwner,
-                      icon: Icon(
-                        note.completedByOwner
-                            ? Icons.check_circle_rounded
-                            : Icons.check_circle_outline_rounded,
-                        color: note.completedByOwner ? _tealColor : _mutedColor,
+                    SizedBox.square(
+                      dimension: checkButtonSize,
+                      child: IconButton(
+                        tooltip: note.completedByOwner
+                            ? 'Marcar como pendente'
+                            : 'Marcar como concluido',
+                        onPressed: note.isClosed ? null : widget.onToggleOwner,
+                        iconSize: checkIconSize,
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints.tight(
+                          Size.square(checkButtonSize),
+                        ),
+                        icon: Icon(
+                          note.completedByOwner
+                              ? Icons.check_circle_rounded
+                              : Icons.check_circle_outline_rounded,
+                          color: note.completedByOwner
+                              ? _tealColor
+                              : _mutedColor,
+                        ),
                       ),
                     ),
                     AnimatedOpacity(
@@ -3095,11 +3361,20 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
                       child: _FocusBoardNoteMenu(
                         note: note,
                         onEdit: widget.onEdit,
-                        onTrash: widget.onTrash,
-                        onRestore: widget.onRestore,
+                        onTrash: () => unawaited(widget.onTrash()),
+                        onArchive: widget.onArchive == null
+                            ? null
+                            : () => unawaited(widget.onArchive!()),
+                        onRestore: widget.onRestore == null
+                            ? null
+                            : () => unawaited(widget.onRestore!()),
                         onShowAudit: widget.onShowAudit,
-                        onReplicate: widget.onReplicate,
-                        onClose: widget.onClose,
+                        onReplicate: widget.onReplicate == null
+                            ? null
+                            : () => unawaited(widget.onReplicate!()),
+                        onClose: widget.onClose == null
+                            ? null
+                            : () => unawaited(widget.onClose!()),
                       ),
                     ),
                   ],
@@ -3229,6 +3504,10 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
         controller: _titleController,
         focusNode: _titleFocusNode,
         maxLines: 1,
+        maxLength: widget.grandchildMaxLength,
+        buildCounter: widget.grandchildMaxLength == null
+            ? null
+            : _hideTextFieldCounter,
         textInputAction: TextInputAction.done,
         onChanged: _handleTextChanged,
         onSubmitted: (_) => unawaited(_saveEdits()),
@@ -3269,6 +3548,10 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
         focusNode: _descriptionFocusNode,
         minLines: 1,
         maxLines: 3,
+        maxLength: widget.grandchildMaxLength,
+        buildCounter: widget.grandchildMaxLength == null
+            ? null
+            : _hideTextFieldCounter,
         textInputAction: TextInputAction.done,
         onChanged: _handleTextChanged,
         onSubmitted: (_) => unawaited(_saveEdits()),
@@ -3287,6 +3570,15 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
     return !widget.selectionMode &&
         note.isCreator(widget.viewerProfile) &&
         !note.isClosed;
+  }
+
+  Widget? _hideTextFieldCounter(
+    BuildContext context, {
+    required int currentLength,
+    required bool isFocused,
+    required int? maxLength,
+  }) {
+    return null;
   }
 
   void _commitWhenFocusLeaves() {
@@ -3342,8 +3634,8 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
     setState(() => _savingEdit = true);
     try {
       await widget.onUpdateText(
-        _titleController.text,
-        _descriptionController.text,
+        _boundedText(_titleController.text),
+        _boundedText(_descriptionController.text),
       );
       if (!mounted) {
         return;
@@ -3377,6 +3669,14 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
     }
   }
 
+  String _boundedText(String value) {
+    final maxLength = widget.grandchildMaxLength;
+    if (maxLength == null || value.length <= maxLength) {
+      return value;
+    }
+    return value.substring(0, maxLength);
+  }
+
   String _noteMetaLabel(_FocusBoardNote note) {
     final created =
         '${note.createdByName} criou em ${_focusBoardShortDateTimeLabel(note.createdAt)}';
@@ -3396,6 +3696,7 @@ class _FocusBoardNoteMenu extends StatelessWidget {
     required this.onTrash,
     required this.onShowAudit,
     this.onEdit,
+    this.onArchive,
     this.onRestore,
     this.onReplicate,
     this.onClose,
@@ -3404,6 +3705,7 @@ class _FocusBoardNoteMenu extends StatelessWidget {
   final _FocusBoardNote note;
   final VoidCallback? onEdit;
   final VoidCallback onTrash;
+  final VoidCallback? onArchive;
   final VoidCallback? onRestore;
   final VoidCallback onShowAudit;
   final VoidCallback? onReplicate;
@@ -3420,6 +3722,8 @@ class _FocusBoardNoteMenu extends StatelessWidget {
             onEdit?.call();
           case 'trash':
             onTrash();
+          case 'archive':
+            onArchive?.call();
           case 'restore':
             onRestore?.call();
           case 'audit':
@@ -3437,8 +3741,13 @@ class _FocusBoardNoteMenu extends StatelessWidget {
           const PopupMenuItem(value: 'replicate', child: Text('Replicar nota')),
         if (onClose != null)
           const PopupMenuItem(value: 'close', child: Text('Encerrar')),
+        if (onArchive != null)
+          const PopupMenuItem(value: 'archive', child: Text('Arquivar')),
         if (onRestore != null)
-          const PopupMenuItem(value: 'restore', child: Text('Restaurar'))
+          PopupMenuItem(
+            value: 'restore',
+            child: Text(note.inArchive ? 'Desarquivar' : 'Restaurar'),
+          )
         else
           const PopupMenuItem(
             value: 'trash',
@@ -3525,8 +3834,17 @@ class _FocusBoardFixedFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final today = _focusBoardDateKey(DateTime.now());
+    final calendarPreview = calendarEntries
+        .where(
+          (entry) =>
+              !entry.isFocusBoardTask &&
+              _focusBoardDateKey(entry.startsAt) == today,
+        )
+        .take(2)
+        .toList(growable: false);
     final taskEntries = calendarEntries
-        .where((entry) => entry.kind.toUpperCase() != 'NOTICE')
+        .where((entry) => entry.isFocusBoardTask)
         .toList(growable: false);
     final taskPreview = taskEntries.take(3).toList(growable: false);
 
@@ -3541,6 +3859,11 @@ class _FocusBoardFixedFooter extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _FocusBoardCalendarFooterSection(
+              entries: calendarPreview,
+              onCancelCalendarEntry: onCancelCalendarEntry,
+            ),
+            const SizedBox(height: 8),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -3688,6 +4011,70 @@ class _FocusBoardTaskActionButton extends StatelessWidget {
   }
 }
 
+class _FocusBoardCalendarFooterSection extends StatelessWidget {
+  const _FocusBoardCalendarFooterSection({
+    required this.entries,
+    required this.onCancelCalendarEntry,
+  });
+
+  final List<_CalendarEntryRecord> entries;
+  final ValueChanged<_CalendarEntryRecord> onCancelCalendarEntry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.event_available_outlined,
+                color: _deepTealColor,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'COMPROMISSOS DO CALENDARIO',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _deepTealColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (entries.isEmpty)
+            const _FocusBoardFooterEmpty(
+              icon: Icons.event_available_outlined,
+              text: 'Sem compromissos de calendario para hoje.',
+            )
+          else
+            for (final entry in entries) ...[
+              _FocusBoardCalendarFooterRow(
+                entry: entry,
+                onCancel: entry.canCancel
+                    ? () => onCancelCalendarEntry(entry)
+                    : null,
+              ),
+              if (entry != entries.last) const SizedBox(height: 6),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
 class _FocusBoardBulkBar extends StatelessWidget {
   const _FocusBoardBulkBar({
     required this.selectedCount,
@@ -3735,6 +4122,66 @@ class _FocusBoardBulkBar extends StatelessWidget {
             tooltip: 'Limpar selecao',
             onPressed: onClear,
             icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FocusBoardCalendarFooterRow extends StatelessWidget {
+  const _FocusBoardCalendarFooterRow({required this.entry, this.onCancel});
+
+  final _CalendarEntryRecord entry;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (entry.priority.toUpperCase()) {
+      'CRITICAL' => const Color(0xFFD81F2A),
+      'HIGH' => const Color(0xFFE9A100),
+      _ => _tealColor,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.calendar_month_outlined, color: color, size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  '${entry.startsAtLabel} | ${entry.kindLabel}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: _mutedColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Acoes do compromisso',
+            onPressed: onCancel,
+            icon: const Icon(Icons.more_vert_rounded),
           ),
         ],
       ),
@@ -4421,6 +4868,7 @@ class _FocusBoardFilterDialogState extends State<_FocusBoardFilterDialog> {
   late final TextEditingController _assignments;
   late final TextEditingController _companies;
   late bool _showTrash;
+  late bool _showArchive;
   String _profileId = 'generic';
 
   @override
@@ -4439,6 +4887,7 @@ class _FocusBoardFilterDialogState extends State<_FocusBoardFilterDialog> {
       text: profile.excludedCompanyLabels.join(', '),
     );
     _showTrash = profile.showTrash;
+    _showArchive = profile.showArchive;
   }
 
   @override
@@ -4492,8 +4941,24 @@ class _FocusBoardFilterDialogState extends State<_FocusBoardFilterDialog> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _showTrash,
-                onChanged: (value) => setState(() => _showTrash = value),
+                onChanged: (value) => setState(() {
+                  _showTrash = value;
+                  if (value) {
+                    _showArchive = false;
+                  }
+                }),
                 title: const Text('Visualizar lixeira'),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _showArchive,
+                onChanged: (value) => setState(() {
+                  _showArchive = value;
+                  if (value) {
+                    _showTrash = false;
+                  }
+                }),
+                title: const Text('Visualizar arquivadas'),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -4568,6 +5033,7 @@ class _FocusBoardFilterDialogState extends State<_FocusBoardFilterDialog> {
     _assignments.text = profile.excludedAssignmentLabels.join(', ');
     _companies.text = profile.excludedCompanyLabels.join(', ');
     _showTrash = profile.showTrash;
+    _showArchive = profile.showArchive;
   }
 
   _FocusBoardFilterProfile _profileFromFields({bool saveAsNew = false}) {
@@ -4580,6 +5046,7 @@ class _FocusBoardFilterDialogState extends State<_FocusBoardFilterDialog> {
       excludedAssignmentLabels: _splitFilterText(_assignments.text),
       excludedCompanyLabels: _splitFilterText(_companies.text),
       showTrash: _showTrash,
+      showArchive: _showArchive,
     );
   }
 
@@ -7111,6 +7578,8 @@ class _CalendarEntryRecord {
   final String notificationChannelsLabel;
   final bool canEdit;
   final bool canCancel;
+
+  bool get isFocusBoardTask => category.toUpperCase().startsWith('TASK_');
 
   _FocusBoardTaskMode get taskMode {
     final normalized = category.toUpperCase();

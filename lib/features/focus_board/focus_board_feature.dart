@@ -259,6 +259,21 @@ DateTime? _focusBoardDateFromJson(Object? value) {
   return DateTime.tryParse(value)?.toLocal();
 }
 
+String _focusBoardParentNoteIdFromAudit(
+  List<_FocusBoardAuditEntry> auditEntries,
+) {
+  for (final entry in auditEntries) {
+    final match = RegExp(
+      r'nota\s+(fbn-\d+)',
+      caseSensitive: false,
+    ).firstMatch(entry.details);
+    if (match != null) {
+      return match.group(1) ?? '';
+    }
+  }
+  return '';
+}
+
 String _focusBoardText(Object? value, {String fallback = ''}) {
   final text = value?.toString().trim() ?? '';
   return text.isEmpty ? fallback : text;
@@ -436,6 +451,8 @@ class _FocusBoardNote {
     required this.createdAt,
     required this.createdById,
     required this.createdByName,
+    this.parentNoteId = '',
+    this.rootNoteId = '',
     this.updatedAt,
     this.lastEditedAt,
     this.companyLabel = '',
@@ -450,6 +467,8 @@ class _FocusBoardNote {
     this.completedAt,
     this.inTrash = false,
     this.trashedAt,
+    this.inArchive = false,
+    this.archivedAt,
     this.restoredFromAutoTrash = false,
     this.isDraft = false,
     this.audit = const [],
@@ -463,6 +482,8 @@ class _FocusBoardNote {
   final DateTime createdAt;
   final String createdById;
   final String createdByName;
+  final String parentNoteId;
+  final String rootNoteId;
   final DateTime? updatedAt;
   final DateTime? lastEditedAt;
   final String companyLabel;
@@ -477,6 +498,8 @@ class _FocusBoardNote {
   final DateTime? completedAt;
   final bool inTrash;
   final DateTime? trashedAt;
+  final bool inArchive;
+  final DateTime? archivedAt;
   final bool restoredFromAutoTrash;
   final bool isDraft;
   final List<_FocusBoardAuditEntry> audit;
@@ -517,7 +540,8 @@ class _FocusBoardNote {
   bool get hasMultipleAssignments => assignments.length > 1;
 
   bool get isManualReplica {
-    return audit.any((entry) => entry.action == 'replica gerada');
+    return parentNoteId.isNotEmpty ||
+        audit.any((entry) => entry.action == 'replica gerada');
   }
 
   int get completedAssignmentCount {
@@ -566,6 +590,8 @@ class _FocusBoardNote {
     DateTime? createdAt,
     String? createdById,
     String? createdByName,
+    String? parentNoteId,
+    String? rootNoteId,
     DateTime? updatedAt,
     bool clearUpdatedAt = false,
     DateTime? lastEditedAt,
@@ -585,6 +611,9 @@ class _FocusBoardNote {
     bool? inTrash,
     DateTime? trashedAt,
     bool clearTrashedAt = false,
+    bool? inArchive,
+    DateTime? archivedAt,
+    bool clearArchivedAt = false,
     bool? restoredFromAutoTrash,
     bool? isDraft,
     List<_FocusBoardAuditEntry>? audit,
@@ -598,6 +627,8 @@ class _FocusBoardNote {
       createdAt: createdAt ?? this.createdAt,
       createdById: createdById ?? this.createdById,
       createdByName: createdByName ?? this.createdByName,
+      parentNoteId: parentNoteId ?? this.parentNoteId,
+      rootNoteId: rootNoteId ?? this.rootNoteId,
       updatedAt: clearUpdatedAt ? null : updatedAt ?? this.updatedAt,
       lastEditedAt: clearLastEditedAt
           ? null
@@ -614,6 +645,8 @@ class _FocusBoardNote {
       completedAt: clearCompletedAt ? null : completedAt ?? this.completedAt,
       inTrash: inTrash ?? this.inTrash,
       trashedAt: clearTrashedAt ? null : trashedAt ?? this.trashedAt,
+      inArchive: inArchive ?? this.inArchive,
+      archivedAt: clearArchivedAt ? null : archivedAt ?? this.archivedAt,
       restoredFromAutoTrash:
           restoredFromAutoTrash ?? this.restoredFromAutoTrash,
       isDraft: isDraft ?? this.isDraft,
@@ -631,6 +664,8 @@ class _FocusBoardNote {
       'createdAt': createdAt.toIso8601String(),
       'createdById': createdById,
       'createdByName': createdByName,
+      'parentNoteId': parentNoteId,
+      'rootNoteId': rootNoteId,
       'updatedAt': updatedAt?.toIso8601String(),
       'lastEditedAt': lastEditedAt?.toIso8601String(),
       'companyLabel': companyLabel,
@@ -647,6 +682,8 @@ class _FocusBoardNote {
       'completedAt': completedAt?.toIso8601String(),
       'inTrash': inTrash,
       'trashedAt': trashedAt?.toIso8601String(),
+      'inArchive': inArchive,
+      'archivedAt': archivedAt?.toIso8601String(),
       'restoredFromAutoTrash': restoredFromAutoTrash,
       'isDraft': isDraft,
       'audit': audit.map((entry) => entry.toJson()).toList(),
@@ -656,6 +693,19 @@ class _FocusBoardNote {
   static _FocusBoardNote fromJson(Map<String, dynamic> json) {
     final assignmentsRaw = json['assignments'];
     final auditRaw = json['audit'];
+    final auditEntries = auditRaw is List
+        ? [
+            for (final entry in auditRaw)
+              if (entry is Map)
+                _FocusBoardAuditEntry.fromJson(
+                  Map<String, dynamic>.from(entry),
+                ),
+          ]
+        : const <_FocusBoardAuditEntry>[];
+    final parentNoteId = _focusBoardText(
+      json['parentNoteId'],
+      fallback: _focusBoardParentNoteIdFromAudit(auditEntries),
+    );
     return _FocusBoardNote(
       id: _focusBoardText(json['id']),
       title: _focusBoardText(json['title'], fallback: 'Nota'),
@@ -670,6 +720,8 @@ class _FocusBoardNote {
         json['createdByName'],
         fallback: 'Sistema',
       ),
+      parentNoteId: parentNoteId,
+      rootNoteId: _focusBoardText(json['rootNoteId'], fallback: parentNoteId),
       updatedAt: _focusBoardDateFromJson(json['updatedAt']),
       lastEditedAt: _focusBoardDateFromJson(json['lastEditedAt']),
       companyLabel: _focusBoardText(json['companyLabel']),
@@ -696,17 +748,11 @@ class _FocusBoardNote {
       completedAt: _focusBoardDateFromJson(json['completedAt']),
       inTrash: json['inTrash'] == true,
       trashedAt: _focusBoardDateFromJson(json['trashedAt']),
+      inArchive: json['inArchive'] == true,
+      archivedAt: _focusBoardDateFromJson(json['archivedAt']),
       restoredFromAutoTrash: json['restoredFromAutoTrash'] == true,
       isDraft: json['isDraft'] == true,
-      audit: auditRaw is List
-          ? [
-              for (final entry in auditRaw)
-                if (entry is Map)
-                  _FocusBoardAuditEntry.fromJson(
-                    Map<String, dynamic>.from(entry),
-                  ),
-            ]
-          : const [],
+      audit: auditEntries,
     );
   }
 }
@@ -719,6 +765,7 @@ class _FocusBoardFilterProfile {
     this.excludedAssignmentLabels = const [],
     this.excludedCompanyLabels = const [],
     this.showTrash = false,
+    this.showArchive = false,
   });
 
   final String id;
@@ -727,6 +774,7 @@ class _FocusBoardFilterProfile {
   final List<String> excludedAssignmentLabels;
   final List<String> excludedCompanyLabels;
   final bool showTrash;
+  final bool showArchive;
 
   static const generic = _FocusBoardFilterProfile(
     id: 'generic',
@@ -734,10 +782,15 @@ class _FocusBoardFilterProfile {
   );
 
   bool excludes(_FocusBoardNote note) {
-    if (!showTrash && note.inTrash) {
-      return true;
-    }
-    if (showTrash && !note.inTrash) {
+    if (showTrash) {
+      if (!note.inTrash) {
+        return true;
+      }
+    } else if (showArchive) {
+      if (!note.inArchive || note.inTrash) {
+        return true;
+      }
+    } else if (note.inTrash || note.inArchive) {
       return true;
     }
     if (excludedCreatorIds.contains(note.createdById)) {
@@ -766,6 +819,7 @@ class _FocusBoardFilterProfile {
     List<String>? excludedAssignmentLabels,
     List<String>? excludedCompanyLabels,
     bool? showTrash,
+    bool? showArchive,
   }) {
     return _FocusBoardFilterProfile(
       id: id ?? this.id,
@@ -776,6 +830,7 @@ class _FocusBoardFilterProfile {
       excludedCompanyLabels:
           excludedCompanyLabels ?? this.excludedCompanyLabels,
       showTrash: showTrash ?? this.showTrash,
+      showArchive: showArchive ?? this.showArchive,
     );
   }
 
@@ -787,6 +842,7 @@ class _FocusBoardFilterProfile {
       'excludedAssignmentLabels': excludedAssignmentLabels,
       'excludedCompanyLabels': excludedCompanyLabels,
       'showTrash': showTrash,
+      'showArchive': showArchive,
     };
   }
 
@@ -802,6 +858,7 @@ class _FocusBoardFilterProfile {
         json['excludedCompanyLabels'],
       ),
       showTrash: json['showTrash'] == true,
+      showArchive: json['showArchive'] == true,
     );
   }
 }
@@ -870,15 +927,58 @@ class _FocusBoardNotesController extends ChangeNotifier {
   }
 
   List<_FocusBoardNote> visibleNotes(_ViewerAccessProfile viewerProfile) {
-    final filtered = [
+    final visibleContainer = [
       for (final note in _notes)
         if (note.canViewerRead(viewerProfile) &&
-            !_activeFilter.excludes(note) &&
-            _matchesStatusFilter(note))
+            (_activeFilter.showTrash
+                ? note.inTrash
+                : _activeFilter.showArchive
+                ? note.inArchive && !note.inTrash
+                : !note.inTrash && !note.inArchive))
           note,
     ];
-    filtered.sort(_compareNotes);
-    return filtered;
+    final filtered = [
+      for (final note in visibleContainer)
+        if (!_activeFilter.excludes(note) && _matchesStatusFilter(note)) note,
+    ];
+    final includedIds = <String>{};
+    final byId = {for (final note in visibleContainer) note.id: note};
+    final childrenByParent = <String, List<_FocusBoardNote>>{};
+    for (final note in visibleContainer) {
+      if (note.parentNoteId.isEmpty) {
+        continue;
+      }
+      childrenByParent.putIfAbsent(note.parentNoteId, () => []).add(note);
+    }
+    for (final note in filtered) {
+      includedIds.add(note.id);
+      var parentId = note.parentNoteId;
+      final visited = <String>{note.id};
+      while (parentId.isNotEmpty && !visited.contains(parentId)) {
+        visited.add(parentId);
+        final parent = byId[parentId];
+        if (parent == null) {
+          break;
+        }
+        includedIds.add(parent.id);
+        parentId = parent.parentNoteId;
+      }
+      void includeChildren(String parentId) {
+        final children = childrenByParent[parentId] ?? const [];
+        for (final child in children) {
+          if (!includedIds.add(child.id)) {
+            continue;
+          }
+          includeChildren(child.id);
+        }
+      }
+
+      includeChildren(note.id);
+    }
+    return _threadOrderedNotes([
+      for (final note in visibleContainer)
+        if (includedIds.contains(note.id)) note,
+    ]);
   }
 
   int get urgentCount {
@@ -886,6 +986,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
         .where(
           (note) =>
               !note.inTrash &&
+              !note.inArchive &&
               note.priority == _FocusBoardNotePriority.urgent &&
               !note.isComplete,
         )
@@ -897,6 +998,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
         .where(
           (note) =>
               !note.inTrash &&
+              !note.inArchive &&
               note.priority == _FocusBoardNotePriority.important &&
               !note.isComplete,
         )
@@ -908,6 +1010,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
         .where(
           (note) =>
               !note.inTrash &&
+              !note.inArchive &&
               note.priority == _FocusBoardNotePriority.normal &&
               !note.isComplete,
         )
@@ -915,15 +1018,23 @@ class _FocusBoardNotesController extends ChangeNotifier {
   }
 
   int get pendingCount {
-    return _notes.where((note) => !note.inTrash && !note.isComplete).length;
+    return _notes
+        .where((note) => !note.inTrash && !note.inArchive && !note.isComplete)
+        .length;
   }
 
   int get completedCount {
-    return _notes.where((note) => !note.inTrash && note.isComplete).length;
+    return _notes
+        .where((note) => !note.inTrash && !note.inArchive && note.isComplete)
+        .length;
   }
 
   int get trashCount {
     return _notes.where((note) => note.inTrash).length;
+  }
+
+  int get archiveCount {
+    return _notes.where((note) => note.inArchive && !note.inTrash).length;
   }
 
   Future<void> addNote({
@@ -1057,9 +1168,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
       );
     }
     final actorId = _focusBoardActorId(viewerProfile);
+    final nextTitle = _limitGrandchildText(
+      current.id,
+      draft.title.trim().isEmpty ? 'Nota' : draft.title.trim(),
+    );
+    final nextDescription = _limitGrandchildText(
+      current.id,
+      draft.description.trim(),
+    );
     _notes[index] = current.copyWith(
-      title: draft.title.trim().isEmpty ? 'Nota' : draft.title.trim(),
-      description: draft.description.trim(),
+      title: nextTitle,
+      description: nextDescription,
       priority: draft.priority,
       dueAt: draft.dueAt,
       companyLabel: draft.companyLabel.trim(),
@@ -1102,12 +1221,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
     if (!current.isCreator(viewerProfile) || current.isClosed) {
       return _FocusBoardTextCommitResult.none;
     }
-    final nextTitle = current.isDraft
+    final rawNextTitle = current.isDraft
         ? _focusBoardTitleForSavedDraft(title, description)
         : title.trim().isEmpty
         ? 'Nova nota'
         : title.trim();
-    final nextDescription = description.trim();
+    final rawNextDescription = description.trim();
+    final nextTitle = _limitGrandchildText(current.id, rawNextTitle);
+    final nextDescription = _limitGrandchildText(
+      current.id,
+      rawNextDescription,
+    );
     if (current.title == nextTitle && current.description == nextDescription) {
       if (!current.isDraft) {
         return _FocusBoardTextCommitResult.none;
@@ -1159,6 +1283,13 @@ class _FocusBoardNotesController extends ChangeNotifier {
     notifyListeners();
     await _persistNotes();
     return _FocusBoardTextCommitResult.textUpdated;
+  }
+
+  String _limitGrandchildText(String noteId, String value) {
+    if (threadDepthFor(noteId) < 2 || value.length <= 15) {
+      return value;
+    }
+    return value.substring(0, 15);
   }
 
   Future<_FocusBoardNote?> discardDraft({
@@ -1327,29 +1458,75 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final index = _notes.indexWhere((note) => note.id == id);
-    if (index < 0) {
+    final linked = threadNotes(id);
+    if (linked.isEmpty) {
       return;
     }
-    final current = _notes[index];
     final now = DateTime.now();
-    _notes[index] = current.copyWith(
-      inTrash: true,
-      trashedAt: now,
-      updatedAt: now,
-      audit: [
-        ...current.audit,
-        _FocusBoardAuditEntry(
-          at: now,
-          actorId: _focusBoardActorId(viewerProfile),
-          actorName: viewerProfile.name,
-          action: 'movido para lixeira',
-          details: current.isComplete
-              ? 'Nota completa movida para lixeira.'
-              : 'Nota incompleta movida para lixeira com confirmacao.',
-        ),
-      ],
-    );
+    final actorId = _focusBoardActorId(viewerProfile);
+    for (final current in linked) {
+      final index = _notes.indexWhere((note) => note.id == current.id);
+      if (index < 0) {
+        continue;
+      }
+      _notes[index] = current.copyWith(
+        inTrash: true,
+        trashedAt: now,
+        inArchive: false,
+        clearArchivedAt: true,
+        updatedAt: now,
+        audit: [
+          ...current.audit,
+          _FocusBoardAuditEntry(
+            at: now,
+            actorId: actorId,
+            actorName: viewerProfile.name,
+            action: 'movido para lixeira',
+            details: current.isComplete
+                ? 'Nota completa movida para lixeira.'
+                : 'Nota incompleta movida para lixeira com confirmacao.',
+          ),
+        ],
+      );
+    }
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> moveToArchive({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final linked = threadNotes(id);
+    if (linked.isEmpty) {
+      return;
+    }
+    final now = DateTime.now();
+    final actorId = _focusBoardActorId(viewerProfile);
+    for (final current in linked) {
+      final index = _notes.indexWhere((note) => note.id == current.id);
+      if (index < 0) {
+        continue;
+      }
+      _notes[index] = current.copyWith(
+        inArchive: true,
+        archivedAt: now,
+        inTrash: false,
+        clearTrashedAt: true,
+        updatedAt: now,
+        audit: [
+          ...current.audit,
+          _FocusBoardAuditEntry(
+            at: now,
+            actorId: actorId,
+            actorName: viewerProfile.name,
+            action: 'arquivado',
+            details: 'Nota arquivada junto ao encadeamento vinculado.',
+          ),
+        ],
+      );
+    }
     notifyListeners();
     await _persistNotes();
   }
@@ -1359,32 +1536,38 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final index = _notes.indexWhere((note) => note.id == id);
-    if (index < 0) {
+    final current = _notes.where((note) => note.id == id).firstOrNull;
+    if (current == null) {
       return;
     }
-    final current = _notes[index];
     if (!current.isCreator(viewerProfile) || current.isClosed) {
       return;
     }
     final now = DateTime.now();
-    _notes[index] = current.copyWith(
-      closedAt: now,
-      closedById: _focusBoardActorId(viewerProfile),
-      closedByName: viewerProfile.name,
-      completedAt: now,
-      updatedAt: now,
-      audit: [
-        ...current.audit,
-        _FocusBoardAuditEntry(
-          at: now,
-          actorId: _focusBoardActorId(viewerProfile),
-          actorName: viewerProfile.name,
-          action: 'encerrado',
-          details: 'Criador encerrou a nota e bloqueou novas alteracoes.',
-        ),
-      ],
-    );
+    final actorId = _focusBoardActorId(viewerProfile);
+    for (final linked in threadNotes(id)) {
+      final index = _notes.indexWhere((note) => note.id == linked.id);
+      if (index < 0) {
+        continue;
+      }
+      _notes[index] = linked.copyWith(
+        closedAt: now,
+        closedById: actorId,
+        closedByName: viewerProfile.name,
+        completedAt: now,
+        updatedAt: now,
+        audit: [
+          ...linked.audit,
+          _FocusBoardAuditEntry(
+            at: now,
+            actorId: actorId,
+            actorName: viewerProfile.name,
+            action: 'encerrado',
+            details: 'Criador encerrou a nota e o encadeamento vinculado.',
+          ),
+        ],
+      );
+    }
     notifyListeners();
     await _persistNotes();
   }
@@ -1400,19 +1583,33 @@ class _FocusBoardNotesController extends ChangeNotifier {
     }
     final now = DateTime.now();
     final actorId = _focusBoardActorId(viewerProfile);
+    final sourceDepth = threadDepthFor(source.id);
+    if (sourceDepth >= 2) {
+      return;
+    }
+    final rootId = source.rootNoteId.isNotEmpty
+        ? source.rootNoteId
+        : source.parentNoteId.isEmpty
+        ? source.id
+        : source.parentNoteId;
+    final childDescription = sourceDepth >= 1 ? '' : source.description;
+    final childTitle = sourceDepth >= 1 ? 'Resposta curta' : source.title;
     final replica = _FocusBoardNote(
       id: 'fbn-${now.microsecondsSinceEpoch}',
-      title: source.title,
-      description: source.description,
+      title: childTitle,
+      description: childDescription,
       priority: source.priority,
       dueAt: source.dueAt,
       createdAt: now,
       createdById: actorId,
       createdByName: viewerProfile.name,
+      parentNoteId: source.id,
+      rootNoteId: rootId,
       companyLabel: source.companyLabel,
       visibility: _FocusBoardNoteVisibility.private,
-      replicasEnabled: source.replicasEnabled,
+      replicasEnabled: sourceDepth == 0,
       replicaMode: _FocusBoardReplicaMode.ownerOnly,
+      isDraft: true,
       audit: [
         _FocusBoardAuditEntry(
           at: now,
@@ -1423,7 +1620,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
         ),
       ],
     );
-    _notes.insert(0, replica);
+    _notes.add(replica);
     _notes[_notes.indexWhere((note) => note.id == id)] = source.copyWith(
       updatedAt: now,
       audit: [
@@ -1441,33 +1638,124 @@ class _FocusBoardNotesController extends ChangeNotifier {
     await _persistNotes();
   }
 
+  int threadDepthFor(String noteId) {
+    final byId = {for (final note in _notes) note.id: note};
+    var depth = 0;
+    var current = byId[noteId];
+    final visited = <String>{};
+    while (current != null &&
+        current.parentNoteId.isNotEmpty &&
+        visited.add(current.id)) {
+      depth += 1;
+      current = byId[current.parentNoteId];
+      if (depth >= 2) {
+        return 2;
+      }
+    }
+    return depth;
+  }
+
+  List<_FocusBoardNote> threadNotes(String noteId) {
+    final byId = {for (final note in _notes) note.id: note};
+    final root = byId[noteId];
+    if (root == null) {
+      return const [];
+    }
+    final ids = <String>{root.id};
+    void includeChildren(String parentId) {
+      final children =
+          _notes
+              .where((note) => note.parentNoteId == parentId)
+              .toList(growable: false)
+            ..sort((left, right) => left.createdAt.compareTo(right.createdAt));
+      for (final child in children) {
+        if (!ids.add(child.id)) {
+          continue;
+        }
+        includeChildren(child.id);
+      }
+    }
+
+    includeChildren(root.id);
+    return _threadOrderedNotes([
+      for (final note in _notes)
+        if (ids.contains(note.id)) note,
+    ]);
+  }
+
+  bool threadHasPending(String noteId) {
+    return threadNotes(noteId).any((note) => !note.isComplete);
+  }
+
   Future<void> restoreFromTrash({
     required String id,
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final index = _notes.indexWhere((note) => note.id == id);
-    if (index < 0) {
+    final linked = threadNotes(id);
+    if (linked.isEmpty) {
       return;
     }
-    final current = _notes[index];
     final now = DateTime.now();
-    _notes[index] = current.copyWith(
-      inTrash: false,
-      clearTrashedAt: true,
-      restoredFromAutoTrash: true,
-      updatedAt: now,
-      audit: [
-        ...current.audit,
-        _FocusBoardAuditEntry(
-          at: now,
-          actorId: _focusBoardActorId(viewerProfile),
-          actorName: viewerProfile.name,
-          action: 'restaurado',
-          details: 'Nota movida manualmente para fora da lixeira.',
-        ),
-      ],
-    );
+    final actorId = _focusBoardActorId(viewerProfile);
+    for (final current in linked) {
+      final index = _notes.indexWhere((note) => note.id == current.id);
+      if (index < 0) {
+        continue;
+      }
+      _notes[index] = current.copyWith(
+        inTrash: false,
+        clearTrashedAt: true,
+        restoredFromAutoTrash: true,
+        updatedAt: now,
+        audit: [
+          ...current.audit,
+          _FocusBoardAuditEntry(
+            at: now,
+            actorId: actorId,
+            actorName: viewerProfile.name,
+            action: 'restaurado',
+            details: 'Nota movida manualmente para fora da lixeira.',
+          ),
+        ],
+      );
+    }
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> restoreFromArchive({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final linked = threadNotes(id);
+    if (linked.isEmpty) {
+      return;
+    }
+    final now = DateTime.now();
+    final actorId = _focusBoardActorId(viewerProfile);
+    for (final current in linked) {
+      final index = _notes.indexWhere((note) => note.id == current.id);
+      if (index < 0) {
+        continue;
+      }
+      _notes[index] = current.copyWith(
+        inArchive: false,
+        clearArchivedAt: true,
+        updatedAt: now,
+        audit: [
+          ...current.audit,
+          _FocusBoardAuditEntry(
+            at: now,
+            actorId: actorId,
+            actorName: viewerProfile.name,
+            action: 'restaurado do arquivo',
+            details: 'Nota movida manualmente para fora dos arquivados.',
+          ),
+        ],
+      );
+    }
     notifyListeners();
     await _persistNotes();
   }
@@ -1618,6 +1906,37 @@ class _FocusBoardNotesController extends ChangeNotifier {
     return right.createdAt.compareTo(left.createdAt);
   }
 
+  List<_FocusBoardNote> _threadOrderedNotes(List<_FocusBoardNote> notes) {
+    final byId = {for (final note in notes) note.id: note};
+    final childrenByParent = <String, List<_FocusBoardNote>>{};
+    for (final note in notes) {
+      if (note.parentNoteId.isEmpty || !byId.containsKey(note.parentNoteId)) {
+        continue;
+      }
+      childrenByParent.putIfAbsent(note.parentNoteId, () => []).add(note);
+    }
+    for (final children in childrenByParent.values) {
+      children.sort((left, right) => left.createdAt.compareTo(right.createdAt));
+    }
+    final roots = [
+      for (final note in notes)
+        if (note.parentNoteId.isEmpty || !byId.containsKey(note.parentNoteId))
+          note,
+    ]..sort(_compareNotes);
+    final ordered = <_FocusBoardNote>[];
+    void appendThread(_FocusBoardNote note) {
+      ordered.add(note);
+      for (final child in childrenByParent[note.id] ?? const []) {
+        appendThread(child);
+      }
+    }
+
+    for (final root in roots) {
+      appendThread(root);
+    }
+    return ordered;
+  }
+
   void _applyAutomaticTrash() {
     final now = DateTime.now();
     var changed = false;
@@ -1625,6 +1944,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
       final note = _notes[index];
       final completedAt = note.completedAt;
       if (note.inTrash ||
+          note.inArchive ||
           note.restoredFromAutoTrash ||
           completedAt == null ||
           !note.isComplete) {

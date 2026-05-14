@@ -69,6 +69,7 @@ const double _workspaceHeaderInlineMinWidth = 980;
 const double _workspaceMasterDetailInlineMinWidth = 980;
 const double _workspaceCompactMasterDetailInlineMinWidth = 840;
 const _focusBoardStandaloneRoute = '/focus-board';
+const _legalRoute = '/legal';
 
 Future<void> initializePariFlowFirebase() async {
   if (previewFirebaseIdToken != null) {
@@ -160,6 +161,7 @@ class PariFlowPartnersApp extends StatelessWidget {
         child: LayoutPreviewPage(),
       ),
       routes: {
+        _legalRoute: (_) => const _LegalTermsPage(),
         _focusBoardStandaloneRoute: (_) => const AuthGate(
           brand: AuthGateBrandConfig(
             paperColor: _paperColor,
@@ -193,6 +195,185 @@ bool get _shouldShowLocalPreviewBanner {
 
   final host = Uri.base.host.toLowerCase();
   return host == 'localhost' || host == '127.0.0.1';
+}
+
+class _LegalTermsPage extends StatefulWidget {
+  const _LegalTermsPage();
+
+  @override
+  State<_LegalTermsPage> createState() => _LegalTermsPageState();
+}
+
+class _LegalTermsPageState extends State<_LegalTermsPage> {
+  bool _acceptedTerms = false;
+  bool _rejectedTerms = false;
+  bool _acceptedPrivacy = false;
+  bool _rejectedPrivacy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _canvasColor,
+      appBar: AppBar(
+        title: const Text('Termos e privacidade'),
+        backgroundColor: _paperColor,
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 880),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _LegalSection(
+                    title: 'Termos de uso',
+                    paragraphs: const [
+                      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. O uso do aplicativo depende de autenticacao valida, vinculo autorizado a empresa e respeito aos perfis de acesso concedidos.',
+                      'Nullam facilisis, sapien vel porta gravida, neque arcu tincidunt risus, vitae luctus erat mi sed libero. O usuario deve manter dados de contato atualizados e nao compartilhar credenciais.',
+                      'Suspendisse potenti. Operacoes sensiveis podem exigir validacao adicional e registro de auditoria para preservar integridade operacional.',
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _LegalAgreementBox(
+                    acceptLabel: 'Concordo com os termos de uso',
+                    rejectLabel: 'Nao concordo com os termos de uso',
+                    accepted: _acceptedTerms,
+                    rejected: _rejectedTerms,
+                    onAccepted: (value) => setState(() {
+                      _acceptedTerms = value;
+                      if (value) {
+                        _rejectedTerms = false;
+                      }
+                    }),
+                    onRejected: (value) => setState(() {
+                      _rejectedTerms = value;
+                      if (value) {
+                        _acceptedTerms = false;
+                      }
+                    }),
+                  ),
+                  const SizedBox(height: 24),
+                  _LegalSection(
+                    title: 'Politica de privacidade',
+                    paragraphs: const [
+                      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Dados pessoais e empresariais sao tratados somente para controle operacional, seguranca, auditoria e suporte do servico.',
+                      'Integer feugiat justo at velit feugiat, sed gravida nibh porta. Informacoes de empresas nao sao exibidas a solicitantes sem vinculo aprovado.',
+                      'Praesent at lectus sed lectus tristique dictum. Registros podem ser mantidos para cumprimento contratual, rastreabilidade e prevencao de uso indevido.',
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _LegalAgreementBox(
+                    acceptLabel: 'Concordo com a politica de privacidade',
+                    rejectLabel: 'Nao concordo com a politica de privacidade',
+                    accepted: _acceptedPrivacy,
+                    rejected: _rejectedPrivacy,
+                    onAccepted: (value) => setState(() {
+                      _acceptedPrivacy = value;
+                      if (value) {
+                        _rejectedPrivacy = false;
+                      }
+                    }),
+                    onRejected: (value) => setState(() {
+                      _rejectedPrivacy = value;
+                      if (value) {
+                        _acceptedPrivacy = false;
+                      }
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegalSection extends StatelessWidget {
+  const _LegalSection({required this.title, required this.paragraphs});
+
+  final String title;
+  final List<String> paragraphs;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _paperColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: _deepTealColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            for (final paragraph in paragraphs) ...[
+              Text(paragraph, style: Theme.of(context).textTheme.bodyMedium),
+              if (paragraph != paragraphs.last) const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LegalAgreementBox extends StatelessWidget {
+  const _LegalAgreementBox({
+    required this.acceptLabel,
+    required this.rejectLabel,
+    required this.accepted,
+    required this.rejected,
+    required this.onAccepted,
+    required this.onRejected,
+  });
+
+  final String acceptLabel;
+  final String rejectLabel;
+  final bool accepted;
+  final bool rejected;
+  final ValueChanged<bool> onAccepted;
+  final ValueChanged<bool> onRejected;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Column(
+        children: [
+          CheckboxListTile(
+            value: accepted,
+            onChanged: (value) => onAccepted(value == true),
+            title: Text(acceptLabel),
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+          const Divider(height: 1, color: _lineColor),
+          CheckboxListTile(
+            value: rejected,
+            onChanged: (value) => onRejected(value == true),
+            title: Text(rejectLabel),
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _LocalPreviewBanner extends StatelessWidget {

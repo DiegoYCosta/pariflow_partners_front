@@ -62,9 +62,13 @@ class _AuthGateState extends State<AuthGate> {
           return _AuthLoadingScreen(brand: widget.brand);
         }
 
-        final user = snapshot.data;
-        if (user != null || _previewSessionUnlocked) {
+        if (_previewSessionUnlocked) {
           return widget.child;
+        }
+
+        final user = snapshot.data;
+        if (user != null) {
+          return _BackendSessionGate(brand: widget.brand, child: widget.child);
         }
 
         return _FirebaseLoginScreen(
@@ -77,6 +81,74 @@ class _AuthGateState extends State<AuthGate> {
                 }
               : null,
         );
+      },
+    );
+  }
+}
+
+class _BackendSessionGate extends StatefulWidget {
+  const _BackendSessionGate({required this.child, required this.brand});
+
+  final Widget child;
+  final AuthGateBrandConfig brand;
+
+  @override
+  State<_BackendSessionGate> createState() => _BackendSessionGateState();
+}
+
+class _BackendSessionGateState extends State<_BackendSessionGate> {
+  late Future<SessionSnapshot> _sessionLoad;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionLoad = ApiClient().ensureDevelopmentSession();
+  }
+
+  void _retry() {
+    setState(() {
+      _sessionLoad = ApiClient().ensureDevelopmentSession();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SessionSnapshot>(
+      future: _sessionLoad,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _AuthLoadingScreen(brand: widget.brand);
+        }
+
+        if (snapshot.hasError) {
+          final message = snapshot.error is ApiException
+              ? (snapshot.error! as ApiException).message
+              : 'Nao foi possivel validar a sessao interna.';
+          return _SessionUnavailableScreen(
+            brand: widget.brand,
+            message: message,
+            onRetry: _retry,
+          );
+        }
+
+        final session = snapshot.data;
+        if (session == null) {
+          return _SessionUnavailableScreen(
+            brand: widget.brand,
+            message: 'Sessao interna nao encontrada.',
+            onRetry: _retry,
+          );
+        }
+
+        if (session.tenantRootCompanyPublicId.trim().isEmpty) {
+          return _CompanyAccessRequiredScreen(
+            brand: widget.brand,
+            session: session,
+            onRetry: _retry,
+          );
+        }
+
+        return widget.child;
       },
     );
   }
@@ -345,6 +417,12 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                   ),
                 ),
               ],
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).pushNamed('/legal'),
+                icon: const Icon(Icons.policy_outlined, size: 18),
+                label: const Text('Termos de uso e privacidade'),
+              ),
             ],
           ),
         ),
@@ -1767,6 +1845,471 @@ void _putIfNotBlank(Map<String, dynamic> body, String key, String value) {
   final normalized = value.trim();
   if (normalized.isNotEmpty) {
     body[key] = normalized;
+  }
+}
+
+const _accessLevelLabels = <String, String>{
+  'ADMIN': 'Administrador',
+  'EXECUTIVE': 'Executivo',
+  'LEGAL': 'Juridico',
+  'HR': 'RH',
+  'OPERATIONS': 'Operacao',
+};
+
+class _SessionUnavailableScreen extends StatelessWidget {
+  const _SessionUnavailableScreen({
+    required this.brand,
+    required this.message,
+    required this.onRetry,
+  });
+
+  final AuthGateBrandConfig brand;
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: brand.paperColor,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.gpp_maybe_outlined,
+                  size: 42,
+                  color: brand.deepTealColor,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Sessao interna nao validada',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: brand.mutedColor),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Tentar novamente'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => unawaited(ApiClient().logout()),
+                      icon: const Icon(Icons.logout_rounded),
+                      label: const Text('Sair'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompanyAccessRequiredScreen extends StatefulWidget {
+  const _CompanyAccessRequiredScreen({
+    required this.brand,
+    required this.session,
+    required this.onRetry,
+  });
+
+  final AuthGateBrandConfig brand;
+  final SessionSnapshot session;
+  final VoidCallback onRetry;
+
+  @override
+  State<_CompanyAccessRequiredScreen> createState() =>
+      _CompanyAccessRequiredScreenState();
+}
+
+class _CompanyAccessRequiredScreenState
+    extends State<_CompanyAccessRequiredScreen> {
+  final _api = ApiClient();
+  final _formKey = GlobalKey<FormState>();
+  final _cnpj = TextEditingController();
+  final _requesterDocument = TextEditingController();
+  final _requesterName = TextEditingController();
+  final _requesterEmail = TextEditingController();
+  final _requesterPhone = TextEditingController();
+  final _notes = TextEditingController();
+  String _accessLevel = 'OPERATIONS';
+  bool _acceptedTerms = false;
+  bool _submitting = false;
+  String? _message;
+
+  AuthGateBrandConfig get _brand => widget.brand;
+
+  @override
+  void dispose() {
+    _cnpj.dispose();
+    _requesterDocument.dispose();
+    _requesterName.dispose();
+    _requesterEmail.dispose();
+    _requesterPhone.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 760;
+    return Scaffold(
+      backgroundColor: _brand.paperColor,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 16 : 28,
+              vertical: 24,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFDCE5E0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _brand.deepTealColor.withValues(alpha: 0.08),
+                      blurRadius: 30,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.business_outlined,
+                              color: _brand.deepTealColor,
+                              size: 30,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Escolha de empresa pendente',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(color: _brand.deepTealColor),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Sua conta Firebase foi validada, mas ainda nao ha vinculo aprovado com uma empresa. Sem esse vinculo, os dados do aplicativo ficam bloqueados.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(color: _brand.mutedColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _accessTextField(
+                          controller: _cnpj,
+                          label: 'CNPJ da empresa',
+                          icon: Icons.badge_outlined,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(14),
+                          ],
+                          validator: (value) =>
+                              _digitsOnly(value ?? '').length == 14
+                              ? null
+                              : 'Informe 14 digitos.',
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          initialValue: _accessLevel,
+                          isExpanded: true,
+                          decoration: _accessDecoration(
+                            label: 'Nivel de acesso solicitado',
+                            icon: Icons.admin_panel_settings_outlined,
+                          ),
+                          items: [
+                            for (final entry in _accessLevelLabels.entries)
+                              DropdownMenuItem(
+                                value: entry.key,
+                                child: Text(entry.value),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _accessLevel = value);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _accessTextField(
+                          controller: _requesterDocument,
+                          label: 'CPF ou CNPJ do solicitante',
+                          icon: Icons.person_search_outlined,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(14),
+                          ],
+                          validator: (value) {
+                            final digits = _digitsOnly(value ?? '');
+                            return digits.length == 11 || digits.length == 14
+                                ? null
+                                : 'Informe CPF ou CNPJ valido.';
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _accessTextField(
+                          controller: _requesterName,
+                          label: 'Nome do solicitante',
+                          icon: Icons.person_outline_rounded,
+                          validator: (value) => (value ?? '').trim().isEmpty
+                              ? 'Informe o nome.'
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                        _accessTextField(
+                          controller: _requesterEmail,
+                          label: 'E-mail de contato',
+                          icon: Icons.mail_outline_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            final email = (value ?? '').trim();
+                            return email.isEmpty || email.contains('@')
+                                ? null
+                                : 'E-mail invalido.';
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _accessTextField(
+                          controller: _requesterPhone,
+                          label: 'Telefone de contato',
+                          icon: Icons.phone_outlined,
+                          keyboardType: TextInputType.phone,
+                        ),
+                        const SizedBox(height: 10),
+                        _accessTextField(
+                          controller: _notes,
+                          label: 'Observacoes sem dados sensiveis',
+                          icon: Icons.notes_outlined,
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 10),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _acceptedTerms,
+                          onChanged: (value) =>
+                              setState(() => _acceptedTerms = value == true),
+                          title: const Text(
+                            'Li e concordo com os termos de uso e politica de privacidade.',
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () =>
+                                Navigator.of(context).pushNamed('/legal'),
+                            icon: const Icon(Icons.open_in_new_rounded),
+                            label: const Text('Abrir termos e privacidade'),
+                          ),
+                        ),
+                        if (_message != null) ...[
+                          const SizedBox(height: 8),
+                          _AccessInfoBox(text: _message!),
+                        ],
+                        const SizedBox(height: 16),
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _submitting
+                                  ? null
+                                  : () => unawaited(ApiClient().logout()),
+                              icon: const Icon(Icons.logout_rounded),
+                              label: const Text('Sair'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _submitting ? null : widget.onRetry,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Revalidar'),
+                            ),
+                            FilledButton.icon(
+                              onPressed: _submitting ? null : _submit,
+                              icon: _submitting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.send_outlined),
+                              label: const Text('Solicitar acesso'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _accessTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+    int maxLines = 1,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      maxLines: maxLines,
+      decoration: _accessDecoration(label: label, icon: icon),
+      validator: validator,
+    );
+  }
+
+  InputDecoration _accessDecoration({
+    required String label,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: const Color(0xFFF8FAF8),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color(0xFFDCE5E0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: _brand.tealColor, width: 1.4),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_acceptedTerms) {
+      setState(() {
+        _message = 'Aceite os termos para enviar a solicitacao.';
+      });
+      return;
+    }
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _message = null;
+    });
+
+    try {
+      final body = <String, dynamic>{
+        'cnpj': _digitsOnly(_cnpj.text),
+        'requesterDocument': _digitsOnly(_requesterDocument.text),
+        'requestedAccessLevel': _accessLevel,
+        'requesterName': _requesterName.text.trim(),
+      };
+      _putIfNotBlank(body, 'requesterEmail', _requesterEmail.text);
+      _putIfNotBlank(body, 'requesterPhone', _requesterPhone.text);
+      _putIfNotBlank(body, 'notes', _notes.text);
+      final result = await _api.postMap('auth/access-request', body: body);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _message =
+            '${result['message'] ?? 'Solicitacao registrada para analise.'}';
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _message = error.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+}
+
+class _AccessInfoBox extends StatelessWidget {
+  const _AccessInfoBox({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDCE5E0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline_rounded, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text)),
+          ],
+        ),
+      ),
+    );
   }
 }
 
