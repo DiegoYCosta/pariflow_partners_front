@@ -42,6 +42,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   Offset? _focusBoardFloatingOffset;
   Size? _focusBoardFloatingSize;
   bool _focusBoardFloatingMaximized = false;
+  bool _focusBoardFloatingWindowVisible = false;
   String _selectedNetworkNodeId = '';
   String? _hoveredNetworkNodeId;
   late final _FocusBoardPersistentController _focusBoardController;
@@ -333,27 +334,34 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
             });
           },
           onDetach: () {
+            final openedInNewTab = openFocusBoardStandaloneTab(
+              _focusBoardStandaloneUri(),
+            );
             setState(() {
               _focusBoardDetached = true;
               _focusBoardSlotVisible = false;
               _focusBoardFloatingMaximized = false;
-              _focusBoardFloatingSize ??= Size(
-                min(780.0, constraints.maxWidth - 48),
-                min(660.0, constraints.maxHeight - 48),
-              );
-              _focusBoardFloatingOffset ??= Offset(
-                max(
-                  18.0,
-                  constraints.maxWidth - _focusBoardFloatingSize!.width - 28,
-                ),
-                22,
-              );
+              _focusBoardFloatingWindowVisible = !openedInNewTab;
+              if (_focusBoardFloatingWindowVisible) {
+                _focusBoardFloatingSize ??= Size(
+                  min(780.0, constraints.maxWidth - 48),
+                  min(660.0, constraints.maxHeight - 48),
+                );
+                _focusBoardFloatingOffset ??= Offset(
+                  max(
+                    18.0,
+                    constraints.maxWidth - _focusBoardFloatingSize!.width - 28,
+                  ),
+                  22,
+                );
+              }
             });
           },
           onAttach: () {
             setState(() {
               _focusBoardDetached = false;
               _focusBoardSlotVisible = true;
+              _focusBoardFloatingWindowVisible = false;
             });
           },
         );
@@ -376,7 +384,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         return Stack(
           children: [
             body,
-            if (_focusBoardDetached)
+            if (_focusBoardDetached && _focusBoardFloatingWindowVisible)
               _buildDetachedFocusBoardWindow(constraints, slotRect),
           ],
         );
@@ -434,6 +442,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
               _focusBoardDetached = false;
               _focusBoardSlotVisible = true;
               _focusBoardFloatingMaximized = false;
+              _focusBoardFloatingWindowVisible = false;
             });
           }
         },
@@ -458,6 +467,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
             _focusBoardDetached = false;
             _focusBoardSlotVisible = true;
             _focusBoardFloatingMaximized = false;
+            _focusBoardFloatingWindowVisible = false;
           });
         },
       ),
@@ -698,6 +708,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     setState(() {
       _destination = destination;
       _focusBoardDetached = false;
+      _focusBoardFloatingWindowVisible = false;
     });
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
@@ -745,6 +756,10 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
+  }
+
+  Uri _focusBoardStandaloneUri() {
+    return Uri.base.replace(fragment: _focusBoardStandaloneRoute);
   }
 }
 

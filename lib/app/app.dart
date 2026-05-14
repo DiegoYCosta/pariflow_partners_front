@@ -15,6 +15,7 @@ import '../firebase_options.dart';
 import '../shared/infrastructure/visual_identity_local_store.dart';
 import '../shared/models/visual_identity.dart';
 import '../widgets/high_tech_light_waves.dart';
+import 'focus_board_tab_launcher.dart';
 
 part '../core/widgets/primitives.dart';
 part '../core/widgets/sprite_mold_icon.dart';
@@ -67,6 +68,7 @@ const _spriteMoldSheetAsset = 'assets/images/Icones.webp';
 const double _workspaceHeaderInlineMinWidth = 980;
 const double _workspaceMasterDetailInlineMinWidth = 980;
 const double _workspaceCompactMasterDetailInlineMinWidth = 840;
+const _focusBoardStandaloneRoute = '/focus-board';
 
 Future<void> initializePariFlowFirebase() async {
   if (previewFirebaseIdToken != null) {
@@ -157,6 +159,20 @@ class PariFlowPartnersApp extends StatelessWidget {
         ),
         child: LayoutPreviewPage(),
       ),
+      routes: {
+        _focusBoardStandaloneRoute: (_) => const AuthGate(
+          brand: AuthGateBrandConfig(
+            paperColor: _paperColor,
+            mutedColor: _mutedColor,
+            tealColor: _tealColor,
+            deepTealColor: _deepTealColor,
+            bannerWebAsset: _crmBannerWebAsset,
+            bannerMobileAsset: _crmBannerMobileAsset,
+            logoSymbolAsset: _crmLogoSymbolAsset,
+          ),
+          child: _FocusBoardStandalonePage(),
+        ),
+      },
       builder: (context, child) {
         return Stack(
           fit: StackFit.expand,

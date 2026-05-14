@@ -1634,6 +1634,72 @@ class _FocusBoardPersistentController extends ChangeNotifier {
   }
 }
 
+class _FocusBoardStandalonePage extends StatefulWidget {
+  const _FocusBoardStandalonePage();
+
+  @override
+  State<_FocusBoardStandalonePage> createState() =>
+      _FocusBoardStandalonePageState();
+}
+
+class _FocusBoardStandalonePageState extends State<_FocusBoardStandalonePage> {
+  late final _FocusBoardPersistentController _controller;
+  _ViewerAccessProfile _viewerProfile = _sessionViewerProfileFallback;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = _FocusBoardPersistentController();
+    _controller.ensureLoaded();
+    unawaited(_loadViewerProfile());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadViewerProfile() async {
+    try {
+      final session = await ApiClient().ensureDevelopmentSession();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewerProfile = _viewerProfileFromSession(session);
+      });
+    } on ApiException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewerProfile = _publicViewerProfile;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _canvasColor,
+      body: SafeArea(
+        child: _FocusBoardDetachedWorkspace(
+          controller: _controller,
+          viewerProfile: _viewerProfile,
+          onAttach: _returnToCrm,
+          attachLabel: 'Voltar ao CRM',
+          attachIcon: Icons.arrow_back_rounded,
+        ),
+      ),
+    );
+  }
+
+  void _returnToCrm() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+  }
+}
+
 class _PersistentFocusBoardDock extends StatefulWidget {
   const _PersistentFocusBoardDock({
     required this.controller,
@@ -1763,9 +1829,9 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
           Expanded(
             child: _FocusBoardSlotPlaceholder(
               icon: Icons.open_in_new_rounded,
-              title: 'Board destacado',
+              title: 'Board em nova aba',
               message:
-                  'A area de recados esta em janela separada. Agenda e tarefas continuam fixas aqui.',
+                  'A area de recados foi aberta em outra aba. Agenda e tarefas continuam fixas aqui.',
               primaryLabel: 'Acoplar',
               primaryIcon: Icons.call_received_rounded,
               onPrimary: widget.onAttach,
@@ -2363,12 +2429,16 @@ class _FocusBoardDetachedWorkspace extends StatefulWidget {
     required this.controller,
     required this.viewerProfile,
     required this.onAttach,
+    this.attachLabel = 'Acoplar',
+    this.attachIcon = Icons.call_received_rounded,
     this.showHeader = true,
   });
 
   final _FocusBoardPersistentController controller;
   final _ViewerAccessProfile viewerProfile;
   final VoidCallback onAttach;
+  final String attachLabel;
+  final IconData attachIcon;
   final bool showHeader;
 
   @override
@@ -2419,6 +2489,8 @@ class _FocusBoardDetachedWorkspaceState
                               widget.controller.runtimeData.sourceLabel,
                           isLoading: widget.controller.runtimeData.isLoading,
                           onAttach: widget.onAttach,
+                          attachLabel: widget.attachLabel,
+                          attachIcon: widget.attachIcon,
                           onRefresh: widget.controller.refresh,
                         ),
                         const SizedBox(height: 18),
@@ -2448,7 +2520,7 @@ class _FocusBoardDetachedWorkspaceState
                                   compact: false,
                                   onDetach: widget.onAttach,
                                   onRefresh: widget.controller.refresh,
-                                  detachedLabel: 'Acoplar',
+                                  detachedLabel: widget.attachLabel,
                                   onCreateReminder: _openCreateReminder,
                                   onCancelReminder: _confirmCancelReminder,
                                 ),
@@ -2469,7 +2541,7 @@ class _FocusBoardDetachedWorkspaceState
                           compact: false,
                           onDetach: widget.onAttach,
                           onRefresh: widget.controller.refresh,
-                          detachedLabel: 'Acoplar',
+                          detachedLabel: widget.attachLabel,
                           onCreateReminder: _openCreateReminder,
                           onCancelReminder: _confirmCancelReminder,
                         ),
@@ -2814,12 +2886,16 @@ class _FocusBoardDetachedHeader extends StatelessWidget {
     required this.sourceLabel,
     required this.isLoading,
     required this.onAttach,
+    required this.attachLabel,
+    required this.attachIcon,
     required this.onRefresh,
   });
 
   final String sourceLabel;
   final bool isLoading;
   final VoidCallback onAttach;
+  final String attachLabel;
+  final IconData attachIcon;
   final VoidCallback onRefresh;
 
   @override
@@ -2878,8 +2954,8 @@ class _FocusBoardDetachedHeader extends StatelessWidget {
           const SizedBox(width: 8),
           FilledButton.icon(
             onPressed: onAttach,
-            icon: const Icon(Icons.call_received_rounded, size: 18),
-            label: const Text('Acoplar'),
+            icon: Icon(attachIcon, size: 18),
+            label: Text(attachLabel),
           ),
         ],
       ),
