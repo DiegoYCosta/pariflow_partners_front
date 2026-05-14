@@ -107,7 +107,7 @@ flutter build web --release --dart-define=PARIFLOW_ENABLE_DEV_TOKEN=false
 
 1. Configurar dominio e HTTPS.
 2. Criar usuarios reais, conceder perfis internos e validar login online.
-3. Fechar UX completa de refresh/logout e sessao longa.
+3. Fechar UX completa de refresh/logout e sessao longa em HTTPS.
 4. Persistir identidade visual no backend, substituindo cache local por dispositivo.
 5. Evoluir calendario/comunicados com preview de audiencia e ciencia.
 6. Evoluir relatorios com exportacao, modelos persistidos e auditoria final.

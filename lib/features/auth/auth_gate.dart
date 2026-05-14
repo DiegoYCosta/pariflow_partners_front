@@ -142,19 +142,18 @@ class _BackendSessionGateState extends State<_BackendSessionGate> {
           );
         }
 
-        if (session.tenantRootCompanyPublicId.trim().isEmpty) {
-          return _CompanyAccessRequiredScreen(
-            brand: widget.brand,
-            session: session,
-            onRetry: _retry,
-          );
+        if (session.userPublicId == 'usr_dev_local') {
+          return widget.child;
         }
 
         if (!_contextConfirmed) {
           return _CompanyContextSelectionScreen(
             brand: widget.brand,
             session: session,
-            onConfirm: () => setState(() => _contextConfirmed = true),
+            onConfirm: (scopedSession) => setState(() {
+              _contextConfirmed = true;
+              _sessionLoad = Future.value(scopedSession);
+            }),
             onRetry: _retry,
           );
         }
@@ -1867,6 +1866,8 @@ const _accessLevelLabels = <String, String>{
   'OPERATIONS': 'Operacao',
 };
 
+const _requestNewCompanyValue = '__request_company_access__';
+
 class _SessionUnavailableScreen extends StatelessWidget {
   const _SessionUnavailableScreen({
     required this.brand,
@@ -1946,144 +1947,16 @@ class _CompanyContextSelectionScreen extends StatelessWidget {
 
   final AuthGateBrandConfig brand;
   final SessionSnapshot session;
-  final VoidCallback onConfirm;
+  final ValueChanged<SessionSnapshot> onConfirm;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final compact = width < 760;
-    final profileLabel = session.profiles.isEmpty
-        ? session.securityContext
-        : session.profiles.join(' / ');
-    return Scaffold(
-      backgroundColor: brand.paperColor,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 16 : 28,
-              vertical: 24,
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFDCE5E0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: brand.deepTealColor.withValues(alpha: 0.08),
-                      blurRadius: 30,
-                      offset: const Offset(0, 16),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.domain_verification_outlined,
-                            color: brand.deepTealColor,
-                            size: 30,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Selecionar empresa vinculada',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(color: brand.deepTealColor),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Confirme o contexto aprovado para abrir o aplicativo.',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(color: brand.mutedColor),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      _CompanyContextInfoTile(
-                        icon: Icons.person_outline_rounded,
-                        label: 'Usuario',
-                        value: '${session.userName} | ${session.userPublicId}',
-                      ),
-                      const SizedBox(height: 10),
-                      _CompanyContextInfoTile(
-                        icon: Icons.business_outlined,
-                        label: 'Empresa',
-                        value: [
-                          session.tenantRootCompanyName,
-                          if (session.tenantRootCompanyCnpj.isNotEmpty)
-                            session.tenantRootCompanyCnpj,
-                          if (session.tenantRootCompanyStatus.isNotEmpty)
-                            session.tenantRootCompanyStatus,
-                        ].where((value) => value.isNotEmpty).join(' | '),
-                      ),
-                      const SizedBox(height: 10),
-                      _CompanyContextInfoTile(
-                        icon: Icons.admin_panel_settings_outlined,
-                        label: 'Nivel de acesso',
-                        value: profileLabel,
-                      ),
-                      const SizedBox(height: 10),
-                      _CompanyContextInfoTile(
-                        icon: Icons.policy_outlined,
-                        label: 'Capacidades',
-                        value: [
-                          if (session.canViewSensitive) 'sensivel',
-                          if (session.canDownloadAttachments) 'download',
-                          if (session.canSoftDeleteAttachment) 'remocao logica',
-                          if (!session.canViewSensitive &&
-                              !session.canDownloadAttachments &&
-                              !session.canSoftDeleteAttachment)
-                            'leitura operacional',
-                        ].join(' | '),
-                      ),
-                      const SizedBox(height: 18),
-                      Wrap(
-                        alignment: WrapAlignment.end,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () => unawaited(ApiClient().logout()),
-                            icon: const Icon(Icons.logout_rounded),
-                            label: const Text('Sair'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: onRetry,
-                            icon: const Icon(Icons.refresh_rounded),
-                            label: const Text('Revalidar'),
-                          ),
-                          FilledButton.icon(
-                            onPressed: onConfirm,
-                            icon: const Icon(Icons.login_rounded),
-                            label: const Text('Entrar'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return _CompanyAccessRequiredScreen(
+      brand: brand,
+      session: session,
+      onRetry: onRetry,
+      onContextSelected: onConfirm,
     );
   }
 }
@@ -2141,11 +2014,13 @@ class _CompanyAccessRequiredScreen extends StatefulWidget {
     required this.brand,
     required this.session,
     required this.onRetry,
+    required this.onContextSelected,
   });
 
   final AuthGateBrandConfig brand;
   final SessionSnapshot session;
   final VoidCallback onRetry;
+  final ValueChanged<SessionSnapshot> onContextSelected;
 
   @override
   State<_CompanyAccessRequiredScreen> createState() =>
@@ -2167,9 +2042,12 @@ class _CompanyAccessRequiredScreenState
   String _accessLevel = 'OPERATIONS';
   bool _acceptedTerms = false;
   bool _submitting = false;
+  bool _selectingContext = false;
   bool _loadingContext = false;
   String? _message;
   var _accessDocuments = <Map<String, dynamic>>[];
+  var _linkedCompanies = <Map<String, dynamic>>[];
+  String _selectedContext = _requestNewCompanyValue;
 
   AuthGateBrandConfig get _brand => widget.brand;
 
@@ -2197,6 +2075,8 @@ class _CompanyAccessRequiredScreenState
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 760;
+    final requestingCompany = _requestingCompany;
+    final selectedCompany = _selectedCompany;
     return Scaffold(
       backgroundColor: _brand.paperColor,
       body: SafeArea(
@@ -2230,12 +2110,12 @@ class _CompanyAccessRequiredScreenState
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.business_outlined,
-                              color: _brand.deepTealColor,
-                              size: 30,
+                            Image.asset(
+                              _brand.logoSymbolAsset,
+                              width: 42,
+                              height: 42,
+                              fit: BoxFit.contain,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -2243,15 +2123,21 @@ class _CompanyAccessRequiredScreenState
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Escolha de empresa pendente',
+                                    'PariFlow Partners',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleLarge
-                                        ?.copyWith(color: _brand.deepTealColor),
+                                        ?.copyWith(
+                                          color: _brand.deepTealColor,
+                                          letterSpacing: 0,
+                                        ),
                                   ),
-                                  const SizedBox(height: 4),
                                   Text(
-                                    'Sua conta Firebase foi validada, mas ainda nao ha vinculo aprovado com uma empresa. Sem esse vinculo, os dados do aplicativo ficam bloqueados.',
+                                    'Contexto empresarial',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -2262,133 +2148,206 @@ class _CompanyAccessRequiredScreenState
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        _accessTextField(
-                          controller: _cnpj,
-                          label: 'CNPJ da empresa',
-                          icon: Icons.badge_outlined,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(14),
-                          ],
-                          validator: (value) =>
-                              _digitsOnly(value ?? '').length == 14
-                              ? null
-                              : 'Informe 14 digitos.',
+                        const SizedBox(height: 18),
+                        Text(
+                          'Selecione a empresa principal aprovada ou solicite um novo vinculo.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: _brand.mutedColor),
                         ),
-                        const SizedBox(height: 10),
-                        _accessTextField(
-                          controller: _companyName,
-                          label: 'Nome da empresa',
-                          icon: Icons.business_center_outlined,
-                          validator: (value) => (value ?? '').trim().isEmpty
-                              ? 'Informe a empresa.'
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<String>(
-                          initialValue: _accessLevel,
-                          isExpanded: true,
-                          decoration: _accessDecoration(
-                            label: 'Nivel de acesso solicitado',
-                            icon: Icons.admin_panel_settings_outlined,
-                          ),
-                          items: [
-                            for (final entry in _accessLevelLabels.entries)
-                              DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
+                        if (_loadingContext) ...[
+                          const SizedBox(height: 14),
+                          const LinearProgressIndicator(minHeight: 2),
+                        ],
+                        if (_linkedCompanies.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedContext,
+                            isExpanded: true,
+                            decoration: _accessDecoration(
+                              label: 'Empresa principal ativa',
+                              icon: Icons.business_outlined,
+                            ),
+                            items: [
+                              for (final company in _linkedCompanies)
+                                DropdownMenuItem(
+                                  value: _companyPublicId(company),
+                                  child: Text(_companyOptionLabel(company)),
+                                ),
+                              const DropdownMenuItem(
+                                value: _requestNewCompanyValue,
+                                child: Text(
+                                  'Solicitar vinculo a outra empresa',
+                                ),
                               ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() => _accessLevel = value);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        _accessTextField(
-                          controller: _requesterDocument,
-                          label: 'CPF ou CNPJ do solicitante',
-                          icon: Icons.person_search_outlined,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(14),
-                          ],
-                          validator: (value) {
-                            final digits = _digitsOnly(value ?? '');
-                            return digits.length == 11 || digits.length == 14
+                            ],
+                            onChanged: _selectingContext
                                 ? null
-                                : 'Informe CPF ou CNPJ valido.';
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        _accessTextField(
-                          controller: _requesterName,
-                          label: 'Nome do solicitante',
-                          icon: Icons.person_outline_rounded,
-                          validator: (value) => (value ?? '').trim().isEmpty
-                              ? 'Informe o nome.'
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        _accessTextField(
-                          controller: _requesterRole,
-                          label: 'Cargo ou relacao com a empresa',
-                          icon: Icons.assignment_ind_outlined,
-                          validator: (value) => (value ?? '').trim().isEmpty
-                              ? 'Informe o vinculo.'
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        _accessTextField(
-                          controller: _requesterEmail,
-                          label: 'E-mail de contato',
-                          icon: Icons.mail_outline_rounded,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            final email = (value ?? '').trim();
-                            return email.isEmpty || email.contains('@')
+                                : (value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        _selectedContext = value;
+                                        _message = null;
+                                      });
+                                    }
+                                  },
+                          ),
+                        ],
+                        if (!requestingCompany && selectedCompany != null) ...[
+                          const SizedBox(height: 14),
+                          _CompanyContextInfoTile(
+                            icon: Icons.person_outline_rounded,
+                            label: 'Usuario',
+                            value:
+                                '${widget.session.userName} | ${widget.session.userPublicId}',
+                          ),
+                          const SizedBox(height: 10),
+                          _CompanyContextInfoTile(
+                            icon: Icons.business_outlined,
+                            label: 'Empresa selecionada',
+                            value: _companyOptionLabel(selectedCompany),
+                          ),
+                          const SizedBox(height: 10),
+                          _CompanyContextInfoTile(
+                            icon: Icons.admin_panel_settings_outlined,
+                            label: 'Nivel de acesso',
+                            value: _companyAccessLabel(selectedCompany),
+                          ),
+                        ],
+                        if (requestingCompany) ...[
+                          const SizedBox(height: 16),
+                          _AccessInfoBox(
+                            text: _linkedCompanies.isEmpty
+                                ? 'Sua conta Firebase foi validada, mas ainda nao ha vinculo aprovado. Envie os dados para analise antes de acessar os documentos do app.'
+                                : 'A solicitacao abaixo nao troca seu contexto atual. O acesso so sera liberado depois da aprovacao no backend.',
+                          ),
+                          const SizedBox(height: 16),
+                          _accessTextField(
+                            controller: _cnpj,
+                            label: 'CNPJ da empresa',
+                            icon: Icons.badge_outlined,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(14),
+                            ],
+                            validator: (value) =>
+                                _digitsOnly(value ?? '').length == 14
                                 ? null
-                                : 'E-mail invalido.';
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        _accessTextField(
-                          controller: _requesterPhone,
-                          label: 'Telefone de contato',
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 10),
-                        _accessTextField(
-                          controller: _notes,
-                          label: 'Observacoes sem dados sensiveis',
-                          icon: Icons.notes_outlined,
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 10),
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value: _acceptedTerms,
-                          onChanged: (value) =>
-                              setState(() => _acceptedTerms = value == true),
-                          title: const Text(
-                            'Li e concordo com os termos de uso e politica de privacidade.',
+                                : 'Informe 14 digitos.',
                           ),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: () =>
-                                Navigator.of(context).pushNamed('/legal'),
-                            icon: const Icon(Icons.open_in_new_rounded),
-                            label: const Text('Abrir termos e privacidade'),
+                          const SizedBox(height: 10),
+                          _accessTextField(
+                            controller: _companyName,
+                            label: 'Nome da empresa',
+                            icon: Icons.business_center_outlined,
+                            validator: (value) => (value ?? '').trim().isEmpty
+                                ? 'Informe a empresa.'
+                                : null,
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<String>(
+                            initialValue: _accessLevel,
+                            isExpanded: true,
+                            decoration: _accessDecoration(
+                              label: 'Nivel de acesso solicitado',
+                              icon: Icons.admin_panel_settings_outlined,
+                            ),
+                            items: [
+                              for (final entry in _accessLevelLabels.entries)
+                                DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(entry.value),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _accessLevel = value);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          _accessTextField(
+                            controller: _requesterDocument,
+                            label: 'CPF ou CNPJ do solicitante',
+                            icon: Icons.person_search_outlined,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(14),
+                            ],
+                            validator: (value) {
+                              final digits = _digitsOnly(value ?? '');
+                              return digits.length == 11 || digits.length == 14
+                                  ? null
+                                  : 'Informe CPF ou CNPJ valido.';
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          _accessTextField(
+                            controller: _requesterName,
+                            label: 'Nome do solicitante',
+                            icon: Icons.person_outline_rounded,
+                            validator: (value) => (value ?? '').trim().isEmpty
+                                ? 'Informe o nome.'
+                                : null,
+                          ),
+                          const SizedBox(height: 10),
+                          _accessTextField(
+                            controller: _requesterRole,
+                            label: 'Cargo ou relacao com a empresa',
+                            icon: Icons.assignment_ind_outlined,
+                            validator: (value) => (value ?? '').trim().isEmpty
+                                ? 'Informe o vinculo.'
+                                : null,
+                          ),
+                          const SizedBox(height: 10),
+                          _accessTextField(
+                            controller: _requesterEmail,
+                            label: 'E-mail de contato',
+                            icon: Icons.mail_outline_rounded,
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (value) {
+                              final email = (value ?? '').trim();
+                              return email.isEmpty || email.contains('@')
+                                  ? null
+                                  : 'E-mail invalido.';
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          _accessTextField(
+                            controller: _requesterPhone,
+                            label: 'Telefone de contato',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 10),
+                          _accessTextField(
+                            controller: _notes,
+                            label: 'Observacoes sem dados sensiveis',
+                            icon: Icons.notes_outlined,
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 10),
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _acceptedTerms,
+                            onChanged: (value) =>
+                                setState(() => _acceptedTerms = value == true),
+                            title: const Text(
+                              'Li e concordo com os termos de uso e politica de privacidade.',
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () =>
+                                  Navigator.of(context).pushNamed('/legal'),
+                              icon: const Icon(Icons.open_in_new_rounded),
+                              label: const Text('Abrir termos e privacidade'),
+                            ),
+                          ),
+                        ],
                         if (_message != null) ...[
                           const SizedBox(height: 8),
                           _AccessInfoBox(text: _message!),
@@ -2416,30 +2375,49 @@ class _CompanyAccessRequiredScreenState
                           runSpacing: 8,
                           children: [
                             OutlinedButton.icon(
-                              onPressed: _submitting
+                              onPressed: _submitting || _selectingContext
                                   ? null
                                   : () => unawaited(ApiClient().logout()),
                               icon: const Icon(Icons.logout_rounded),
                               label: const Text('Sair'),
                             ),
                             OutlinedButton.icon(
-                              onPressed: _submitting ? null : widget.onRetry,
+                              onPressed: _submitting || _selectingContext
+                                  ? null
+                                  : widget.onRetry,
                               icon: const Icon(Icons.refresh_rounded),
                               label: const Text('Revalidar'),
                             ),
-                            FilledButton.icon(
-                              onPressed: _submitting ? null : _submit,
-                              icon: _submitting
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.send_outlined),
-                              label: const Text('Solicitar acesso'),
-                            ),
+                            if (requestingCompany)
+                              FilledButton.icon(
+                                onPressed: _submitting ? null : _submit,
+                                icon: _submitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.send_outlined),
+                                label: const Text('Solicitar acesso'),
+                              )
+                            else
+                              FilledButton.icon(
+                                onPressed: _selectingContext
+                                    ? null
+                                    : _confirmSelectedContext,
+                                icon: _selectingContext
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.login_rounded),
+                                label: const Text('Entrar'),
+                              ),
                           ],
                         ),
                       ],
@@ -2452,6 +2430,47 @@ class _CompanyAccessRequiredScreenState
         ),
       ),
     );
+  }
+
+  bool get _requestingCompany =>
+      _selectedContext == _requestNewCompanyValue || _linkedCompanies.isEmpty;
+
+  Map<String, dynamic>? get _selectedCompany {
+    for (final company in _linkedCompanies) {
+      if (_companyPublicId(company) == _selectedContext) {
+        return company;
+      }
+    }
+    return null;
+  }
+
+  String _companyPublicId(Map<String, dynamic> company) {
+    return _asText(company['publicId']);
+  }
+
+  String _companyOptionLabel(Map<String, dynamic> company) {
+    final name = [
+      _asText(company['tradeName']),
+      _asText(company['legalName']),
+    ].firstWhere((value) => value.isNotEmpty, orElse: () => 'Empresa');
+    final cnpj = _asText(company['cnpj']);
+    final status = _asText(company['status']);
+    return [
+      name,
+      if (cnpj.isNotEmpty) cnpj,
+      if (status.isNotEmpty) status,
+    ].join(' | ');
+  }
+
+  String _companyAccessLabel(Map<String, dynamic> company) {
+    final profile = _asText(company['accessProfile']);
+    if (profile.isNotEmpty) {
+      return _accessLevelLabels[profile.toUpperCase()] ?? profile;
+    }
+    final profiles = widget.session.profiles;
+    return profiles.isEmpty
+        ? widget.session.securityContext
+        : profiles.join(' / ');
   }
 
   Widget _accessTextField({
@@ -2545,6 +2564,42 @@ class _CompanyAccessRequiredScreenState
     }
   }
 
+  Future<void> _confirmSelectedContext() async {
+    final selectedCompany = _selectedCompany;
+    if (selectedCompany == null) {
+      setState(() {
+        _message = 'Selecione uma empresa vinculada para continuar.';
+      });
+      return;
+    }
+
+    setState(() {
+      _selectingContext = true;
+      _message = null;
+    });
+
+    try {
+      final session = await _api.selectCompanyContext(
+        _companyPublicId(selectedCompany),
+      );
+      if (!mounted) {
+        return;
+      }
+      widget.onContextSelected(session);
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _message = error.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _selectingContext = false);
+      }
+    }
+  }
+
   Future<void> _loadAccessContext() async {
     setState(() => _loadingContext = true);
     try {
@@ -2552,7 +2607,25 @@ class _CompanyAccessRequiredScreenState
       if (!mounted) {
         return;
       }
+      final linkedCompanies = [
+        for (final item in (data['linkedCompanies'] as List? ?? const []))
+          if (item is Map) item.cast<String, dynamic>(),
+      ];
+      final linkedCompany = data['linkedCompany'];
+      if (linkedCompanies.isEmpty && linkedCompany is Map) {
+        linkedCompanies.add(linkedCompany.cast<String, dynamic>());
+      }
+      final currentTenant = widget.session.tenantRootCompanyPublicId;
+      final hasCurrentTenant = linkedCompanies.any(
+        (company) => _companyPublicId(company) == currentTenant,
+      );
       setState(() {
+        _linkedCompanies = linkedCompanies;
+        _selectedContext = hasCurrentTenant
+            ? currentTenant
+            : linkedCompanies.isNotEmpty
+            ? _companyPublicId(linkedCompanies.first)
+            : _requestNewCompanyValue;
         _accessDocuments = [
           for (final item in (data['documents'] as List? ?? const []))
             if (item is Map) item.cast<String, dynamic>(),
@@ -2563,6 +2636,8 @@ class _CompanyAccessRequiredScreenState
         return;
       }
       setState(() {
+        _linkedCompanies = const [];
+        _selectedContext = _requestNewCompanyValue;
         _accessDocuments = const [];
       });
     } finally {

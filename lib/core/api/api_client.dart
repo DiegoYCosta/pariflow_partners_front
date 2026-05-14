@@ -51,6 +51,18 @@ class ApiClient {
     return ensureDevelopmentSession();
   }
 
+  Future<SessionSnapshot> selectCompanyContext(
+    String tenantRootCompanyPublicId,
+  ) async {
+    final data = await postMap(
+      'auth/company-context',
+      body: {'tenantRootCompanyPublicId': tenantRootCompanyPublicId},
+    );
+    final session = SessionSnapshot.fromMap(data);
+    _storeSession(session);
+    return session;
+  }
+
   Future<SessionSnapshot> _loadDevelopmentSession() async {
     if (await _tryRefreshSession()) {
       return _session!;
