@@ -15,3 +15,7 @@ bool closeCurrentBrowserWindow() {
 bool openExternalBrowserTab(String url) {
   return false;
 }
+
+bool openExternalBrowserPopup(String url) {
+  return false;
+}

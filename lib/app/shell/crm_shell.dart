@@ -3740,6 +3740,15 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
                     entries: _calendarEntriesForDay(day),
                     nonBusinessDays: _calendarNonBusinessDaysForDay(day),
                     onTap: () => unawaited(_openCalendarDay(day)),
+                    onAdd: () => unawaited(
+                      _openCalendarEntryDialog(
+                        initialDate: DateTime(
+                          _calendarMonth.year,
+                          _calendarMonth.month,
+                          day,
+                        ),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -4919,76 +4928,16 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
     required List<Map<String, dynamic>> entries,
     required List<Map<String, dynamic>> nonBusinessDays,
     required VoidCallback onTap,
+    required VoidCallback onAdd,
   }) {
-    final hasNonBusinessDay = nonBusinessDays.isNotEmpty;
-    final background = hasNonBusinessDay
-        ? _amberColor.withValues(alpha: 0.10)
-        : selected
-        ? _tealColor.withValues(alpha: 0.12)
-        : const Color(0xFFF8FAFB);
-    final borderColor = hasNonBusinessDay
-        ? _amberColor.withValues(alpha: 0.34)
-        : selected
-        ? _tealColor.withValues(alpha: 0.32)
-        : _lineColor;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '$day',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: hasNonBusinessDay || selected
-                      ? _deepTealColor
-                      : _inkColor,
-                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (entries.isNotEmpty)
-                    Container(
-                      constraints: const BoxConstraints(minWidth: 18),
-                      height: 17,
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                      decoration: BoxDecoration(
-                        color: _deepTealColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${entries.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  if (hasNonBusinessDay) ...[
-                    if (entries.isNotEmpty) const SizedBox(width: 4),
-                    Icon(Icons.block_rounded, color: _amberColor, size: 15),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    return _SharedCalendarDayCell(
+      day: day,
+      month: _calendarMonth,
+      selected: selected,
+      entries: entries,
+      nonBusinessDays: nonBusinessDays,
+      onTap: onTap,
+      onAdd: onAdd,
     );
   }
 
@@ -5113,6 +5062,172 @@ class _CrmProfileSettingsDialogState extends State<_CrmProfileSettingsDialog> {
       'Dezembro',
     ];
     return '${labels[month.month - 1]} ${month.year}';
+  }
+}
+
+class _SharedCalendarDayCell extends StatefulWidget {
+  const _SharedCalendarDayCell({
+    required this.day,
+    required this.month,
+    required this.selected,
+    required this.entries,
+    required this.nonBusinessDays,
+    required this.onTap,
+    required this.onAdd,
+  });
+
+  final int day;
+  final DateTime month;
+  final bool selected;
+  final List<Map<String, dynamic>> entries;
+  final List<Map<String, dynamic>> nonBusinessDays;
+  final VoidCallback onTap;
+  final VoidCallback onAdd;
+
+  @override
+  State<_SharedCalendarDayCell> createState() => _SharedCalendarDayCellState();
+}
+
+class _SharedCalendarDayCellState extends State<_SharedCalendarDayCell> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNonBusinessDay = widget.nonBusinessDays.isNotEmpty;
+    final background = hasNonBusinessDay
+        ? _amberColor.withValues(alpha: 0.10)
+        : widget.selected
+        ? _tealColor.withValues(alpha: 0.12)
+        : const Color(0xFFF8FAFB);
+    final borderColor = hasNonBusinessDay
+        ? _amberColor.withValues(alpha: 0.34)
+        : widget.selected
+        ? _tealColor.withValues(alpha: 0.32)
+        : _lineColor;
+    final hoverItems = _hoverItems;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: Colors.transparent,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: widget.onTap,
+                child: Ink(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${widget.day}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: hasNonBusinessDay || widget.selected
+                              ? _deepTealColor
+                              : _inkColor,
+                          fontWeight: widget.selected
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (widget.entries.isNotEmpty)
+                            Container(
+                              constraints: const BoxConstraints(minWidth: 18),
+                              height: 17,
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _deepTealColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${widget.entries.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          if (hasNonBusinessDay) ...[
+                            if (widget.entries.isNotEmpty)
+                              const SizedBox(width: 4),
+                            Icon(
+                              Icons.block_rounded,
+                              color: _amberColor,
+                              size: 15,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_hovered)
+              Positioned.fill(
+                child: _CalendarHoverHandler(
+                  date: DateTime(
+                    widget.month.year,
+                    widget.month.month,
+                    widget.day,
+                  ),
+                  items: hoverItems,
+                  onOpen: widget.onTap,
+                  onAdd: widget.onAdd,
+                  addLabel: 'Adicionar compromisso',
+                  emptyLabel: 'Sem compromissos marcados.',
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_CalendarHoverItem> get _hoverItems {
+    return [
+      for (final entry in widget.entries)
+        _CalendarHoverItem(
+          icon: Icons.event_note_outlined,
+          title: _apiText(entry['title'], fallback: 'Item de calendario'),
+          detail: _joinCalendarHoverDetails([
+            _calendarEntryDisplayDateLabel(entry),
+            _apiText(entry['kindLabel'], fallback: _apiText(entry['kind'])),
+            _apiText(entry['statusLabel'], fallback: _apiText(entry['status'])),
+            _apiText(entry['description']),
+          ]),
+          color: _calendarHoverGoldColor,
+        ),
+      for (final item in widget.nonBusinessDays)
+        _CalendarHoverItem(
+          icon: Icons.event_busy_outlined,
+          title: _apiText(item['name'], fallback: 'Dia nao util'),
+          detail: _joinCalendarHoverDetails([
+            _apiText(item['dateLabel'], fallback: _apiText(item['date'])),
+            _apiText(item['regionCode']),
+            _apiText(item['stateCode']),
+            _apiText(item['cityName']),
+            if (item['isRecurringYearly'] == true) 'recorrente anual',
+          ]),
+          color: _calendarHoverSlateColor,
+        ),
+    ];
   }
 }
 

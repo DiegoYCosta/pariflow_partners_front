@@ -5,6 +5,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/focus_board_tab_launcher.dart';
+import '../../app/legal_routes.dart';
 import '../../core/api/api_client.dart';
 import '../../firebase_options.dart';
 
@@ -26,6 +28,151 @@ class AuthGateBrandConfig {
   final String bannerWebAsset;
   final String bannerMobileAsset;
   final String logoSymbolAsset;
+}
+
+void _openLegalDocumentPopupForContext(
+  BuildContext context, {
+  required String route,
+  required String label,
+}) {
+  final opened = openExternalBrowserPopup(_legalRouteUri(route));
+  if (opened || !context.mounted) {
+    return;
+  }
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        'Permita pop-ups no navegador para abrir $label em nova guia.',
+      ),
+    ),
+  );
+}
+
+Uri _legalRouteUri(String route) {
+  final normalizedRoute = route.startsWith('/') ? route : '/$route';
+  return Uri.base.replace(fragment: normalizedRoute);
+}
+
+class _LegalAcceptancePanel extends StatelessWidget {
+  const _LegalAcceptancePanel({
+    required this.brand,
+    required this.acceptedTerms,
+    required this.acceptedPrivacy,
+    required this.enabled,
+    required this.onTermsChanged,
+    required this.onPrivacyChanged,
+    required this.onOpenTerms,
+    required this.onOpenPrivacy,
+  });
+
+  final AuthGateBrandConfig brand;
+  final bool acceptedTerms;
+  final bool acceptedPrivacy;
+  final bool enabled;
+  final ValueChanged<bool> onTermsChanged;
+  final ValueChanged<bool> onPrivacyChanged;
+  final VoidCallback onOpenTerms;
+  final VoidCallback onOpenPrivacy;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF8),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFDCE5E0)),
+      ),
+      child: Column(
+        children: [
+          _LegalAcceptanceRow(
+            brand: brand,
+            value: acceptedTerms,
+            enabled: enabled,
+            label: 'Li e concordo com os termos de uso.',
+            openLabel: 'Abrir termos',
+            onChanged: onTermsChanged,
+            onOpen: onOpenTerms,
+          ),
+          const Divider(height: 1, color: Color(0xFFDCE5E0)),
+          _LegalAcceptanceRow(
+            brand: brand,
+            value: acceptedPrivacy,
+            enabled: enabled,
+            label: 'Li e concordo com a politica de privacidade.',
+            openLabel: 'Abrir privacidade',
+            onChanged: onPrivacyChanged,
+            onOpen: onOpenPrivacy,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegalAcceptanceRow extends StatelessWidget {
+  const _LegalAcceptanceRow({
+    required this.brand,
+    required this.value,
+    required this.enabled,
+    required this.label,
+    required this.openLabel,
+    required this.onChanged,
+    required this.onOpen,
+  });
+
+  final AuthGateBrandConfig brand;
+  final bool value;
+  final bool enabled;
+  final String label;
+  final String openLabel;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Checkbox(
+            value: value,
+            onChanged: enabled ? (checked) => onChanged(checked == true) : null,
+            visualDensity: VisualDensity.compact,
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: brand.deepTealColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: enabled ? onOpen : null,
+                    icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                    label: Text(openLabel),
+                    style: TextButton.styleFrom(
+                      foregroundColor: brand.tealColor,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      alignment: Alignment.centerLeft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class AuthGate extends StatefulWidget {
@@ -179,6 +326,8 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _acceptedTerms = false;
+  bool _acceptedPrivacy = false;
   bool _isSubmitting = false;
 
   AuthGateBrandConfig get _brand => widget.brand;
@@ -276,6 +425,7 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
 
   Widget _buildLoginPanel(BuildContext context) {
     final theme = Theme.of(context);
+    final legalAccepted = _legalAccepted;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -393,8 +543,27 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              _LegalAcceptancePanel(
+                brand: _brand,
+                acceptedTerms: _acceptedTerms,
+                acceptedPrivacy: _acceptedPrivacy,
+                enabled: !_isSubmitting,
+                onTermsChanged: (value) =>
+                    setState(() => _acceptedTerms = value),
+                onPrivacyChanged: (value) =>
+                    setState(() => _acceptedPrivacy = value),
+                onOpenTerms: () => _openLegalDocumentPopup(
+                  pariflowTermsOfUseRoute,
+                  'Termos de uso',
+                ),
+                onOpenPrivacy: () => _openLegalDocumentPopup(
+                  pariflowPrivacyPolicyRoute,
+                  'Politica de privacidade',
+                ),
+              ),
+              const SizedBox(height: 12),
               FilledButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
+                onPressed: _isSubmitting || !legalAccepted ? null : _submit,
                 icon: _isSubmitting
                     ? const SizedBox(
                         width: 18,
@@ -415,7 +584,9 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
               if (widget.onPreviewSession != null) ...[
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: _isSubmitting ? null : widget.onPreviewSession,
+                  onPressed: _isSubmitting || !legalAccepted
+                      ? null
+                      : _startPreviewSession,
                   icon: const Icon(Icons.science_outlined),
                   label: const Text('Entrar em homologacao'),
                   style: OutlinedButton.styleFrom(
@@ -427,12 +598,6 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => Navigator.of(context).pushNamed('/legal'),
-                icon: const Icon(Icons.policy_outlined, size: 18),
-                label: const Text('Termos de uso e privacidade'),
-              ),
             ],
           ),
         ),
@@ -464,6 +629,9 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (!_validateLegalAcceptance()) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -487,6 +655,29 @@ class _FirebaseLoginScreenState extends State<_FirebaseLoginScreen> {
       }
     }
   }
+
+  void _startPreviewSession() {
+    if (!_validateLegalAcceptance()) {
+      return;
+    }
+    widget.onPreviewSession?.call();
+  }
+
+  bool _validateLegalAcceptance() {
+    if (_legalAccepted) {
+      return true;
+    }
+    _showAuthMessage(
+      'Marque o aceite dos termos de uso e da politica de privacidade para entrar.',
+    );
+    return false;
+  }
+
+  void _openLegalDocumentPopup(String route, String label) {
+    _openLegalDocumentPopupForContext(context, route: route, label: label);
+  }
+
+  bool get _legalAccepted => _acceptedTerms && _acceptedPrivacy;
 
   Future<void> _sendPasswordReset() async {
     final email = _emailController.text.trim();
@@ -2041,6 +2232,7 @@ class _CompanyAccessRequiredScreenState
   final _notes = TextEditingController();
   String _accessLevel = 'OPERATIONS';
   bool _acceptedTerms = false;
+  bool _acceptedPrivacy = false;
   bool _submitting = false;
   bool _selectingContext = false;
   bool _loadingContext = false;
@@ -2077,6 +2269,7 @@ class _CompanyAccessRequiredScreenState
     final compact = width < 760;
     final requestingCompany = _requestingCompany;
     final selectedCompany = _selectedCompany;
+    final legalAccepted = _legalAccepted;
     return Scaffold(
       backgroundColor: _brand.paperColor,
       body: SafeArea(
@@ -2327,26 +2520,6 @@ class _CompanyAccessRequiredScreenState
                             icon: Icons.notes_outlined,
                             maxLines: 3,
                           ),
-                          const SizedBox(height: 10),
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: _acceptedTerms,
-                            onChanged: (value) =>
-                                setState(() => _acceptedTerms = value == true),
-                            title: const Text(
-                              'Li e concordo com os termos de uso e politica de privacidade.',
-                            ),
-                            controlAffinity: ListTileControlAffinity.leading,
-                          ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () =>
-                                  Navigator.of(context).pushNamed('/legal'),
-                              icon: const Icon(Icons.open_in_new_rounded),
-                              label: const Text('Abrir termos e privacidade'),
-                            ),
-                          ),
                         ],
                         if (_message != null) ...[
                           const SizedBox(height: 8),
@@ -2368,6 +2541,28 @@ class _CompanyAccessRequiredScreenState
                             const SizedBox(height: 8),
                           ],
                         ],
+                        const SizedBox(height: 12),
+                        _LegalAcceptancePanel(
+                          brand: _brand,
+                          acceptedTerms: _acceptedTerms,
+                          acceptedPrivacy: _acceptedPrivacy,
+                          enabled: !_submitting && !_selectingContext,
+                          onTermsChanged: (value) =>
+                              setState(() => _acceptedTerms = value),
+                          onPrivacyChanged: (value) =>
+                              setState(() => _acceptedPrivacy = value),
+                          onOpenTerms: () => _openLegalDocumentPopupForContext(
+                            context,
+                            route: pariflowTermsOfUseRoute,
+                            label: 'Termos de uso',
+                          ),
+                          onOpenPrivacy: () =>
+                              _openLegalDocumentPopupForContext(
+                                context,
+                                route: pariflowPrivacyPolicyRoute,
+                                label: 'Politica de privacidade',
+                              ),
+                        ),
                         const SizedBox(height: 16),
                         Wrap(
                           alignment: WrapAlignment.end,
@@ -2390,7 +2585,12 @@ class _CompanyAccessRequiredScreenState
                             ),
                             if (requestingCompany)
                               FilledButton.icon(
-                                onPressed: _submitting ? null : _submit,
+                                onPressed:
+                                    _submitting ||
+                                        _selectingContext ||
+                                        !legalAccepted
+                                    ? null
+                                    : _submit,
                                 icon: _submitting
                                     ? const SizedBox(
                                         width: 18,
@@ -2404,7 +2604,7 @@ class _CompanyAccessRequiredScreenState
                               )
                             else
                               FilledButton.icon(
-                                onPressed: _selectingContext
+                                onPressed: _selectingContext || !legalAccepted
                                     ? null
                                     : _confirmSelectedContext,
                                 icon: _selectingContext
@@ -2514,10 +2714,7 @@ class _CompanyAccessRequiredScreenState
   }
 
   Future<void> _submit() async {
-    if (!_acceptedTerms) {
-      setState(() {
-        _message = 'Aceite os termos para enviar a solicitacao.';
-      });
+    if (!_validateLegalAcceptance()) {
       return;
     }
     if (!_formKey.currentState!.validate()) {
@@ -2565,6 +2762,9 @@ class _CompanyAccessRequiredScreenState
   }
 
   Future<void> _confirmSelectedContext() async {
+    if (!_validateLegalAcceptance()) {
+      return;
+    }
     final selectedCompany = _selectedCompany;
     if (selectedCompany == null) {
       setState(() {
@@ -2599,6 +2799,19 @@ class _CompanyAccessRequiredScreenState
       }
     }
   }
+
+  bool _validateLegalAcceptance() {
+    if (_legalAccepted) {
+      return true;
+    }
+    setState(() {
+      _message =
+          'Marque o aceite dos termos de uso e da politica de privacidade para entrar.';
+    });
+    return false;
+  }
+
+  bool get _legalAccepted => _acceptedTerms && _acceptedPrivacy;
 
   Future<void> _loadAccessContext() async {
     setState(() => _loadingContext = true);

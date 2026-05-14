@@ -44,3 +44,7 @@ bool closeCurrentFocusBoardWindow() {
 bool openExternalBrowserTab(Uri uri) {
   return platform.openExternalBrowserTab(uri.toString());
 }
+
+bool openExternalBrowserPopup(Uri uri) {
+  return platform.openExternalBrowserPopup(uri.toString());
+}

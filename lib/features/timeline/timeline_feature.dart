@@ -1008,9 +1008,9 @@ class _TimelineCalendar extends StatelessWidget {
         for (var day = 1; day <= daysInMonth; day += 1)
           _TimelineDayCell(
             date: DateTime(month.year, month.month, day),
-            recordCount: _recordCountForDay(day),
-            calendarCount: _calendarCountForDay(day),
-            nonBusinessCount: _nonBusinessCountForDay(day),
+            records: _recordsForDay(day),
+            calendarEntries: _calendarEntriesForDay(day),
+            nonBusinessDays: _nonBusinessDaysForDay(day),
             selected:
                 selectedDate?.year == month.year &&
                     selectedDate?.month == month.month &&
@@ -1030,33 +1030,37 @@ class _TimelineCalendar extends StatelessWidget {
     );
   }
 
-  int _recordCountForDay(int day) {
-    return records.where((record) {
-      final date = record.eventDate;
-      return date != null &&
-          date.year == month.year &&
-          date.month == month.month &&
-          date.day == day;
-    }).length;
+  List<_TimelineRecord> _recordsForDay(int day) {
+    return records
+        .where((record) {
+          final date = record.eventDate;
+          return date != null &&
+              date.year == month.year &&
+              date.month == month.month &&
+              date.day == day;
+        })
+        .toList(growable: false);
   }
 
-  int _calendarCountForDay(int day) {
+  List<_TimelineCalendarEntry> _calendarEntriesForDay(int day) {
     final date = DateTime(month.year, month.month, day);
     return calendarEntries
         .where((entry) => _sameDate(entry.occurrenceStartsAt, date))
-        .length;
+        .toList(growable: false);
   }
 
-  int _nonBusinessCountForDay(int day) {
+  List<_TimelineNonBusinessDay> _nonBusinessDaysForDay(int day) {
     final date = DateTime(month.year, month.month, day);
-    return nonBusinessDays.where((item) {
-      if (_sameDate(item.date, date)) {
-        return true;
-      }
-      return item.isRecurringYearly &&
-          item.date.month == date.month &&
-          item.date.day == date.day;
-    }).length;
+    return nonBusinessDays
+        .where((item) {
+          if (_sameDate(item.date, date)) {
+            return true;
+          }
+          return item.isRecurringYearly &&
+              item.date.month == date.month &&
+              item.date.day == date.day;
+        })
+        .toList(growable: false);
   }
 
   bool _dateIsInCalendarRange(int day) {
@@ -1074,9 +1078,9 @@ class _TimelineCalendar extends StatelessWidget {
 class _TimelineDayCell extends StatefulWidget {
   const _TimelineDayCell({
     required this.date,
-    required this.recordCount,
-    required this.calendarCount,
-    required this.nonBusinessCount,
+    required this.records,
+    required this.calendarEntries,
+    required this.nonBusinessDays,
     required this.selected,
     required this.inRange,
     required this.today,
@@ -1085,15 +1089,18 @@ class _TimelineDayCell extends StatefulWidget {
   });
 
   final DateTime date;
-  final int recordCount;
-  final int calendarCount;
-  final int nonBusinessCount;
+  final List<_TimelineRecord> records;
+  final List<_TimelineCalendarEntry> calendarEntries;
+  final List<_TimelineNonBusinessDay> nonBusinessDays;
   final bool selected;
   final bool inRange;
   final bool today;
   final VoidCallback onOpen;
   final VoidCallback onAdd;
 
+  int get recordCount => records.length;
+  int get calendarCount => calendarEntries.length;
+  int get nonBusinessCount => nonBusinessDays.length;
   int get count => recordCount + calendarCount + nonBusinessCount;
 
   @override
@@ -1114,6 +1121,7 @@ class _TimelineDayCellState extends State<_TimelineDayCell> {
         : const Color(0xFFF8FAFB);
     final textColor = widget.selected ? Colors.white : _inkColor;
     final count = widget.count;
+    final hoverItems = _hoverItems;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -1195,30 +1203,58 @@ class _TimelineDayCellState extends State<_TimelineDayCell> {
               ),
             ),
             if (_hovered)
-              Center(
-                child: Material(
-                  color: Colors.white.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(999),
-                  elevation: 4,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: widget.onAdd,
-                    child: const SizedBox(
-                      width: 42,
-                      height: 42,
-                      child: Icon(
-                        Icons.add_rounded,
-                        color: _deepTealColor,
-                        size: 30,
-                      ),
-                    ),
-                  ),
+              Positioned.fill(
+                child: _CalendarHoverHandler(
+                  date: widget.date,
+                  items: hoverItems,
+                  onOpen: widget.onOpen,
+                  onAdd: widget.onAdd,
+                  addLabel: 'Adicionar registro',
+                  emptyLabel: 'Sem registros neste dia.',
                 ),
               ),
           ],
         ),
       ),
     );
+  }
+
+  List<_CalendarHoverItem> get _hoverItems {
+    return [
+      for (final record in widget.records)
+        _CalendarHoverItem(
+          icon: Icons.timeline_outlined,
+          title: record.title.isEmpty ? 'Registro da timeline' : record.title,
+          detail: _joinCalendarHoverDetails([
+            record.eventDateLabel,
+            record.categoryLabel,
+            record.description,
+          ]),
+          color: _calendarHoverTealColor,
+        ),
+      for (final entry in widget.calendarEntries)
+        _CalendarHoverItem(
+          icon: Icons.event_note_outlined,
+          title: entry.title.isEmpty ? 'Compromisso' : entry.title,
+          detail: _joinCalendarHoverDetails([
+            entry.occurrenceStartsAtLabel,
+            entry.kindLabel,
+            entry.statusLabel,
+            entry.description,
+          ]),
+          color: _calendarHoverGoldColor,
+        ),
+      for (final item in widget.nonBusinessDays)
+        _CalendarHoverItem(
+          icon: Icons.event_busy_outlined,
+          title: item.name.isEmpty ? 'Dia nao util' : item.name,
+          detail: _joinCalendarHoverDetails([
+            item.dateLabel,
+            if (item.isRecurringYearly) 'recorrente anual',
+          ]),
+          color: _calendarHoverSlateColor,
+        ),
+    ];
   }
 }
 
@@ -1236,6 +1272,314 @@ class _TimelineDayMarker extends StatelessWidget {
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
+}
+
+const _calendarHoverGoldColor = Color(0xFFE0A64C);
+const _calendarHoverTealColor = Color(0xFF7BC8BD);
+const _calendarHoverSlateColor = Color(0xFFB7C6BF);
+
+class _CalendarHoverItem {
+  const _CalendarHoverItem({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final Color color;
+}
+
+class _CalendarHoverHandler extends StatelessWidget {
+  const _CalendarHoverHandler({
+    required this.date,
+    required this.items,
+    required this.onOpen,
+    required this.onAdd,
+    required this.addLabel,
+    required this.emptyLabel,
+  });
+
+  final DateTime date;
+  final List<_CalendarHoverItem> items;
+  final VoidCallback onOpen;
+  final VoidCallback onAdd;
+  final String addLabel;
+  final String emptyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 78 || constraints.maxWidth < 86;
+        final visibleLimit = items.isEmpty
+            ? 0
+            : compact
+            ? 1
+            : constraints.maxHeight < 112
+            ? 2
+            : 3;
+        final visibleItems = items.take(visibleLimit).toList(growable: false);
+        final hiddenCount = items.length - visibleItems.length;
+        final dateLabel =
+            '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onOpen,
+            child: Ink(
+              width: double.infinity,
+              height: double.infinity,
+              padding: EdgeInsets.all(compact ? 5 : 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF062F33).withValues(alpha: 0.92),
+                    const Color(0xFF08272C).withValues(alpha: 0.92),
+                    const Color(0xFF041E23).withValues(alpha: 0.92),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _calendarHoverGoldColor.withValues(alpha: 0.88),
+                  width: 0.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _CalendarHoverAddButton(
+                        label: addLabel,
+                        compact: compact,
+                        onTap: onAdd,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          dateLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.92),
+                                fontSize: compact ? 9.5 : null,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                      ),
+                      if (items.isNotEmpty)
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 18),
+                          height: compact ? 16 : 18,
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: BoxDecoration(
+                            color: _calendarHoverGoldColor.withValues(
+                              alpha: 0.16,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: _calendarHoverGoldColor.withValues(
+                                alpha: 0.38,
+                              ),
+                              width: 0.6,
+                            ),
+                          ),
+                          child: Text(
+                            '${items.length}',
+                            style: TextStyle(
+                              color: _calendarHoverGoldColor,
+                              fontSize: compact ? 9 : 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  SizedBox(height: compact ? 3 : 5),
+                  Expanded(
+                    child: ClipRect(
+                      child: items.isEmpty
+                          ? Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                emptyLabel,
+                                softWrap: true,
+                                maxLines: compact ? 2 : 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.80,
+                                      ),
+                                      fontSize: compact ? 9.5 : 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.12,
+                                    ),
+                              ),
+                            )
+                          : SingleChildScrollView(
+                              physics: const NeverScrollableScrollPhysics(),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  for (final item in visibleItems) ...[
+                                    _CalendarHoverItemRow(
+                                      item: item,
+                                      compact: compact,
+                                    ),
+                                    SizedBox(height: compact ? 2 : 4),
+                                  ],
+                                  if (hiddenCount > 0)
+                                    Text(
+                                      '+$hiddenCount outros',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: _calendarHoverGoldColor,
+                                            fontSize: compact ? 9 : 10,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CalendarHoverAddButton extends StatelessWidget {
+  const _CalendarHoverAddButton({
+    required this.label,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = compact ? 28.0 : 32.0;
+    return Tooltip(
+      message: label,
+      waitDuration: const Duration(milliseconds: 350),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _calendarHoverGoldColor.withValues(alpha: 0.62),
+                width: 0.8,
+              ),
+            ),
+            child: Icon(
+              Icons.add_rounded,
+              color: _calendarHoverGoldColor,
+              size: compact ? 21 : 24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarHoverItemRow extends StatelessWidget {
+  const _CalendarHoverItemRow({required this.item, required this.compact});
+
+  final _CalendarHoverItem item;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(top: compact ? 1 : 2),
+          child: Icon(item.icon, color: item.color, size: compact ? 11 : 13),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                softWrap: true,
+                maxLines: compact ? 1 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                  fontSize: compact ? 9.5 : 10.5,
+                  fontWeight: FontWeight.w900,
+                  height: 1.08,
+                ),
+              ),
+              if (item.detail.isNotEmpty)
+                Text(
+                  item.detail,
+                  softWrap: true,
+                  maxLines: compact ? 1 : 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.74),
+                    fontSize: compact ? 9 : 9.8,
+                    fontWeight: FontWeight.w600,
+                    height: 1.08,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _joinCalendarHoverDetails(Iterable<String> values) {
+  return values
+      .map((value) => value.trim())
+      .where((value) {
+        return value.isNotEmpty;
+      })
+      .join(' | ');
 }
 
 class _TimelineRecordTile extends StatelessWidget {

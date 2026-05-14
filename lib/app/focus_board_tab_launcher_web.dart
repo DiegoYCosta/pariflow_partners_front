@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:js_interop';
 
 const _focusBoardWindowTarget = 'pariflow_focus_board_window';
@@ -97,6 +98,19 @@ bool openExternalBrowserTab(String url) {
   return true;
 }
 
+bool openExternalBrowserPopup(String url) {
+  final openedWindow = _openBrowserWindow(
+    url,
+    '_blank',
+    _externalPopupWindowFeatures(),
+  );
+  if (openedWindow == null) {
+    return false;
+  }
+  openedWindow.focus();
+  return true;
+}
+
 String _focusBoardWindowFeatures() {
   final width = _screenAvailWidth < 720 ? 640 : 780;
   final height = _screenAvailHeight < 720 ? 600 : 660;
@@ -109,4 +123,18 @@ String _focusBoardWindowFeatures() {
   return 'popup=yes,width=$width,height=$height,left=$left,top=$top,'
       'resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,'
       'location=no';
+}
+
+String _externalPopupWindowFeatures() {
+  final width = min(920.0, max(360.0, _screenAvailWidth - 32)).round();
+  final height = min(760.0, max(480.0, _screenAvailHeight - 56)).round();
+  final leftMax = max(12.0, _screenAvailWidth - width - 12);
+  final topMax = max(12.0, _screenAvailHeight - height - 12);
+  final left = (_windowScreenX + ((_windowOuterWidth - width) / 2))
+      .clamp(12, leftMax)
+      .round();
+  final top = (_windowScreenY + 36).clamp(12, topMax).round();
+  return 'popup=yes,width=$width,height=$height,left=$left,top=$top,'
+      'resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,'
+      'location=no,noopener,noreferrer';
 }
