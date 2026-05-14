@@ -1,59 +1,54 @@
-# Documentacao do Front
+﻿# Documentacao do Front
 
-Data de referencia: `2026-05-12`.
+Data de referencia: `2026-05-14`.
 
-Esta pasta foi consolidada para reduzir documentos pequenos e duplicados. O
-runbook operacional agora concentra ambiente, Firebase, sessao, integracao com
-backend, deploy AWS e smoke tests.
+Esta pasta consolida a documentacao viva do front Flutter. Ela reduz duplicacao
+entre documentos externos e o repositorio, mantendo um indice direto para o que
+importa na realidade atual do produto.
 
-## Ordem de Leitura
+## Ordem de leitura
 
-1. [Estado atual e proximos passos](current-implementation-status.md)
-2. [Guia operacional, seguranca e deploy](guia-operacional-ambientes-e-funcoes.md)
-3. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
-4. [Calendario compartilhado, lembretes e relatorios](calendario-compartilhado-e-relatorios.md)
-5. [Contrato relacional de Network](relational-graph-contract.md)
-6. [Design system CRM](new-ui-design-system.md)
-7. [Sistema visual de cores e formas](sistema-visual-de-cores-e-formas.md)
-8. [Icones e moldes](icones-moldes.md)
+1. [README do front](../README.md)
+2. [Estado atual e proximos passos](current-implementation-status.md)
+3. [Guia operacional, seguranca e deploy](guia-operacional-ambientes-e-funcoes.md)
+4. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
+5. [Calendario, Timeline e relatorios](calendario-compartilhado-e-relatorios.md)
+6. [Contrato relacional de Network](relational-graph-contract.md)
+7. [Design system CRM](new-ui-design-system.md)
+8. [Sistema visual de cores e formas](sistema-visual-de-cores-e-formas.md)
+9. [Icones e moldes](icones-moldes.md)
 
-## Fontes de Verdade
+## Fontes de verdade
 
-- Dominio de negocio: `D:\DEV\flutter\JOTABE\DPPRO_JOTABE\Documentação`
-- Backend: `D:\DEV\flutter\JOTABE\PariFlow Partners - Back`
-- Front real: `lib/`
+- Codigo real: `lib/`
+- API: `D:\DEV\flutter\JOTABE\PariFlow Partners - Back`
+- Documentacao de produto: `D:\DEV\flutter\JOTABE\DPPRO_JOTABE\Documentacao`
 - Deploy: `D:\DEV\flutter\JOTABE\deploy_pfp_aws.ps1` e `.sh`
-- Checklist AWS do backend: `../PariFlow Partners - Back/docs/aws-security-checklist.md`
+- Ambiente: `.env.front.example` e `.env.front.preview`
 
-## Estado Atual Resumido
+## Estado atual resumido
 
 | Area | Estado |
 | --- | --- |
-| Shell CRM | ativo |
-| Companies | lista, detalhe e CRUD conectados a API real |
-| Clients | lista, detalhe e CRUD conectados a API real; relacoes ainda podem cruzar contratos no front |
-| Contracts | CRUD de contratos, tipos, modelos, servicos, postos e documentos |
-| People | CRUD de pessoa, vinculos, ocorrencias e anexos; leitura de tags/anexos por ACL |
-| Focus Board/Agenda | hub contextual com lembretes por pessoa e criacao em `POST /api/v1/agenda` |
-| Timeline | calendario operacional compartilhado com agenda, registros e feriados reais |
-| Relatorios | Central de Relatorios integrada a `POST /api/v1/relatorios/executar`, incluindo `controls_calendar` |
-| Network | consome `GET /api/v1/network/graph` |
-| Auth | `dev-token` so funciona em localhost com opt-in; host publico exige Firebase Admin real |
-| Mocks | removidos de `lib/` e fora do bundle publicado |
-| AWS | homologacao por IP ativa, Swagger off, bypass off, seed sample off |
+| Shell CRM | ativo como variante principal |
+| Home | dashboard real, sem mock silencioso |
+| Companies/Clients/Contracts | CRUDs reais conectados a API |
+| People | CRUD de pessoa, vinculos, ocorrencias, anexos, agenda e Focus Board |
+| Focus Board | persistente, acoplavel/desacoplavel, alimentada pela API |
+| Timeline | calendario operacional com agenda, dias nao uteis e registros |
+| Relatorios | central integrada a `POST /api/v1/relatorios/executar` |
+| Network | grafo real via `GET /api/v1/network/graph` |
+| Auth | Firebase real em host publico; `dev-token` so local |
+| Perfil | `GET/PATCH /auth/me`, preferencias, calendario e onboarding interno |
+| Mocks | fora do runtime real e do bundle publicado |
 
-## Pendencias Reais
+## Pendencias reais
 
-1. Configurar dominio e HTTPS.
-2. Configurar Firebase Admin na EC2 e criar usuarios reais.
-3. Rodar smoke de login real ponta a ponta.
-4. Trocar `COOKIE_SECURE=true` quando houver HTTPS.
-5. Fechar storage privado, download rastreavel e step-up sensivel.
-6. Integrar o front ao refresh/logout do backend quando a UX de sessao for
-   fechada.
-7. Fechar sensitive-session/step-up.
-8. Evoluir filtros e comunicados por grupo no calendario compartilhado. Os
-   feriados nacionais do Brasil ja entram por padrao ate 2050; exclusoes devem
-   ser solicitadas ao suporte.
-9. Validar CRUDs, relatorios, calendario e Network com dados reais de
-   homologacao.
+1. Dominio e HTTPS.
+2. Usuarios reais, perfis internos e smoke de login real.
+3. UX final de refresh/logout.
+4. Storage privado, step-up e download rastreavel.
+5. Persistencia backend de identidade visual.
+6. Preview de audiencia, ciencia e filtros salvos no calendario.
+7. Exportacao/auditoria final de relatorios.
+8. Validacao responsiva com dados reais.

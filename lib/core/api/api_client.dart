@@ -18,6 +18,7 @@ class ApiClient {
   static String? _accessToken;
   static SessionSnapshot? _session;
   static DateTime? _accessTokenRefreshAt;
+  static Future<SessionSnapshot>? _activeSessionLoad;
 
   bool get hasSession => _accessToken != null;
 
@@ -29,6 +30,23 @@ class ApiClient {
       return _session!;
     }
 
+    final activeSessionLoad = _activeSessionLoad;
+    if (activeSessionLoad != null) {
+      return activeSessionLoad;
+    }
+
+    final sessionLoad = _loadDevelopmentSession();
+    _activeSessionLoad = sessionLoad;
+    try {
+      return await sessionLoad;
+    } finally {
+      if (identical(_activeSessionLoad, sessionLoad)) {
+        _activeSessionLoad = null;
+      }
+    }
+  }
+
+  Future<SessionSnapshot> _loadDevelopmentSession() async {
     if (await _tryRefreshSession()) {
       return _session!;
     }
@@ -343,8 +361,8 @@ class SessionSnapshot {
       accessToken: '${map['accessToken'] ?? ''}',
       userPublicId: '${user['publicId'] ?? ''}',
       userName: '${user['nome'] ?? user['name'] ?? user['email'] ?? 'Sessao'}',
-      tenantRootCompanyPublicId:
-          '${tenantRootCompany['publicId'] ?? ''}'.trim(),
+      tenantRootCompanyPublicId: '${tenantRootCompany['publicId'] ?? ''}'
+          .trim(),
       tenantRootCompanyName: tenantName,
       expiresInSeconds: _intFromMap(map['expiresInSeconds'], fallback: 600),
       refreshExpiresInSeconds: _intFromMap(

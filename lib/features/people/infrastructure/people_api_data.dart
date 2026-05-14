@@ -79,10 +79,18 @@ class _PeopleApiRepository {
   }
 
   Future<_PeopleRuntimeData> loadWorkspaceData() async {
+    return _loadWorkspaceData(perPage: 24);
+  }
+
+  Future<_PeopleRuntimeData> loadFocusBoardInitialData() async {
+    return _loadWorkspaceData(perPage: 1);
+  }
+
+  Future<_PeopleRuntimeData> _loadWorkspaceData({required int perPage}) async {
     final session = await _apiClient.ensureDevelopmentSession();
     final peopleEnvelope = await _apiClient.getMap(
       'pessoas',
-      query: const {'page': '1', 'perPage': '24'},
+      query: {'page': '1', 'perPage': perPage.toString()},
     );
     final people = _apiMapList(peopleEnvelope['items']);
 

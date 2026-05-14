@@ -1,74 +1,115 @@
-# PariFlow Partners Front
+﻿# PariFlow Partners Front
 
-Frontend Flutter do PariFlow Partners com alvo Web e Android.
+Frontend Flutter do PariFlow Partners com alvo Web, Android e iOS.
 
-## Estado Atual
+Data de referencia: `2026-05-14`.
+
+## Estado atual
 
 O projeto ja nao esta em fundacao conceitual. O shell CRM esta ativo e os
-modulos `Companies`, `Clients`, `Contracts`, `People` e `Network` possuem
-features dedicadas.
+modulos `Home`, `Companies`, `Clients`, `Contracts`, `People`, `Network` e
+`Timeline` possuem features dedicadas. A Central de Relatorios fica no topo do
+shell como fluxo transversal.
 
-O front possui camada HTTP propria e consome endpoints reais do backend para os
-modulos operacionais. Dados mock/sample nao entram mais no runtime real nem no
-bundle publicado. O `dev-token` fica limitado a localhost/loopback com opt-in
-explicito; host publico exige Firebase real e Firebase Admin no backend.
+O front possui camada HTTP propria, Firebase Web, controle de sessao interna,
+refresh/logout, estados loading/empty/error e consumo real dos endpoints do
+backend. Dados mock/sample nao entram no runtime real nem no bundle publicado.
 
-## Relatorios (WIP)
+## Modulos e integracoes
 
-A Central de Relatorios esta em desenvolvimento, mas ja possui integracao real
-com `POST /api/v1/relatorios/executar` para templates suportados. A UI organiza
-o catalogo por familias estrategicas, gerenciais, controles, compliance/risco,
-logs/auditoria e automacao, com subrelatorios e filtros configuraveis como
-periodo, publico, status, empresa e responsavel.
+| Area | Estado |
+| --- | --- |
+| Auth | Firebase Web, `session/exchange`, refresh automatico, logout e tela publica de cadastro de cliente |
+| Home | dashboard real via `GET /api/v1/dashboard/home` |
+| Companies | lista, detalhe e CRUD via `empresas-prestadoras` |
+| Clients | lista, detalhe e CRUD via `clientes` |
+| Contracts | contratos, tipos, modelos, servicos, postos e documentos |
+| People | pessoa, vinculos, ocorrencias, anexos, agenda e Focus Board |
+| Focus Board | hub persistente acoplado/desacoplado com dados da API |
+| Timeline | calendario mensal operacional com timeline, agenda e dias nao uteis |
+| Reports | catalogo e execucao real via `POST /api/v1/relatorios/executar` |
+| Network | grafo real via `GET /api/v1/network/graph` |
+| Perfil/configuracoes | `GET/PATCH /auth/me`, calendario, contatos e onboarding interno |
+| Identidade visual | marcadores, badges, chips, picker e cache local por `shared_preferences` |
 
-O filtro `Publico` ja indica a hierarquia do usuario atual, destaca o perfil
-dele e bloqueia selecoes acima da permissao disponivel, exibindo uma mensagem
-curta quando o acesso exige liberacao de admin. Essa protecao visual nao
-substitui a ACL do backend; a liberacao final de dados sensiveis deve continuar
-validada pela API.
-
-O relatorio `controls_calendar` ja representa agenda, compromissos e lembretes.
-Ainda faltam persistencia de modelos de relatorio, exportacao, auditoria das
-execucoes, filtros avancados estilo CMNET e alinhamento final das permissoes
-granulares com backend e banco.
-
-## Calendario Compartilhado e Timeline
-
-A agenda compartilhada e a Timeline usam os mesmos endpoints reais de
-calendario (`/api/v1/agenda` e `/api/v1/agenda/non-business-days`). Toda
-empresa recebe por padrao os feriados nacionais do Brasil ate 2050; pedidos de
-exclusao desses feriados devem ser encaminhados ao suporte. Dias nao uteis
-adicionais podem ser cadastrados por escopo de empresa, regiao, estado ou
-cidade, e lembretes para funcionarios desligados seguem desativados por padrao,
-com reativacao manual por usuario autorizado.
-
-## Documentacao Viva
+## Documentacao viva
 
 - [Indice documental](docs/README.md)
-- [Guia operacional, seguranca e deploy](docs/guia-operacional-ambientes-e-funcoes.md)
 - [Estado atual e proximos passos](docs/current-implementation-status.md)
-- [Calendario compartilhado, lembretes e relatorios](docs/calendario-compartilhado-e-relatorios.md)
+- [Guia operacional, seguranca e deploy](docs/guia-operacional-ambientes-e-funcoes.md)
 - [Consolidacao arquitetural do front](docs/front-architecture-consolidation.md)
+- [Calendario, Timeline e relatorios](docs/calendario-compartilhado-e-relatorios.md)
 - [Contrato relacional de Network](docs/relational-graph-contract.md)
 - [Design system CRM](docs/new-ui-design-system.md)
+- [Sistema visual de cores e formas](docs/sistema-visual-de-cores-e-formas.md)
 - [Icones e moldes](docs/icones-moldes.md)
 
-## Regras de Integracao
+As pastas externas `D:\DEV\flutter\JOTABE\docs - FRONT` e
+`D:\DEV\flutter\JOTABE\DPPRO_JOTABE\Documentacao` continuam como referencia,
+mas os documentos operacionais tambem estao em `PariFlow Partners - Front/docs`.
+
+## Ambiente e autenticacao
+
+- A API fica em `/api/v1`.
+- Em build web release no mesmo host do Apache, o front usa `/api/v1` por
+  padrao quando `PARIFLOW_API_BASE_URL` nao for informado.
+- Em debug web sem `dart-define`, o default aponta para
+  `http://127.0.0.1:3002/api/v1`, usado pelo proxy local do script online.
+- Para backend local, use:
+
+```powershell
+.\scripts\run-web-local.ps1 -UseDevToken
+```
+
+- Para API online via proxy local:
+
+```powershell
+.\scripts\run-web-online.ps1
+```
+
+- Para build web de producao:
+
+```powershell
+.\scripts\build-web-production.ps1
+```
+
+- Para Android online:
+
+```powershell
+.\scripts\run-android-online.ps1
+```
+
+`dev-token` so funciona em localhost/loopback com opt-in explicito. Host
+publico exige Firebase real e Firebase Admin no backend.
+
+## Regras de integracao
 
 - Toda relacao usa `publicId`, nunca ID interno.
-- A API fica em `/api/v1`.
-- Em build web no mesmo host do Apache, o front usa `/api/v1` automaticamente.
-- Se a API ficar em outro host, buildar com
-  `--dart-define=PARIFLOW_API_BASE_URL=https://dominio/api/v1`.
-- Para desenvolvimento online, use:
-  - `scripts/run-web-online.ps1` para Web;
-  - `scripts/run-android-online.ps1` para Android;
-  - `scripts/build-web-production.ps1` para build de producao.
-- Em `flutter run`, o padrão de debug aponta para a API online; para backend
-  local, passe explicitamente `--dart-define=PARIFLOW_API_BASE_URL=http://localhost:3000/api/v1`.
-- Em `localhost` ou `127.0.0.1`, o app mostra um aviso fixo de preview local no
-  canto superior direito. Esse aviso nao aparece em deploy publico.
-- Conteudo sensivel, anexos e permissao seguem ACL do backend; o front nao
-  infere acesso nem exibe metadado protegido sem autorizacao.
-- Quando a API falha ou retorna vazia, a tela deve mostrar estado empty/error
-  sem preencher com mock silencioso.
+- O front espera envelope `{ data, meta }` em sucesso e `{ error }` em erro.
+- Conteudo sensivel, anexos, tags e permissoes seguem ACL do backend.
+- Quando a API falha ou retorna vazia, a tela mostra empty/error sem preencher
+  mock silencioso.
+- Firebase Web usa somente variaveis `PARIFLOW_FIREBASE_*`.
+- Service Account Firebase, JWT secrets, SMTP, WhatsApp, banco e AWS ficam
+  somente no backend/infra.
+
+## Validacao local
+
+```powershell
+cd "D:\DEV\flutter\JOTABE\PariFlow Partners - Front"
+flutter pub get
+dart analyze
+flutter test --reporter=compact
+flutter build web --release --dart-define=PARIFLOW_ENABLE_DEV_TOKEN=false
+```
+
+## Pendencias reais
+
+1. Configurar dominio e HTTPS.
+2. Criar usuarios reais, conceder perfis internos e validar login online.
+3. Fechar UX completa de refresh/logout e sessao longa.
+4. Finalizar storage privado, download rastreavel e step-up.
+5. Persistir identidade visual no backend, substituindo cache local por dispositivo.
+6. Evoluir calendario com filtros salvos, preview de audiencia e ciencia.
+7. Evoluir relatorios com exportacao, modelos persistidos e auditoria final.
+8. Validar responsividade Web/Android/iOS com dados reais.

@@ -1396,6 +1396,7 @@ class _FocusBoardHubPanel extends StatefulWidget {
     required this.sections,
     required this.calendarEntries,
     required this.docked,
+    this.dockedFooterInitiallyCollapsed = false,
     required this.onAddCalendarEntry,
     required this.onCancelCalendarEntry,
     this.onDetach,
@@ -1412,6 +1413,7 @@ class _FocusBoardHubPanel extends StatefulWidget {
   final List<_SensitiveSectionGroup> sections;
   final List<_CalendarEntryRecord> calendarEntries;
   final bool docked;
+  final bool dockedFooterInitiallyCollapsed;
   final VoidCallback onAddCalendarEntry;
   final ValueChanged<_CalendarEntryRecord> onCancelCalendarEntry;
   final VoidCallback? onDetach;
@@ -1430,6 +1432,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   String? _attentionNoteId;
   int _attentionPulse = 0;
   Timer? _attentionTimer;
+  bool? _footerExpandedOverride;
 
   @override
   void initState() {
@@ -1515,6 +1518,12 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
           final footerHeight = tightHeight
               ? (availableHeight * 0.30).clamp(132.0, 220.0).toDouble()
               : (availableHeight * 0.37).clamp(240.0, 360.0).toDouble();
+          // Janela separada: calendario/compromissos/recados continuam
+          // disponiveis para compatibilidade com futuras integracoes do
+          // Focus Board, mas nascem recolhidos enquanto a API e avaliada.
+          final footerExpanded =
+              _footerExpandedOverride ?? !widget.dockedFooterInitiallyCollapsed;
+          final effectiveFooterHeight = footerExpanded ? footerHeight : 38.0;
           final headerPadding = tightHeight
               ? const EdgeInsets.fromLTRB(8, 6, 8, 6)
               : const EdgeInsets.fromLTRB(10, 8, 10, 8);
@@ -1527,8 +1536,10 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
               const Divider(height: 1, color: _lineColor),
               Expanded(child: _notesStage(boardNotes)),
               SizedBox(
-                height: footerHeight,
-                child: _footer(boardNotes, upcomingEntries),
+                height: effectiveFooterHeight,
+                child: footerExpanded
+                    ? _footer(boardNotes, upcomingEntries)
+                    : _collapsedFooterHandle(context),
               ),
             ],
           );
@@ -1627,6 +1638,32 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       onClearSelection: _clearSelection,
       onBulkComplete: _bulkComplete,
       onBulkTrash: _bulkTrash,
+    );
+  }
+
+  Widget _collapsedFooterHandle(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: _lineColor)),
+      ),
+      child: Center(
+        child: Tooltip(
+          message: 'Mostrar calendario, compromissos e recados',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(99),
+            onTap: () => setState(() => _footerExpandedOverride = true),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+              child: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 24,
+                color: _mutedColor.withValues(alpha: 0.82),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

@@ -1531,15 +1531,19 @@ class _FocusBoardNotesController extends ChangeNotifier {
 }
 
 class _FocusBoardPersistentController extends ChangeNotifier {
-  _FocusBoardPersistentController({ApiClient? apiClient})
-    : _repository = _PeopleApiRepository(apiClient: apiClient),
-      notesController = _FocusBoardNotesController();
+  _FocusBoardPersistentController({
+    ApiClient? apiClient,
+    this.fastInitialLoad = false,
+  }) : _repository = _PeopleApiRepository(apiClient: apiClient),
+       notesController = _FocusBoardNotesController();
 
   final _PeopleApiRepository _repository;
+  final bool fastInitialLoad;
   final _FocusBoardNotesController notesController;
   _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.initial();
   Future<void>? _activeLoad;
   bool _requestedInitialLoad = false;
+  bool _requestedFullLoad = false;
   String? _selectedPersonPublicId;
 
   _PeopleRuntimeData get runtimeData => _runtimeData;
@@ -1577,24 +1581,44 @@ class _FocusBoardPersistentController extends ChangeNotifier {
     _runtimeData = _runtimeData.copyWith(isLoading: true);
     notifyListeners();
 
-    _activeLoad = _repository
-        .loadWorkspaceData()
-        .then((data) {
-          _runtimeData = data;
-          _normalizeSelection();
-          notifyListeners();
-        })
-        .catchError((Object error) {
-          _runtimeData = _PeopleRuntimeData.unavailable(
-            message: _peopleRuntimeErrorMessage(error),
-          );
-          notifyListeners();
-        })
-        .whenComplete(() {
-          _activeLoad = null;
-        });
+    final shouldUseFastInitialLoad =
+        fastInitialLoad && !_requestedFullLoad && people.isEmpty;
+    _requestedFullLoad = true;
+
+    _activeLoad =
+        (shouldUseFastInitialLoad
+                ? _repository.loadFocusBoardInitialData()
+                : _repository.loadWorkspaceData())
+            .then((data) {
+              _runtimeData = data;
+              _normalizeSelection();
+              notifyListeners();
+              if (shouldUseFastInitialLoad) {
+                unawaited(_refreshFullWorkspaceInBackground());
+              }
+            })
+            .catchError((Object error) {
+              _runtimeData = _PeopleRuntimeData.unavailable(
+                message: _peopleRuntimeErrorMessage(error),
+              );
+              notifyListeners();
+            })
+            .whenComplete(() {
+              _activeLoad = null;
+            });
 
     return _activeLoad!;
+  }
+
+  Future<void> _refreshFullWorkspaceInBackground() async {
+    try {
+      final data = await _repository.loadWorkspaceData();
+      _runtimeData = data;
+      _normalizeSelection();
+      notifyListeners();
+    } catch (_) {
+      // O recorte inicial permanece visivel; o usuario ainda pode atualizar.
+    }
   }
 
   void selectPerson(String publicId) {
@@ -1649,7 +1673,7 @@ class _FocusBoardStandalonePageState extends State<_FocusBoardStandalonePage> {
   @override
   void initState() {
     super.initState();
-    _controller = _FocusBoardPersistentController();
+    _controller = _FocusBoardPersistentController(fastInitialLoad: true);
     _controller.ensureLoaded();
     unawaited(_loadViewerProfile());
   }
@@ -1688,15 +1712,22 @@ class _FocusBoardStandalonePageState extends State<_FocusBoardStandalonePage> {
           controller: _controller,
           viewerProfile: _viewerProfile,
           onAttach: _returnToCrm,
-          attachLabel: 'Voltar ao CRM',
-          attachIcon: Icons.arrow_back_rounded,
+          showHeader: false,
+          showPeopleSelector: false,
+          matchDockedLayout: true,
         ),
       ),
     );
   }
 
   void _returnToCrm() {
-    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    closeCurrentFocusBoardWindow();
+    Future<void>.delayed(const Duration(milliseconds: 160), () {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    });
   }
 }
 
@@ -1829,9 +1860,9 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
           Expanded(
             child: _FocusBoardSlotPlaceholder(
               icon: Icons.open_in_new_rounded,
-              title: 'Board em nova aba',
+              title: 'Board em janela separada',
               message:
-                  'A area de recados foi aberta em outra aba. Agenda e tarefas continuam fixas aqui.',
+                  'Ao fechar a janela do navegador, o board volta para este slot.',
               primaryLabel: 'Acoplar',
               primaryIcon: Icons.call_received_rounded,
               onPrimary: widget.onAttach,
@@ -2291,6 +2322,7 @@ class _FocusBoardFloatingWindow extends StatelessWidget {
     required this.controller,
     required this.viewerProfile,
     required this.maximized,
+    required this.onMoveStart,
     required this.onMove,
     required this.onMoveEnd,
     required this.onResize,
@@ -2301,6 +2333,7 @@ class _FocusBoardFloatingWindow extends StatelessWidget {
   final _FocusBoardPersistentController controller;
   final _ViewerAccessProfile viewerProfile;
   final bool maximized;
+  final VoidCallback onMoveStart;
   final ValueChanged<Offset> onMove;
   final VoidCallback onMoveEnd;
   final ValueChanged<Offset> onResize;
@@ -2333,6 +2366,7 @@ class _FocusBoardFloatingWindow extends StatelessWidget {
                 cursor: SystemMouseCursors.move,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
+                  onPanStart: (_) => onMoveStart(),
                   onPanUpdate: (details) => onMove(details.delta),
                   onPanEnd: (_) => onMoveEnd(),
                   child: Container(
@@ -2394,6 +2428,8 @@ class _FocusBoardFloatingWindow extends StatelessWidget {
                   viewerProfile: viewerProfile,
                   onAttach: onAttach,
                   showHeader: false,
+                  showPeopleSelector: false,
+                  matchDockedLayout: true,
                 ),
               ),
               if (!maximized)
@@ -2429,17 +2465,17 @@ class _FocusBoardDetachedWorkspace extends StatefulWidget {
     required this.controller,
     required this.viewerProfile,
     required this.onAttach,
-    this.attachLabel = 'Acoplar',
-    this.attachIcon = Icons.call_received_rounded,
     this.showHeader = true,
+    this.showPeopleSelector = false,
+    this.matchDockedLayout = false,
   });
 
   final _FocusBoardPersistentController controller;
   final _ViewerAccessProfile viewerProfile;
   final VoidCallback onAttach;
-  final String attachLabel;
-  final IconData attachIcon;
   final bool showHeader;
+  final bool showPeopleSelector;
+  final bool matchDockedLayout;
 
   @override
   State<_FocusBoardDetachedWorkspace> createState() =>
@@ -2464,7 +2500,30 @@ class _FocusBoardDetachedWorkspaceState
             final width = constraints.maxWidth.isFinite
                 ? constraints.maxWidth
                 : MediaQuery.sizeOf(context).width;
-            final showSelector = width >= 980;
+            if (widget.matchDockedLayout) {
+              final height = constraints.maxHeight.isFinite
+                  ? constraints.maxHeight
+                  : 660.0;
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  height: max(360.0, height - 24),
+                  child: _FocusBoardRuntimeFrame(
+                    controller: widget.controller,
+                    viewerProfile: widget.viewerProfile,
+                    compact: true,
+                    onDetach: widget.onAttach,
+                    onRefresh: widget.controller.refresh,
+                    detachedLabel: 'Acoplar',
+                    dockedPresentation: true,
+                    collapseDockedFooterInitially: true,
+                    onCreateReminder: _openCreateReminder,
+                    onCancelReminder: _confirmCancelReminder,
+                  ),
+                ),
+              );
+            }
+            final showSelector = widget.showPeopleSelector && width >= 980;
             final runtimeMaxWidth = showSelector ? 760.0 : double.infinity;
             final people = widget.controller.people;
             final selected = widget.controller.selectedItem;
@@ -2479,7 +2538,9 @@ class _FocusBoardDetachedWorkspaceState
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1180),
+                  constraints: BoxConstraints(
+                    maxWidth: widget.showPeopleSelector ? 1180 : 820,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2489,63 +2550,73 @@ class _FocusBoardDetachedWorkspaceState
                               widget.controller.runtimeData.sourceLabel,
                           isLoading: widget.controller.runtimeData.isLoading,
                           onAttach: widget.onAttach,
-                          attachLabel: widget.attachLabel,
-                          attachIcon: widget.attachIcon,
                           onRefresh: widget.controller.refresh,
                         ),
                         const SizedBox(height: 18),
                       ],
-                      if (showSelector)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 330,
-                              child: _FocusBoardPeopleSelector(
-                                people: people,
-                                selectedPublicId: selected?.publicId,
-                                onSelected: widget.controller.selectPerson,
-                              ),
-                            ),
-                            const SizedBox(width: 22),
-                            Flexible(
-                              fit: FlexFit.loose,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: runtimeMaxWidth,
-                                ),
-                                child: _FocusBoardRuntimeFrame(
-                                  controller: widget.controller,
-                                  viewerProfile: widget.viewerProfile,
-                                  compact: false,
-                                  onDetach: widget.onAttach,
-                                  onRefresh: widget.controller.refresh,
-                                  detachedLabel: widget.attachLabel,
-                                  onCreateReminder: _openCreateReminder,
-                                  onCancelReminder: _confirmCancelReminder,
+                      if (widget.showPeopleSelector) ...[
+                        if (showSelector)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 330,
+                                child: _FocusBoardPeopleSelector(
+                                  people: people,
+                                  selectedPublicId: selected?.publicId,
+                                  onSelected: widget.controller.selectPerson,
                                 ),
                               ),
-                            ),
-                          ],
-                        )
-                      else ...[
-                        _FocusBoardPeopleSelector(
-                          people: people,
-                          selectedPublicId: selected?.publicId,
-                          onSelected: widget.controller.selectPerson,
-                        ),
-                        const SizedBox(height: 18),
+                              const SizedBox(width: 22),
+                              Flexible(
+                                fit: FlexFit.loose,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: runtimeMaxWidth,
+                                  ),
+                                  child: _FocusBoardRuntimeFrame(
+                                    controller: widget.controller,
+                                    viewerProfile: widget.viewerProfile,
+                                    compact: false,
+                                    onDetach: widget.onAttach,
+                                    onRefresh: widget.controller.refresh,
+                                    detachedLabel: 'Acoplar',
+                                    onCreateReminder: _openCreateReminder,
+                                    onCancelReminder: _confirmCancelReminder,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else ...[
+                          _FocusBoardPeopleSelector(
+                            people: people,
+                            selectedPublicId: selected?.publicId,
+                            onSelected: widget.controller.selectPerson,
+                          ),
+                          const SizedBox(height: 18),
+                          _FocusBoardRuntimeFrame(
+                            controller: widget.controller,
+                            viewerProfile: widget.viewerProfile,
+                            compact: false,
+                            onDetach: widget.onAttach,
+                            onRefresh: widget.controller.refresh,
+                            detachedLabel: 'Acoplar',
+                            onCreateReminder: _openCreateReminder,
+                            onCancelReminder: _confirmCancelReminder,
+                          ),
+                        ],
+                      ] else
                         _FocusBoardRuntimeFrame(
                           controller: widget.controller,
                           viewerProfile: widget.viewerProfile,
                           compact: false,
                           onDetach: widget.onAttach,
                           onRefresh: widget.controller.refresh,
-                          detachedLabel: widget.attachLabel,
+                          detachedLabel: 'Acoplar',
                           onCreateReminder: _openCreateReminder,
                           onCancelReminder: _confirmCancelReminder,
                         ),
-                      ],
                     ],
                   ),
                 ),
@@ -2653,6 +2724,8 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
     required this.onRefresh,
     required this.onCreateReminder,
     required this.onCancelReminder,
+    this.dockedPresentation = false,
+    this.collapseDockedFooterInitially = false,
     this.detachedLabel,
   });
 
@@ -2663,6 +2736,8 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
   final VoidCallback onRefresh;
   final ValueChanged<_EntityItem> onCreateReminder;
   final ValueChanged<_CalendarEntryRecord> onCancelReminder;
+  final bool dockedPresentation;
+  final bool collapseDockedFooterInitially;
   final String? detachedLabel;
 
   @override
@@ -2700,6 +2775,7 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
       ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
     final sections = _buildSensitiveSections(notes);
     final docked = detachedLabel == null;
+    final useDockedPresentation = docked || dockedPresentation;
     final hub = _FocusBoardHubPanel(
       viewerProfile: viewerProfile,
       item: item,
@@ -2709,7 +2785,9 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
       attachments: item.attachments,
       sections: sections,
       calendarEntries: profile.calendarEntries,
-      docked: docked,
+      docked: useDockedPresentation,
+      dockedFooterInitiallyCollapsed:
+          useDockedPresentation && collapseDockedFooterInitially,
       onAddCalendarEntry: () => onCreateReminder(item),
       onCancelCalendarEntry: onCancelReminder,
       onDetach: onDetach,
@@ -2719,7 +2797,7 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
 
     return _FocusBoardShellCard(
       compact: compact,
-      child: docked
+      child: useDockedPresentation
           ? hub
           : _FocusBoardResponsiveViewport(compact: compact, child: hub),
     );
@@ -2886,16 +2964,12 @@ class _FocusBoardDetachedHeader extends StatelessWidget {
     required this.sourceLabel,
     required this.isLoading,
     required this.onAttach,
-    required this.attachLabel,
-    required this.attachIcon,
     required this.onRefresh,
   });
 
   final String sourceLabel;
   final bool isLoading;
   final VoidCallback onAttach;
-  final String attachLabel;
-  final IconData attachIcon;
   final VoidCallback onRefresh;
 
   @override
@@ -2954,8 +3028,8 @@ class _FocusBoardDetachedHeader extends StatelessWidget {
           const SizedBox(width: 8),
           FilledButton.icon(
             onPressed: onAttach,
-            icon: Icon(attachIcon, size: 18),
-            label: Text(attachLabel),
+            icon: const Icon(Icons.call_received_rounded, size: 18),
+            label: const Text('Acoplar'),
           ),
         ],
       ),

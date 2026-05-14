@@ -43,6 +43,12 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   Size? _focusBoardFloatingSize;
   bool _focusBoardFloatingMaximized = false;
   bool _focusBoardFloatingWindowVisible = false;
+  bool _focusBoardDockCandidate = false;
+  bool _focusBoardDockCancelledForDrag = false;
+  final FocusNode _focusBoardDockKeyboardFocusNode = FocusNode(
+    debugLabel: 'focus-board-dock-keyboard',
+  );
+  Timer? _focusBoardWindowMonitor;
   String _selectedNetworkNodeId = '';
   String? _hoveredNetworkNodeId;
   late final _FocusBoardPersistentController _focusBoardController;
@@ -63,6 +69,8 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
 
   @override
   void dispose() {
+    _focusBoardWindowMonitor?.cancel();
+    _focusBoardDockKeyboardFocusNode.dispose();
     _focusBoardController.dispose();
     super.dispose();
   }
@@ -334,14 +342,15 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
             });
           },
           onDetach: () {
-            final openedInNewTab = openFocusBoardStandaloneTab(
+            final openResult = openFocusBoardStandaloneWindow(
               _focusBoardStandaloneUri(),
             );
+            final openedInBrowser = openResult.openedInBrowser;
             setState(() {
               _focusBoardDetached = true;
               _focusBoardSlotVisible = false;
               _focusBoardFloatingMaximized = false;
-              _focusBoardFloatingWindowVisible = !openedInNewTab;
+              _focusBoardFloatingWindowVisible = !openedInBrowser;
               if (_focusBoardFloatingWindowVisible) {
                 _focusBoardFloatingSize ??= Size(
                   min(780.0, constraints.maxWidth - 48),
@@ -356,8 +365,16 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                 );
               }
             });
+            if (openedInBrowser) {
+              _startFocusBoardWindowMonitor();
+            } else {
+              _focusBoardWindowMonitor?.cancel();
+            }
+            _showFocusBoardOpenFeedback(openResult);
           },
           onAttach: () {
+            closeFocusBoardStandaloneWindow();
+            _focusBoardWindowMonitor?.cancel();
             setState(() {
               _focusBoardDetached = false;
               _focusBoardSlotVisible = true;
@@ -384,6 +401,8 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         return Stack(
           children: [
             body,
+            if (_focusBoardDockCandidate && _focusBoardFloatingWindowVisible)
+              _buildFocusBoardDockTargetOverlay(slotRect),
             if (_focusBoardDetached && _focusBoardFloatingWindowVisible)
               _buildDetachedFocusBoardWindow(constraints, slotRect),
           ],
@@ -419,57 +438,151 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
       top: offset.dy,
       width: size.width,
       height: size.height,
-      child: _FocusBoardFloatingWindow(
-        controller: _focusBoardController,
-        viewerProfile: _viewerProfile,
-        maximized: _focusBoardFloatingMaximized,
-        onMove: (delta) {
-          if (_focusBoardFloatingMaximized) {
+      child: KeyboardListener(
+        focusNode: _focusBoardDockKeyboardFocusNode,
+        onKeyEvent: (event) {
+          if (event is! KeyDownEvent ||
+              event.logicalKey != LogicalKeyboardKey.escape ||
+              !_focusBoardDockCandidate) {
             return;
           }
           setState(() {
-            _focusBoardFloatingOffset = _clampFloatingOffset(
+            _focusBoardDockCandidate = false;
+            _focusBoardDockCancelledForDrag = true;
+          });
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('Acoplamento cancelado para este movimento.'),
+              ),
+            );
+        },
+        child: _FocusBoardFloatingWindow(
+          controller: _focusBoardController,
+          viewerProfile: _viewerProfile,
+          maximized: _focusBoardFloatingMaximized,
+          onMoveStart: () {
+            _focusBoardDockKeyboardFocusNode.requestFocus();
+            setState(() {
+              _focusBoardDockCandidate = false;
+              _focusBoardDockCancelledForDrag = false;
+            });
+          },
+          onMove: (delta) {
+            if (_focusBoardFloatingMaximized) {
+              return;
+            }
+            final nextOffset = _clampFloatingOffset(
               offset + delta,
               size,
               constraints,
             );
-          });
-        },
-        onMoveEnd: () {
-          final dragAnchor = Offset(offset.dx + size.width / 2, offset.dy + 22);
-          if (slotRect.inflate(36).contains(dragAnchor)) {
+            final nextAnchor = Offset(
+              nextOffset.dx + size.width / 2,
+              nextOffset.dy + 22,
+            );
+            setState(() {
+              _focusBoardFloatingOffset = nextOffset;
+              _focusBoardDockCandidate =
+                  !_focusBoardDockCancelledForDrag &&
+                  slotRect.inflate(36).contains(nextAnchor);
+            });
+          },
+          onMoveEnd: () {
+            if (_focusBoardDockCandidate && !_focusBoardDockCancelledForDrag) {
+              closeFocusBoardStandaloneWindow();
+              _focusBoardWindowMonitor?.cancel();
+              setState(() {
+                _focusBoardDetached = false;
+                _focusBoardSlotVisible = true;
+                _focusBoardFloatingMaximized = false;
+                _focusBoardFloatingWindowVisible = false;
+                _focusBoardDockCandidate = false;
+                _focusBoardDockCancelledForDrag = false;
+              });
+              return;
+            }
+            closeFocusBoardStandaloneWindow();
+            _focusBoardWindowMonitor?.cancel();
+            setState(() {
+              _focusBoardDockCandidate = false;
+              _focusBoardDockCancelledForDrag = false;
+            });
+          },
+          onResize: (delta) {
+            if (_focusBoardFloatingMaximized) {
+              return;
+            }
+            setState(() {
+              _focusBoardFloatingSize = _clampFloatingSize(
+                Size(size.width + delta.dx, size.height + delta.dy),
+                constraints,
+              );
+              _focusBoardDockCandidate = false;
+              _focusBoardDockCancelledForDrag = false;
+            });
+          },
+          onToggleMaximized: () {
+            setState(() {
+              _focusBoardFloatingMaximized = !_focusBoardFloatingMaximized;
+              _focusBoardDockCandidate = false;
+              _focusBoardDockCancelledForDrag = false;
+            });
+          },
+          onAttach: () {
+            closeFocusBoardStandaloneWindow();
+            _focusBoardWindowMonitor?.cancel();
             setState(() {
               _focusBoardDetached = false;
               _focusBoardSlotVisible = true;
               _focusBoardFloatingMaximized = false;
               _focusBoardFloatingWindowVisible = false;
+              _focusBoardDockCandidate = false;
+              _focusBoardDockCancelledForDrag = false;
             });
-          }
-        },
-        onResize: (delta) {
-          if (_focusBoardFloatingMaximized) {
-            return;
-          }
-          setState(() {
-            _focusBoardFloatingSize = _clampFloatingSize(
-              Size(size.width + delta.dx, size.height + delta.dy),
-              constraints,
-            );
-          });
-        },
-        onToggleMaximized: () {
-          setState(() {
-            _focusBoardFloatingMaximized = !_focusBoardFloatingMaximized;
-          });
-        },
-        onAttach: () {
-          setState(() {
-            _focusBoardDetached = false;
-            _focusBoardSlotVisible = true;
-            _focusBoardFloatingMaximized = false;
-            _focusBoardFloatingWindowVisible = false;
-          });
-        },
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFocusBoardDockTargetOverlay(Rect slotRect) {
+    final rect = slotRect.deflate(12);
+    return Positioned(
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _deepTealColor.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _deepTealColor, width: 2),
+          ),
+          child: Center(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _deepTealColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Text(
+                  'Solte para acoplar automaticamente - Esc cancela',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -705,10 +818,15 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   }
 
   void _handleDestination(_Destination destination) {
+    final keepFocusBoardDetached = isFocusBoardStandaloneWindowOpen();
     setState(() {
       _destination = destination;
-      _focusBoardDetached = false;
-      _focusBoardFloatingWindowVisible = false;
+      _focusBoardDetached = keepFocusBoardDetached;
+      _focusBoardSlotVisible = !keepFocusBoardDetached;
+      if (!keepFocusBoardDetached) {
+        _focusBoardFloatingWindowVisible = false;
+        _focusBoardWindowMonitor?.cancel();
+      }
     });
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
@@ -759,7 +877,55 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
   }
 
   Uri _focusBoardStandaloneUri() {
-    return Uri.base.replace(fragment: _focusBoardStandaloneRoute);
+    final queryParameters = Map<String, String>.of(Uri.base.queryParameters)
+      ..remove('focusPerson');
+    return Uri.base.replace(
+      queryParameters: queryParameters,
+      fragment: _focusBoardStandaloneRoute,
+    );
+  }
+
+  void _startFocusBoardWindowMonitor() {
+    _focusBoardWindowMonitor?.cancel();
+    _focusBoardWindowMonitor = Timer.periodic(
+      const Duration(milliseconds: 800),
+      (timer) {
+        if (isFocusBoardStandaloneWindowOpen()) {
+          return;
+        }
+        timer.cancel();
+        if (!mounted ||
+            !_focusBoardDetached ||
+            _focusBoardFloatingWindowVisible) {
+          return;
+        }
+        setState(() {
+          _focusBoardDetached = false;
+          _focusBoardSlotVisible = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Focus Board fechado e acoplado novamente.'),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFocusBoardOpenFeedback(FocusBoardWindowOpenResult result) {
+    final message = switch (result.status) {
+      FocusBoardWindowOpenStatus.opened =>
+        'Focus Board aberto em janela separada. Ao fechar, ele volta para o slot.',
+      FocusBoardWindowOpenStatus.focusedExisting =>
+        'Focus Board ja estava aberto; foquei a janela existente.',
+      FocusBoardWindowOpenStatus.blocked =>
+        'O navegador bloqueou a janela do Focus Board. Libere pop-ups para este site.',
+      FocusBoardWindowOpenStatus.unsupported =>
+        'Este ambiente nao abriu uma janela separada. Use a janela interna temporaria.',
+    };
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
