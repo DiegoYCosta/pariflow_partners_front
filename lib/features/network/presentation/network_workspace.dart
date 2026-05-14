@@ -2056,6 +2056,8 @@ String _nodeSearchHaystack(_NetworkGraphNode node) {
     'position',
     'location',
     'scale',
+    'schedule',
+    'service',
     'shift',
     'contractStatus',
     'startDate',
@@ -2093,11 +2095,15 @@ String? _nodePosition(_NetworkGraphNode node) {
     return node.displayName;
   }
   final value = node.detailSnapshot.extras['position'];
-  if (value == null) {
-    return null;
+  if (value != null) {
+    final text = '$value'.trim();
+    return text.isEmpty || text == '-' ? null : text;
   }
-  final text = '$value'.trim();
-  return text.isEmpty || text == '-' ? null : text;
+  if (node.lane == _NetworkGraphLane.employee) {
+    final subtitle = node.subtitle.trim();
+    return subtitle.isEmpty || subtitle == '-' ? null : subtitle;
+  }
+  return null;
 }
 
 DateTime? _nodeStartDate(_NetworkGraphNode node) {
@@ -7029,7 +7035,7 @@ class _RelationalNetworkDetailPanel extends StatelessWidget {
           _RelationalDetailField(
             icon: Icons.schedule_outlined,
             label: 'Escala',
-            value: '${extras['scale'] ?? '-'}',
+            value: '${extras['scale'] ?? extras['schedule'] ?? '-'}',
           ),
           _RelationalDetailField(
             icon: Icons.wb_sunny_outlined,

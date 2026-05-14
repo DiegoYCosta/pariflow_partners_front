@@ -101,6 +101,20 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
                   color: _roseColor,
                 ),
               ],
+              const SizedBox(height: 16),
+              _TimelineOverviewStrip(
+                recordsCount: _records.length,
+                calendarEntriesCount: _calendarEntries.length,
+                nonBusinessDaysCount: _nonBusinessDays.length,
+                selectedCount:
+                    selectedRecords.length +
+                    selectedCalendarEntries.length +
+                    selectedNonBusinessDays.length,
+                selectionLabel: _selectedDate == null
+                    ? 'mes inteiro'
+                    : _selectionLabel(),
+                loading: _loading,
+              ),
               const SizedBox(height: 18),
               Center(
                 child: ConstrainedBox(
@@ -765,6 +779,138 @@ class _TimelineWorkspaceState extends State<_TimelineWorkspace> {
   }
 }
 
+class _TimelineOverviewStrip extends StatelessWidget {
+  const _TimelineOverviewStrip({
+    required this.recordsCount,
+    required this.calendarEntriesCount,
+    required this.nonBusinessDaysCount,
+    required this.selectedCount,
+    required this.selectionLabel,
+    required this.loading,
+  });
+
+  final int recordsCount;
+  final int calendarEntriesCount;
+  final int nonBusinessDaysCount;
+  final int selectedCount;
+  final String selectionLabel;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _TimelineOverviewItem(
+            icon: Icons.timeline_outlined,
+            label: 'Registros',
+            value: '$recordsCount',
+            color: _deepTealColor,
+          ),
+          _TimelineOverviewItem(
+            icon: Icons.event_note_outlined,
+            label: 'Agenda',
+            value: '$calendarEntriesCount',
+            color: _amberColor,
+          ),
+          _TimelineOverviewItem(
+            icon: Icons.event_busy_outlined,
+            label: 'Nao uteis',
+            value: '$nonBusinessDaysCount',
+            color: _slateColor,
+          ),
+          _TimelineOverviewItem(
+            icon: loading
+                ? Icons.sync_rounded
+                : Icons.check_circle_outline_rounded,
+            label: selectionLabel,
+            value: '$selectedCount no recorte',
+            color: loading ? _mutedColor : _tealColor,
+            wide: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineOverviewItem extends StatelessWidget {
+  const _TimelineOverviewItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.wide = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final bool wide;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minWidth: wide ? 210 : 148,
+        maxWidth: wide ? 280 : 180,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 19),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: _inkColor,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: _mutedColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TimelineCalendar extends StatelessWidget {
   const _TimelineCalendar({
     required this.month,
@@ -824,7 +970,9 @@ class _TimelineCalendar extends StatelessWidget {
         for (var day = 1; day <= daysInMonth; day += 1)
           _TimelineDayCell(
             date: DateTime(month.year, month.month, day),
-            count: _countForDay(day),
+            recordCount: _recordCountForDay(day),
+            calendarCount: _calendarCountForDay(day),
+            nonBusinessCount: _nonBusinessCountForDay(day),
             selected:
                 selectedDate?.year == month.year &&
                     selectedDate?.month == month.month &&
@@ -844,19 +992,26 @@ class _TimelineCalendar extends StatelessWidget {
     );
   }
 
-  int _countForDay(int day) {
-    final date = DateTime(month.year, month.month, day);
-    final recordsCount = records.where((record) {
+  int _recordCountForDay(int day) {
+    return records.where((record) {
       final date = record.eventDate;
       return date != null &&
           date.year == month.year &&
           date.month == month.month &&
           date.day == day;
     }).length;
-    final calendarCount = calendarEntries
+  }
+
+  int _calendarCountForDay(int day) {
+    final date = DateTime(month.year, month.month, day);
+    return calendarEntries
         .where((entry) => _sameDate(entry.occurrenceStartsAt, date))
         .length;
-    final nonBusinessCount = nonBusinessDays.where((item) {
+  }
+
+  int _nonBusinessCountForDay(int day) {
+    final date = DateTime(month.year, month.month, day);
+    return nonBusinessDays.where((item) {
       if (_sameDate(item.date, date)) {
         return true;
       }
@@ -864,7 +1019,6 @@ class _TimelineCalendar extends StatelessWidget {
           item.date.month == date.month &&
           item.date.day == date.day;
     }).length;
-    return recordsCount + calendarCount + nonBusinessCount;
   }
 
   bool _dateIsInCalendarRange(int day) {
@@ -882,7 +1036,9 @@ class _TimelineCalendar extends StatelessWidget {
 class _TimelineDayCell extends StatefulWidget {
   const _TimelineDayCell({
     required this.date,
-    required this.count,
+    required this.recordCount,
+    required this.calendarCount,
+    required this.nonBusinessCount,
     required this.selected,
     required this.inRange,
     required this.today,
@@ -891,12 +1047,16 @@ class _TimelineDayCell extends StatefulWidget {
   });
 
   final DateTime date;
-  final int count;
+  final int recordCount;
+  final int calendarCount;
+  final int nonBusinessCount;
   final bool selected;
   final bool inRange;
   final bool today;
   final VoidCallback onOpen;
   final VoidCallback onAdd;
+
+  int get count => recordCount + calendarCount + nonBusinessCount;
 
   @override
   State<_TimelineDayCell> createState() => _TimelineDayCellState();
@@ -915,6 +1075,7 @@ class _TimelineDayCellState extends State<_TimelineDayCell> {
         ? _tealColor
         : const Color(0xFFF8FAFB);
     final textColor = widget.selected ? Colors.white : _inkColor;
+    final count = widget.count;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -934,7 +1095,7 @@ class _TimelineDayCellState extends State<_TimelineDayCell> {
                     border: Border.all(
                       color: widget.selected
                           ? _deepTealColor
-                          : widget.inRange || widget.count > 0
+                          : widget.inRange || count > 0
                           ? _tealColor.withValues(alpha: 0.34)
                           : _lineColor,
                     ),
@@ -957,14 +1118,14 @@ class _TimelineDayCellState extends State<_TimelineDayCell> {
                         alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                         decoration: BoxDecoration(
-                          color: widget.count > 0
+                          color: count > 0
                               ? (widget.selected ? Colors.white : _tealColor)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: widget.count > 0
+                        child: count > 0
                             ? Text(
-                                '${widget.count}',
+                                '$count',
                                 style: TextStyle(
                                   color: widget.selected
                                       ? _deepTealColor
@@ -974,6 +1135,21 @@ class _TimelineDayCellState extends State<_TimelineDayCell> {
                                 ),
                               )
                             : const SizedBox.shrink(),
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 5,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (widget.recordCount > 0)
+                              const _TimelineDayMarker(color: _deepTealColor),
+                            if (widget.calendarCount > 0)
+                              const _TimelineDayMarker(color: _amberColor),
+                            if (widget.nonBusinessCount > 0)
+                              const _TimelineDayMarker(color: _slateColor),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -1004,6 +1180,22 @@ class _TimelineDayCellState extends State<_TimelineDayCell> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TimelineDayMarker extends StatelessWidget {
+  const _TimelineDayMarker({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 5,
+      height: 5,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

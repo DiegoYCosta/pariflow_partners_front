@@ -40,3 +40,7 @@ void closeFocusBoardStandaloneWindow() {
 bool closeCurrentFocusBoardWindow() {
   return platform.closeCurrentBrowserWindow();
 }
+
+bool openExternalBrowserTab(Uri uri) {
+  return platform.openExternalBrowserTab(uri.toString());
+}

@@ -88,6 +88,15 @@ bool closeCurrentBrowserWindow() {
   return true;
 }
 
+bool openExternalBrowserTab(String url) {
+  final openedWindow = _openBrowserWindow(url, '_blank', 'noopener,noreferrer');
+  if (openedWindow == null) {
+    return false;
+  }
+  openedWindow.focus();
+  return true;
+}
+
 String _focusBoardWindowFeatures() {
   final width = _screenAvailWidth < 720 ? 640 : 780;
   final height = _screenAvailHeight < 720 ? 600 : 660;

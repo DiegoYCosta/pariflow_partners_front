@@ -337,6 +337,99 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
     );
   }
 
+  Future<void> _openAttachmentAccess(_AttachmentRecord attachment) async {
+    await _tryOpenAttachmentAccess(attachment, allowStepUp: true);
+  }
+
+  Future<void> _tryOpenAttachmentAccess(
+    _AttachmentRecord attachment, {
+    required bool allowStepUp,
+  }) async {
+    try {
+      final access = await _repository.createAttachmentAccess(
+        attachment.publicId,
+        download: attachment.canDownload,
+      );
+      if (!mounted) {
+        return;
+      }
+      await _presentAttachmentAccess(access);
+    } on ApiException catch (error) {
+      if (allowStepUp && _isSensitiveStepUpRequired(error, attachment)) {
+        if (!mounted) {
+          return;
+        }
+        final verified = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _SensitiveStepUpDialog(
+            repository: _repository,
+            attachment: attachment,
+          ),
+        );
+        if (verified == true && mounted) {
+          await _tryOpenAttachmentAccess(attachment, allowStepUp: false);
+        }
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: _roseColor),
+      );
+    }
+  }
+
+  bool _isSensitiveStepUpRequired(
+    ApiException error,
+    _AttachmentRecord attachment,
+  ) {
+    final message = error.message.toLowerCase();
+    return error.statusCode == 403 &&
+        (attachment.requiresSensitiveSession ||
+            message.contains('sessao sensivel'));
+  }
+
+  Future<void> _presentAttachmentAccess(_AttachmentAccessResult access) async {
+    if (access.signedUrl.isEmpty) {
+      final source = access.source.toUpperCase() == 'S3_PRIVATE'
+          ? 'O arquivo esta em storage privado, mas a API nao retornou uma URL assinada para este ambiente.'
+          : 'Anexo registrado sem arquivo digital direto. A consulta foi auditada como metadata only.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(source)));
+      return;
+    }
+
+    final uri = Uri.tryParse(access.signedUrl);
+    if (uri == null) {
+      await _showAttachmentAccessLink(access.signedUrl);
+      return;
+    }
+
+    final opened = openExternalBrowserTab(uri);
+    if (!opened && mounted) {
+      await _showAttachmentAccessLink(access.signedUrl);
+    }
+  }
+
+  Future<void> _showAttachmentAccessLink(String url) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Acesso auditavel gerado'),
+        content: SelectableText(url),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<bool> _confirmAction({
     required String title,
     required String message,
@@ -622,6 +715,7 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
                     _openEditOccurrenceDialog(selectedItem, occurrence),
                 onRemoveOccurrence: _removeOccurrence,
                 onAddAttachment: () => _openCreateAttachmentDialog(profile),
+                onOpenAttachment: _openAttachmentAccess,
                 onEditAttachment: _openEditAttachmentDialog,
                 onRemoveAttachment: _removeAttachment,
               );
@@ -1339,6 +1433,7 @@ class _PeopleSideColumn extends StatelessWidget {
     required this.onEditOccurrence,
     required this.onRemoveOccurrence,
     required this.onAddAttachment,
+    required this.onOpenAttachment,
     required this.onEditAttachment,
     required this.onRemoveAttachment,
   });
@@ -1352,6 +1447,7 @@ class _PeopleSideColumn extends StatelessWidget {
   final ValueChanged<_OccurrenceRecord> onEditOccurrence;
   final ValueChanged<_OccurrenceRecord> onRemoveOccurrence;
   final VoidCallback onAddAttachment;
+  final ValueChanged<_AttachmentRecord> onOpenAttachment;
   final ValueChanged<_AttachmentRecord> onEditAttachment;
   final ValueChanged<_AttachmentRecord> onRemoveAttachment;
 
@@ -1376,7 +1472,9 @@ class _PeopleSideColumn extends StatelessWidget {
           item: item,
           attachments: attachments,
           occurrences: profile.occurrences,
+          calendarEntries: profile.calendarEntries,
           onAdd: onAddAttachment,
+          onOpen: onOpenAttachment,
           onEdit: onEditAttachment,
           onRemove: onRemoveAttachment,
         ),
@@ -5829,7 +5927,9 @@ class _AttachmentsPanel extends StatelessWidget {
     required this.item,
     required this.attachments,
     required this.occurrences,
+    required this.calendarEntries,
     required this.onAdd,
+    required this.onOpen,
     required this.onEdit,
     required this.onRemove,
   });
@@ -5838,12 +5938,19 @@ class _AttachmentsPanel extends StatelessWidget {
   final _EntityItem item;
   final List<_AttachmentRecord> attachments;
   final List<_OccurrenceRecord> occurrences;
+  final List<_CalendarEntryRecord> calendarEntries;
   final VoidCallback onAdd;
+  final ValueChanged<_AttachmentRecord> onOpen;
   final ValueChanged<_AttachmentRecord> onEdit;
   final ValueChanged<_AttachmentRecord> onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final activeCalendarEntries = calendarEntries.where((entry) {
+      final status = entry.status.toUpperCase();
+      return status != 'CANCELED' && status != 'COMPLETED';
+    }).toList()..sort((left, right) => left.startsAt.compareTo(right.startsAt));
+
     return _Panel(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
       child: Column(
@@ -5870,6 +5977,10 @@ class _AttachmentsPanel extends StatelessWidget {
               ),
             ],
           ),
+          if (activeCalendarEntries.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _AttachmentCalendarContext(entries: activeCalendarEntries),
+          ],
           const SizedBox(height: 18),
           const Divider(color: _lineColor),
           if (attachments.isEmpty) ...[
@@ -5896,6 +6007,7 @@ class _AttachmentsPanel extends StatelessWidget {
             for (final attachment in attachments) ...[
               _AttachmentRow(
                 attachment: attachment,
+                onAccess: () => onOpen(attachment),
                 onEdit: attachment.canEdit ? () => onEdit(attachment) : null,
                 onRemove: attachment.canDelete
                     ? () => onRemove(attachment)
@@ -5910,14 +6022,74 @@ class _AttachmentsPanel extends StatelessWidget {
   }
 }
 
+class _AttachmentCalendarContext extends StatelessWidget {
+  const _AttachmentCalendarContext({required this.entries});
+
+  final List<_CalendarEntryRecord> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final nextEntry = entries.first;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _amberColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _amberColor.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.event_note_outlined, color: _amberColor, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Agenda vinculada',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${nextEntry.startsAtLabel} | ${nextEntry.title}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _mutedColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _Tag(
+            label: '${entries.length} itens',
+            icon: Icons.calendar_month_outlined,
+            color: _amberColor,
+            background: _amberColor.withValues(alpha: 0.12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AttachmentRow extends StatelessWidget {
   const _AttachmentRow({
     required this.attachment,
+    required this.onAccess,
     required this.onEdit,
     required this.onRemove,
   });
 
   final _AttachmentRecord attachment;
+  final VoidCallback onAccess;
   final VoidCallback? onEdit;
   final VoidCallback? onRemove;
 
@@ -5952,6 +6124,8 @@ class _AttachmentRow extends StatelessWidget {
               children: [
                 Text(
                   attachment.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 6),
@@ -5961,6 +6135,37 @@ class _AttachmentRow extends StatelessWidget {
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
                 ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _Tag(
+                      label: attachment.classification.label,
+                      icon: attachment.classification.icon,
+                      color: _attachmentColorFor(attachment),
+                      background: _attachmentColorFor(
+                        attachment,
+                      ).withValues(alpha: 0.10),
+                    ),
+                    _Tag(
+                      label: attachment.accessSourceLabel,
+                      icon:
+                          attachment.accessSource.toUpperCase() == 'S3_PRIVATE'
+                          ? Icons.cloud_queue_outlined
+                          : Icons.link_outlined,
+                      color: _slateColor,
+                      background: _slateColor.withValues(alpha: 0.10),
+                    ),
+                    if (attachment.requiresSensitiveSession)
+                      _Tag(
+                        label: 'step-up',
+                        icon: Icons.verified_user_outlined,
+                        color: _roseColor,
+                        background: _roseColor.withValues(alpha: 0.10),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -5968,11 +6173,16 @@ class _AttachmentRow extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                attachment.canDownload
-                    ? Icons.download_rounded
-                    : Icons.lock_outline_rounded,
-                color: _mutedColor,
+              IconButton.filledTonal(
+                tooltip: attachment.canDownload
+                    ? 'Gerar download auditavel'
+                    : 'Visualizar com auditoria',
+                onPressed: onAccess,
+                icon: Icon(
+                  attachment.canDownload
+                      ? Icons.download_rounded
+                      : Icons.visibility_outlined,
+                ),
               ),
               IconButton(
                 tooltip: 'Editar anexo',
@@ -5988,6 +6198,204 @@ class _AttachmentRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SensitiveStepUpDialog extends StatefulWidget {
+  const _SensitiveStepUpDialog({
+    required this.repository,
+    required this.attachment,
+  });
+
+  final _PeopleApiRepository repository;
+  final _AttachmentRecord attachment;
+
+  @override
+  State<_SensitiveStepUpDialog> createState() => _SensitiveStepUpDialogState();
+}
+
+class _SensitiveStepUpDialogState extends State<_SensitiveStepUpDialog> {
+  final _codeController = TextEditingController();
+  _SensitiveSessionStartResult? _session;
+  bool _loading = true;
+  bool _verifying = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_startSession());
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startSession() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final session = await widget.repository.startSensitiveSession(
+        justification:
+            'Acesso auditavel ao anexo sensivel ${widget.attachment.title}.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _session = session;
+        _loading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    }
+  }
+
+  Future<void> _verify() async {
+    final session = _session;
+    final code = _codeController.text.trim();
+    if (session == null || code.length != 6) {
+      setState(() => _error = 'Informe o codigo de 6 digitos.');
+      return;
+    }
+
+    setState(() {
+      _verifying = true;
+      _error = null;
+    });
+    try {
+      await widget.repository.verifySensitiveSession(
+        publicId: session.publicId,
+        code: code,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _verifying = false;
+        _error = error.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = _session;
+    return AlertDialog(
+      title: const Text('Validar sessao sensivel'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.attachment.title,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const LinearProgressIndicator(minHeight: 2)
+            else if (session != null) ...[
+              Text(
+                session.deliveryTargetMasked.isEmpty
+                    ? 'Codigo enviado pelo canal configurado na API.'
+                    : 'Codigo enviado para ${session.deliveryTargetMasked}.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+              ),
+              if (session.expiresAt != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Expira em ${_shortDateTimeLabel(session.expiresAt)}.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: _mutedColor),
+                ),
+              ],
+              if (session.devCode.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SelectableText(
+                  'Codigo dev: ${session.devCode}',
+                  style: const TextStyle(
+                    color: _roseColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: _codeController,
+                enabled: !_verifying,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Codigo',
+                  prefixIcon: Icon(Icons.pin_outlined),
+                ),
+                onSubmitted: (_) {
+                  if (!_verifying) {
+                    unawaited(_verify());
+                  }
+                },
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: _roseColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _verifying ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        if (!_loading && session == null)
+          OutlinedButton.icon(
+            onPressed: _startSession,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Reenviar'),
+          ),
+        if (session != null)
+          FilledButton.icon(
+            onPressed: _verifying ? null : _verify,
+            icon: _verifying
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.verified_user_outlined, size: 18),
+            label: const Text('Validar'),
+          ),
+      ],
     );
   }
 }

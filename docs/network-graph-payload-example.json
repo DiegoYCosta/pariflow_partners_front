@@ -2,61 +2,35 @@
   "data": {
     "period": {
       "preset": "1y",
-      "from": "2025-01-01",
-      "to": "2025-12-31"
+      "from": "2025-05-14",
+      "to": "2026-05-14"
     },
     "lanes": [
       "root_company",
       "client_company",
       "contract",
+      "position",
       "employee"
     ],
     "nodes": [
       {
-        "publicId": "egr_01hroot0000000000000001",
+        "publicId": "emp_01hroot0000000000000001",
         "nodeType": "root_company",
         "lane": "root_company",
-        "displayName": "Summit Holdings",
-        "subtitle": "Holding company",
+        "displayName": "PariFlow Services",
+        "subtitle": "Empresa prestadora",
         "status": "active",
-        "badges": [
-          "2 client companies",
-          "2 active contracts"
-        ],
+        "badges": ["prestadora", "12.345.678/0001-90"],
         "detailSnapshot": {
           "kind": "root_company",
-          "summary": "Holding com carteira ativa e cruzamento historico com outro grupo empresarial.",
-          "activeClientCompanies": 2,
-          "activeContracts": 2,
-          "activeEmployees": 2,
+          "summary": "Prestadora com carteira ativa no recorte relacional atual.",
+          "activeClientCompanies": 1,
+          "activeContracts": 1,
+          "activeEmployees": 1,
           "historicalEmployees": 1,
           "cta": {
-            "label": "Ver grupo completo",
-            "targetPublicId": "egr_01hroot0000000000000001"
-          }
-        }
-      },
-      {
-        "publicId": "egr_01hroot0000000000000002",
-        "nodeType": "root_company",
-        "lane": "root_company",
-        "displayName": "Pioneer Group",
-        "subtitle": "Holding company",
-        "status": "active",
-        "badges": [
-          "3 client companies",
-          "3 contracts in view"
-        ],
-        "detailSnapshot": {
-          "kind": "root_company",
-          "summary": "Holding com carteira ativa, contratos correntes e historico compartilhado com a malha da Summit.",
-          "activeClientCompanies": 3,
-          "activeContracts": 3,
-          "activeEmployees": 3,
-          "historicalEmployees": 2,
-          "cta": {
-            "label": "Ver grupo completo",
-            "targetPublicId": "egr_01hroot0000000000000002"
+            "label": "Abrir prestadora",
+            "targetPublicId": "emp_01hroot0000000000000001"
           }
         }
       },
@@ -64,118 +38,19 @@
         "publicId": "cli_01hcli0000000000000001",
         "nodeType": "client_company",
         "lane": "client_company",
-        "displayName": "Summit Retail LLC",
-        "subtitle": "Client company",
+        "displayName": "Acme Operacoes",
+        "subtitle": "MATRIZ",
         "status": "active",
-        "badges": [
-          "1 active contract"
-        ],
+        "badges": ["cliente", "98.765.432/0001-10"],
         "detailSnapshot": {
           "kind": "client_company",
-          "summary": "Cliente operacional conectado a uma raiz principal e a um contrato ativo de retail ops.",
-          "rootCompanies": [
-            "Summit Holdings"
-          ],
+          "summary": "Cliente conectado a contratos visiveis no recorte.",
+          "rootCompanies": ["PariFlow Services"],
           "activeContracts": 1,
           "activeEmployees": 1,
           "cta": {
-            "label": "Abrir empresa cliente",
+            "label": "Abrir cliente",
             "targetPublicId": "cli_01hcli0000000000000001"
-          }
-        }
-      },
-      {
-        "publicId": "cli_01hcli0000000000000002",
-        "nodeType": "client_company",
-        "lane": "client_company",
-        "displayName": "Summit Solutions Inc.",
-        "subtitle": "Client company",
-        "status": "active",
-        "badges": [
-          "1 active contract",
-          "1 indirect bridge"
-        ],
-        "detailSnapshot": {
-          "kind": "client_company",
-          "summary": "Cliente operacional da Summit com ponte indireta para Pioneer Services.",
-          "rootCompanies": [
-            "Summit Holdings"
-          ],
-          "activeContracts": 1,
-          "indirectConnections": 1,
-          "cta": {
-            "label": "Abrir empresa cliente",
-            "targetPublicId": "cli_01hcli0000000000000002"
-          }
-        }
-      },
-      {
-        "publicId": "cli_01hcli0000000000000003",
-        "nodeType": "client_company",
-        "lane": "client_company",
-        "displayName": "Pioneer Services LLC",
-        "subtitle": "Client company",
-        "status": "active",
-        "badges": [
-          "2 relevant contracts"
-        ],
-        "detailSnapshot": {
-          "kind": "client_company",
-          "summary": "Cliente operacional com contrato ativo de maintenance e historico relacionado a consulting.",
-          "rootCompanies": [
-            "Pioneer Group"
-          ],
-          "activeContracts": 2,
-          "activeEmployees": 2,
-          "cta": {
-            "label": "Abrir empresa cliente",
-            "targetPublicId": "cli_01hcli0000000000000003"
-          }
-        }
-      },
-      {
-        "publicId": "cli_01hcli0000000000000004",
-        "nodeType": "client_company",
-        "lane": "client_company",
-        "displayName": "Pioneer Retail Inc.",
-        "subtitle": "Client company",
-        "status": "active",
-        "badges": [
-          "1 historical contract"
-        ],
-        "detailSnapshot": {
-          "kind": "client_company",
-          "summary": "Cliente com relacao historica ainda relevante para o contrato de maintenance.",
-          "rootCompanies": [
-            "Pioneer Group"
-          ],
-          "historicalContracts": 1,
-          "cta": {
-            "label": "Abrir empresa cliente",
-            "targetPublicId": "cli_01hcli0000000000000004"
-          }
-        }
-      },
-      {
-        "publicId": "cli_01hcli0000000000000005",
-        "nodeType": "client_company",
-        "lane": "client_company",
-        "displayName": "Pioneer Tech LLC",
-        "subtitle": "Client company",
-        "status": "active",
-        "badges": [
-          "1 expired contract"
-        ],
-        "detailSnapshot": {
-          "kind": "client_company",
-          "summary": "Cliente com supply agreement expirado ainda visivel no recorte historico.",
-          "rootCompanies": [
-            "Pioneer Group"
-          ],
-          "historicalContracts": 1,
-          "cta": {
-            "label": "Abrir empresa cliente",
-            "targetPublicId": "cli_01hcli0000000000000005"
           }
         }
       },
@@ -183,20 +58,17 @@
         "publicId": "ctr_01hctr0000000000000001",
         "nodeType": "contract",
         "lane": "contract",
-        "displayName": "Retail Ops Agreement",
-        "subtitle": "Active",
+        "displayName": "PariFlow Services -> Acme Operacoes",
+        "subtitle": "ACTIVE",
         "status": "active",
-        "badges": [
-          "1 employee"
-        ],
+        "badges": ["1 postos", "2 vinculos"],
         "detailSnapshot": {
           "kind": "contract",
-          "summary": "Contrato ativo de operacao de retail conectado a uma company e a uma colaboradora.",
+          "summary": "Contrato entre PariFlow Services e Acme Operacoes.",
           "contractStatus": "active",
-          "clientCompanies": [
-            "Summit Retail LLC"
-          ],
+          "clientCompanies": ["Acme Operacoes"],
           "activeEmployees": 1,
+          "historicalEmployees": 1,
           "cta": {
             "label": "Abrir contrato",
             "targetPublicId": "ctr_01hctr0000000000000001"
@@ -204,457 +76,143 @@
         }
       },
       {
-        "publicId": "ctr_01hctr0000000000000002",
-        "nodeType": "contract",
-        "lane": "contract",
-        "displayName": "IT Services Contract",
-        "subtitle": "Active",
+        "publicId": "pos_01hpos0000000000000001",
+        "nodeType": "position",
+        "lane": "position",
+        "displayName": "Portaria 12x36",
+        "subtitle": "Unidade Campinas",
         "status": "active",
-        "badges": [
-          "1 employee"
-        ],
+        "badges": ["ACTIVE", "Portaria", "2 vinculos"],
         "detailSnapshot": {
-          "kind": "contract",
-          "summary": "Contrato ativo de servicos de TI ligado a Summit Solutions.",
+          "kind": "position",
+          "summary": "Posto Portaria 12x36 no contrato ctr_01hctr0000000000000001.",
           "contractStatus": "active",
-          "clientCompanies": [
-            "Summit Solutions Inc."
-          ],
+          "clientCompanies": ["Acme Operacoes"],
           "activeEmployees": 1,
-          "cta": {
-            "label": "Abrir contrato",
-            "targetPublicId": "ctr_01hctr0000000000000002"
-          }
-        }
-      },
-      {
-        "publicId": "ctr_01hctr0000000000000003",
-        "nodeType": "contract",
-        "lane": "contract",
-        "displayName": "Consulting Agreement",
-        "subtitle": "Expired",
-        "status": "expired",
-        "badges": [
-          "historical relation"
-        ],
-        "detailSnapshot": {
-          "kind": "contract",
-          "summary": "Contrato expirado que ainda compoe a leitura historica de Sarah Johnson.",
-          "contractStatus": "expired",
-          "clientCompanies": [
-            "Pioneer Services LLC"
-          ],
           "historicalEmployees": 1,
           "cta": {
-            "label": "Abrir contrato",
-            "targetPublicId": "ctr_01hctr0000000000000003"
-          }
-        }
-      },
-      {
-        "publicId": "ctr_01hctr0000000000000004",
-        "nodeType": "contract",
-        "lane": "contract",
-        "displayName": "Maintenance Contract",
-        "subtitle": "Active",
-        "status": "active",
-        "badges": [
-          "2 employees",
-          "2 client contexts"
-        ],
-        "detailSnapshot": {
-          "kind": "contract",
-          "summary": "Contrato ativo que mostra que um contrato pode carregar mais de uma company relevante no mesmo recorte.",
-          "contractStatus": "active",
-          "clientCompanies": [
-            "Pioneer Services LLC",
-            "Pioneer Retail Inc."
-          ],
-          "activeEmployees": 2,
-          "cta": {
-            "label": "Abrir contrato",
-            "targetPublicId": "ctr_01hctr0000000000000004"
-          }
-        }
-      },
-      {
-        "publicId": "ctr_01hctr0000000000000005",
-        "nodeType": "contract",
-        "lane": "contract",
-        "displayName": "Supply Agreement",
-        "subtitle": "Expired",
-        "status": "expired",
-        "badges": [
-          "historical employee"
-        ],
-        "detailSnapshot": {
-          "kind": "contract",
-          "summary": "Contrato expirado de supply ainda visivel em historico ampliado.",
-          "contractStatus": "expired",
-          "clientCompanies": [
-            "Pioneer Tech LLC"
-          ],
-          "historicalEmployees": 1,
-          "cta": {
-            "label": "Abrir contrato",
-            "targetPublicId": "ctr_01hctr0000000000000005"
-          }
+            "label": "Abrir posto",
+            "targetPublicId": "pos_01hpos0000000000000001"
+          },
+          "contract": "ctr_01hctr0000000000000001",
+          "service": "Portaria",
+          "shift": "Noturno",
+          "schedule": "12x36",
+          "scale": "12x36",
+          "location": "Unidade Campinas",
+          "statusLabel": "ACTIVE"
         }
       },
       {
         "publicId": "pes_01hpes0000000000000001",
         "nodeType": "employee",
         "lane": "employee",
-        "displayName": "Jessica Lee",
-        "subtitle": "Project Manager",
+        "displayName": "Mariana Silva",
+        "subtitle": "Portaria 12x36",
         "status": "active",
-        "badges": [
-          "1 active contract"
-        ],
+        "badges": ["CLT", "PariFlow Services"],
         "detailSnapshot": {
           "kind": "employee",
-          "employeeId": "EMP-10431",
-          "email": "jessica.lee@summitretail.com",
-          "phone": "+1 (555) 234-5601",
-          "department": "Retail Operations",
-          "manager": "Olivia Carter",
-          "clientCompany": "Summit Retail LLC",
-          "contract": "Retail Ops Agreement",
-          "status": "Active",
-          "startDate": "2023-02-01",
-          "location": "Chicago, IL",
+          "summary": "Mariana Silva em Portaria 12x36.",
+          "activeContracts": 1,
+          "historicalContracts": 0,
           "cta": {
-            "label": "View Full Profile",
+            "label": "Abrir pessoa",
             "targetPublicId": "pes_01hpes0000000000000001"
-          }
+          },
+          "email": "mariana.silva@example.com",
+          "phone": "+55 19 99999-0001",
+          "cpf": "123.456.789-00",
+          "clientCompany": "Acme Operacoes",
+          "contract": "ctr_01hctr0000000000000001",
+          "providerCompany": "PariFlow Services",
+          "position": "Portaria 12x36",
+          "statusLabel": "ACTIVE",
+          "startDate": "2025-02-01",
+          "location": "Unidade Campinas"
         }
       },
       {
         "publicId": "pes_01hpes0000000000000002",
         "nodeType": "employee",
         "lane": "employee",
-        "displayName": "Michael Chen",
-        "subtitle": "IT Specialist",
-        "status": "active",
-        "badges": [
-          "1 active contract"
-        ],
+        "displayName": "Rafael Costa",
+        "subtitle": "Portaria 12x36",
+        "status": "dismissed",
+        "badges": ["CLT", "PariFlow Services"],
         "detailSnapshot": {
           "kind": "employee",
-          "employeeId": "EMP-10432",
-          "email": "michael.chen@summitsolutions.com",
-          "phone": "+1 (555) 234-5670",
-          "department": "Technology",
-          "manager": "Helen Brooks",
-          "clientCompany": "Summit Solutions Inc.",
-          "contract": "IT Services Contract",
-          "status": "Active",
-          "startDate": "2022-08-15",
-          "location": "Austin, TX",
+          "summary": "Rafael Costa em Portaria 12x36.",
+          "activeContracts": 0,
+          "historicalContracts": 1,
           "cta": {
-            "label": "View Full Profile",
+            "label": "Abrir pessoa",
             "targetPublicId": "pes_01hpes0000000000000002"
-          }
-        }
-      },
-      {
-        "publicId": "pes_01hpes0000000000000003",
-        "nodeType": "employee",
-        "lane": "employee",
-        "displayName": "Sarah Johnson",
-        "subtitle": "Senior Analyst",
-        "status": "active",
-        "badges": [
-          "1 active contract",
-          "1 historical contract"
-        ],
-        "detailSnapshot": {
-          "kind": "employee",
-          "employeeId": "EMP-10432",
-          "email": "sarah.johnson@pioneerservices.com",
-          "phone": "+1 (555) 234-5678",
-          "department": "Analytics",
-          "manager": "David Williams",
-          "clientCompany": "Pioneer Services LLC",
-          "contract": "Maintenance Contract",
-          "status": "Active",
-          "startDate": "2022-01-15",
-          "location": "Chicago, IL",
-          "historicalContracts": [
-            "Consulting Agreement"
-          ],
-          "cta": {
-            "label": "View Full Profile",
-            "targetPublicId": "pes_01hpes0000000000000003"
-          }
-        }
-      },
-      {
-        "publicId": "pes_01hpes0000000000000004",
-        "nodeType": "employee",
-        "lane": "employee",
-        "displayName": "David Williams",
-        "subtitle": "Account Manager",
-        "status": "active",
-        "badges": [
-          "1 active contract"
-        ],
-        "detailSnapshot": {
-          "kind": "employee",
-          "employeeId": "EMP-10433",
-          "email": "david.williams@pioneerservices.com",
-          "phone": "+1 (555) 234-5681",
-          "department": "Client Services",
-          "manager": "Sophia Turner",
-          "clientCompany": "Pioneer Services LLC",
-          "contract": "Maintenance Contract",
-          "status": "Active",
-          "startDate": "2021-04-04",
-          "location": "Chicago, IL",
-          "cta": {
-            "label": "View Full Profile",
-            "targetPublicId": "pes_01hpes0000000000000004"
-          }
-        }
-      },
-      {
-        "publicId": "pes_01hpes0000000000000005",
-        "nodeType": "employee",
-        "lane": "employee",
-        "displayName": "Emily Davis",
-        "subtitle": "Operations Lead",
-        "status": "historical",
-        "badges": [
-          "expired contract"
-        ],
-        "detailSnapshot": {
-          "kind": "employee",
-          "employeeId": "EMP-10434",
-          "email": "emily.davis@pioneertech.com",
-          "phone": "+1 (555) 234-5690",
-          "department": "Operations",
-          "manager": "Liam Foster",
-          "clientCompany": "Pioneer Tech LLC",
-          "contract": "Supply Agreement",
-          "status": "Historical",
-          "startDate": "2020-03-12",
-          "endDate": "2024-11-30",
-          "location": "Denver, CO",
-          "cta": {
-            "label": "View Full Profile",
-            "targetPublicId": "pes_01hpes0000000000000005"
-          }
+          },
+          "email": "rafael.costa@example.com",
+          "phone": "+55 19 99999-0002",
+          "cpf": "987.654.321-00",
+          "clientCompany": "Acme Operacoes",
+          "contract": "ctr_01hctr0000000000000001",
+          "providerCompany": "PariFlow Services",
+          "position": "Portaria 12x36",
+          "statusLabel": "DISMISSED",
+          "startDate": "2024-01-15",
+          "endDate": "2025-03-20",
+          "location": "Unidade Campinas"
         }
       }
     ],
     "edges": [
       {
-        "publicId": "rel_01hrel0000000000000001",
-        "fromPublicId": "egr_01hroot0000000000000001",
-        "toPublicId": "egr_01hroot0000000000000002",
-        "relationshipKind": "historical_association",
-        "relationshipState": "historical",
-        "periodStart": "2021-01-01",
-        "periodEnd": "2022-12-31",
-        "metadata": {
-          "label": "legacy strategic overlap"
-        }
-      },
-      {
-        "publicId": "rel_01hrel0000000000000002",
-        "fromPublicId": "egr_01hroot0000000000000001",
+        "publicId": "edge_emp_01hroot0000000000000001_cli_01hcli0000000000000001_ctr_01hctr0000000000000001",
+        "fromPublicId": "emp_01hroot0000000000000001",
         "toPublicId": "cli_01hcli0000000000000001",
-        "relationshipKind": "client_membership",
+        "relationshipKind": "provider_client_scope",
         "relationshipState": "active",
-        "periodStart": "2024-01-01",
-        "periodEnd": null,
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000003",
-        "fromPublicId": "egr_01hroot0000000000000001",
-        "toPublicId": "cli_01hcli0000000000000002",
-        "relationshipKind": "client_membership",
-        "relationshipState": "active",
-        "periodStart": "2024-01-01",
-        "periodEnd": null,
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000004",
-        "fromPublicId": "egr_01hroot0000000000000002",
-        "toPublicId": "cli_01hcli0000000000000003",
-        "relationshipKind": "client_membership",
-        "relationshipState": "active",
-        "periodStart": "2024-01-01",
-        "periodEnd": null,
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000005",
-        "fromPublicId": "egr_01hroot0000000000000002",
-        "toPublicId": "cli_01hcli0000000000000004",
-        "relationshipKind": "client_membership",
-        "relationshipState": "active",
-        "periodStart": "2024-01-01",
-        "periodEnd": null,
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000006",
-        "fromPublicId": "egr_01hroot0000000000000002",
-        "toPublicId": "cli_01hcli0000000000000005",
-        "relationshipKind": "client_membership",
-        "relationshipState": "active",
-        "periodStart": "2024-01-01",
-        "periodEnd": null,
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000007",
-        "fromPublicId": "cli_01hcli0000000000000002",
-        "toPublicId": "cli_01hcli0000000000000003",
-        "relationshipKind": "indirect_association",
-        "relationshipState": "indirect",
         "periodStart": "2025-01-01",
         "periodEnd": null,
-        "metadata": {
-          "label": "shared delivery context"
-        }
+        "metadata": { "label": "ACTIVE" }
       },
       {
-        "publicId": "rel_01hrel0000000000000008",
+        "publicId": "edge_cli_01hcli0000000000000001_ctr_01hctr0000000000000001",
         "fromPublicId": "cli_01hcli0000000000000001",
         "toPublicId": "ctr_01hctr0000000000000001",
-        "relationshipKind": "contract_scope",
+        "relationshipKind": "contract_allocation",
         "relationshipState": "active",
         "periodStart": "2025-01-01",
         "periodEnd": null,
-        "metadata": {}
+        "metadata": { "label": "ACTIVE" }
       },
       {
-        "publicId": "rel_01hrel0000000000000009",
-        "fromPublicId": "cli_01hcli0000000000000002",
-        "toPublicId": "ctr_01hctr0000000000000002",
-        "relationshipKind": "contract_scope",
-        "relationshipState": "active",
-        "periodStart": "2025-01-01",
-        "periodEnd": null,
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000010",
-        "fromPublicId": "cli_01hcli0000000000000003",
-        "toPublicId": "ctr_01hctr0000000000000003",
-        "relationshipKind": "contract_scope",
-        "relationshipState": "historical",
-        "periodStart": "2023-01-01",
-        "periodEnd": "2024-12-31",
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000011",
-        "fromPublicId": "cli_01hcli0000000000000003",
-        "toPublicId": "ctr_01hctr0000000000000004",
-        "relationshipKind": "contract_scope",
-        "relationshipState": "active",
-        "periodStart": "2025-01-01",
-        "periodEnd": null,
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000012",
-        "fromPublicId": "cli_01hcli0000000000000004",
-        "toPublicId": "ctr_01hctr0000000000000004",
-        "relationshipKind": "historical_association",
-        "relationshipState": "historical",
-        "periodStart": "2024-01-01",
-        "periodEnd": "2024-12-31",
-        "metadata": {
-          "label": "previous operating context"
-        }
-      },
-      {
-        "publicId": "rel_01hrel0000000000000013",
-        "fromPublicId": "cli_01hcli0000000000000005",
-        "toPublicId": "ctr_01hctr0000000000000005",
-        "relationshipKind": "contract_scope",
-        "relationshipState": "historical",
-        "periodStart": "2023-01-01",
-        "periodEnd": "2024-11-30",
-        "metadata": {}
-      },
-      {
-        "publicId": "rel_01hrel0000000000000014",
+        "publicId": "edge_ctr_01hctr0000000000000001_pos_01hpos0000000000000001",
         "fromPublicId": "ctr_01hctr0000000000000001",
+        "toPublicId": "pos_01hpos0000000000000001",
+        "relationshipKind": "position_scope",
+        "relationshipState": "active",
+        "periodStart": "2025-01-01",
+        "periodEnd": null,
+        "metadata": { "label": "Portaria" }
+      },
+      {
+        "publicId": "edge_pos_01hpos0000000000000001_pes_01hpes0000000000000001_vin_01hvin0000000000000001",
+        "fromPublicId": "pos_01hpos0000000000000001",
         "toPublicId": "pes_01hpes0000000000000001",
-        "relationshipKind": "active_allocation",
+        "relationshipKind": "employment_link",
         "relationshipState": "active",
-        "periodStart": "2023-02-01",
+        "periodStart": "2025-02-01",
         "periodEnd": null,
-        "metadata": {
-          "employmentLinkPublicId": "vin_01hvin0000000000000001"
-        }
+        "metadata": { "label": "ACTIVE" }
       },
       {
-        "publicId": "rel_01hrel0000000000000015",
-        "fromPublicId": "ctr_01hctr0000000000000002",
+        "publicId": "edge_pos_01hpos0000000000000001_pes_01hpes0000000000000002_vin_01hvin0000000000000002",
+        "fromPublicId": "pos_01hpos0000000000000001",
         "toPublicId": "pes_01hpes0000000000000002",
-        "relationshipKind": "active_allocation",
-        "relationshipState": "active",
-        "periodStart": "2022-08-15",
-        "periodEnd": null,
-        "metadata": {
-          "employmentLinkPublicId": "vin_01hvin0000000000000002"
-        }
-      },
-      {
-        "publicId": "rel_01hrel0000000000000016",
-        "fromPublicId": "ctr_01hctr0000000000000003",
-        "toPublicId": "pes_01hpes0000000000000003",
-        "relationshipKind": "historical_allocation",
+        "relationshipKind": "employment_link",
         "relationshipState": "historical",
-        "periodStart": "2023-03-01",
-        "periodEnd": "2024-12-31",
-        "metadata": {
-          "employmentLinkPublicId": "vin_01hvin0000000000000003"
-        }
-      },
-      {
-        "publicId": "rel_01hrel0000000000000017",
-        "fromPublicId": "ctr_01hctr0000000000000004",
-        "toPublicId": "pes_01hpes0000000000000003",
-        "relationshipKind": "active_allocation",
-        "relationshipState": "active",
-        "periodStart": "2025-01-15",
-        "periodEnd": null,
-        "metadata": {
-          "employmentLinkPublicId": "vin_01hvin0000000000000004"
-        }
-      },
-      {
-        "publicId": "rel_01hrel0000000000000018",
-        "fromPublicId": "ctr_01hctr0000000000000004",
-        "toPublicId": "pes_01hpes0000000000000004",
-        "relationshipKind": "active_allocation",
-        "relationshipState": "active",
-        "periodStart": "2021-04-04",
-        "periodEnd": null,
-        "metadata": {
-          "employmentLinkPublicId": "vin_01hvin0000000000000005"
-        }
-      },
-      {
-        "publicId": "rel_01hrel0000000000000019",
-        "fromPublicId": "ctr_01hctr0000000000000005",
-        "toPublicId": "pes_01hpes0000000000000005",
-        "relationshipKind": "historical_allocation",
-        "relationshipState": "historical",
-        "periodStart": "2020-03-12",
-        "periodEnd": "2024-11-30",
-        "metadata": {
-          "employmentLinkPublicId": "vin_01hvin0000000000000006"
-        }
+        "periodStart": "2024-01-15",
+        "periodEnd": "2025-03-20",
+        "metadata": { "label": "DISMISSED" }
       }
     ],
     "filters": {
@@ -663,94 +221,44 @@
         "periodPreset": "1y",
         "rootCompanyPublicIds": [],
         "clientCompanyPublicIds": [],
-        "contractStatuses": [
-          "active",
-          "expired"
-        ],
-        "employeeStatuses": [
-          "active",
-          "historical"
-        ],
+        "contractStatuses": ["active"],
+        "employeeStatuses": ["active", "dismissed"],
         "includeHistorical": true,
-        "includeIndirect": true
+        "includeIndirect": false
       },
       "available": {
-        "periodPresets": [
-          "6m",
-          "1y",
-          "2y",
-          "all"
-        ],
+        "periodPresets": ["6m", "1y", "2y", "all"],
         "rootCompanies": [
           {
-            "publicId": "egr_01hroot0000000000000001",
-            "label": "Summit Holdings"
-          },
-          {
-            "publicId": "egr_01hroot0000000000000002",
-            "label": "Pioneer Group"
+            "publicId": "emp_01hroot0000000000000001",
+            "label": "PariFlow Services"
           }
         ],
         "clientCompanies": [
           {
             "publicId": "cli_01hcli0000000000000001",
-            "label": "Summit Retail LLC"
-          },
-          {
-            "publicId": "cli_01hcli0000000000000002",
-            "label": "Summit Solutions Inc."
-          },
-          {
-            "publicId": "cli_01hcli0000000000000003",
-            "label": "Pioneer Services LLC"
-          },
-          {
-            "publicId": "cli_01hcli0000000000000004",
-            "label": "Pioneer Retail Inc."
-          },
-          {
-            "publicId": "cli_01hcli0000000000000005",
-            "label": "Pioneer Tech LLC"
+            "label": "Acme Operacoes"
           }
         ],
-        "contractStatuses": [
-          "active",
-          "expired"
-        ],
-        "employeeStatuses": [
-          "active",
-          "historical"
-        ],
-        "relationshipStates": [
-          "active",
-          "historical",
-          "indirect"
-        ]
+        "contractStatuses": ["active"],
+        "employeeStatuses": ["active", "dismissed"],
+        "relationshipStates": ["active", "historical", "indirect"]
       }
     },
     "legend": {
       "relationshipStates": [
-        {
-          "value": "active",
-          "label": "Active Relationship"
-        },
-        {
-          "value": "historical",
-          "label": "Historical Relationship"
-        },
-        {
-          "value": "indirect",
-          "label": "Indirect Relationship"
-        }
+        { "value": "active", "label": "Relacao ativa" },
+        { "value": "historical", "label": "Relacao historica" },
+        { "value": "indirect", "label": "Relacao indireta" }
       ]
     },
     "focus": {
-      "selectedNodePublicId": "pes_01hpes0000000000000003",
+      "selectedNodePublicId": "pes_01hpes0000000000000001",
       "hoveredNodePublicId": null,
-      "viewportAnchorPublicId": "pes_01hpes0000000000000003"
+      "viewportAnchorPublicId": "pes_01hpes0000000000000001"
     }
   },
   "meta": {
-    "traceId": "req_01hnetworkpayloadexample0001"
+    "traceId": "req_01hnetworkcontractexample0001"
   }
 }

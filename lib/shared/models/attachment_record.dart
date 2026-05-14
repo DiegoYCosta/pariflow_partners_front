@@ -49,6 +49,8 @@ class _AttachmentRecord {
     this.mimeType = '',
     this.externalLink = '',
     this.physicalLocation = '',
+    this.accessSource = '',
+    this.requiresSensitiveSession = false,
     this.canDownload = true,
     this.canEdit = false,
     this.canDelete = false,
@@ -66,6 +68,8 @@ class _AttachmentRecord {
   final String mimeType;
   final String externalLink;
   final String physicalLocation;
+  final String accessSource;
+  final bool requiresSensitiveSession;
   final bool canDownload;
   final bool canEdit;
   final bool canDelete;
@@ -74,8 +78,25 @@ class _AttachmentRecord {
     if (!accessPolicy.canViewerRead(viewer)) {
       return 'conteudo nao compartilhado com este perfil';
     }
+    if (requiresSensitiveSession) {
+      return 'consulta liberada | step-up sensivel obrigatorio';
+    }
     return canDownload
         ? 'consulta liberada | download rastreavel'
         : 'consulta liberada | sem download direto';
+  }
+
+  String get accessSourceLabel {
+    return switch (accessSource.toUpperCase()) {
+      'S3_PRIVATE' => 'storage privado',
+      'EXTERNAL_LINK' => 'link externo auditado',
+      'METADATA_ONLY' => 'sem arquivo digital',
+      _ =>
+        externalLink.isNotEmpty
+            ? 'link externo auditado'
+            : physicalLocation.isNotEmpty
+            ? 'arquivo fisico'
+            : 'origem protegida',
+    };
   }
 }

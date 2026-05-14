@@ -70,6 +70,37 @@ class _PeopleApiRepository {
     await _apiClient.deleteMap('anexos/$publicId');
   }
 
+  Future<_AttachmentAccessResult> createAttachmentAccess(
+    String publicId, {
+    required bool download,
+  }) async {
+    final data = await _apiClient.getMap(
+      'anexos/$publicId/access',
+      query: {'disposition': download ? 'download' : 'view'},
+    );
+    return _AttachmentAccessResult.fromMap(data);
+  }
+
+  Future<_SensitiveSessionStartResult> startSensitiveSession({
+    required String justification,
+  }) async {
+    final data = await _apiClient.postMap(
+      'auth/sensitive-session/start',
+      body: {'level': 'SENSITIVE', 'justification': justification},
+    );
+    return _SensitiveSessionStartResult.fromMap(data);
+  }
+
+  Future<void> verifySensitiveSession({
+    required String publicId,
+    required String code,
+  }) async {
+    await _apiClient.postMap(
+      'auth/sensitive-session/verify',
+      body: {'publicId': publicId, 'code': code},
+    );
+  }
+
   Future<void> createCalendarEntry(Map<String, dynamic> body) async {
     await _apiClient.postMap('agenda', body: body);
   }
@@ -195,6 +226,71 @@ class _PeopleApiRepository {
       return const [];
     }
   }
+}
+
+class _AttachmentAccessResult {
+  const _AttachmentAccessResult({
+    required this.publicId,
+    required this.fileName,
+    required this.mimeType,
+    required this.disposition,
+    required this.source,
+    required this.signedUrl,
+    required this.expiresAt,
+    required this.requiresSensitiveSession,
+  });
+
+  factory _AttachmentAccessResult.fromMap(Map<String, dynamic> map) {
+    return _AttachmentAccessResult(
+      publicId: _apiText(map['publicId']),
+      fileName: _apiText(map['fileName']),
+      mimeType: _apiText(map['mimeType']),
+      disposition: _apiText(map['disposition'], fallback: 'view'),
+      source: _apiText(map['source'], fallback: 'METADATA_ONLY'),
+      signedUrl: _apiText(map['signedUrl']),
+      expiresAt: _apiDate(map['expiresAt']),
+      requiresSensitiveSession: map['requiresSensitiveSession'] == true,
+    );
+  }
+
+  final String publicId;
+  final String fileName;
+  final String mimeType;
+  final String disposition;
+  final String source;
+  final String signedUrl;
+  final DateTime? expiresAt;
+  final bool requiresSensitiveSession;
+}
+
+class _SensitiveSessionStartResult {
+  const _SensitiveSessionStartResult({
+    required this.publicId,
+    required this.level,
+    required this.status,
+    required this.expiresAt,
+    required this.deliveryTargetMasked,
+    required this.devCode,
+  });
+
+  factory _SensitiveSessionStartResult.fromMap(Map<String, dynamic> map) {
+    final delivery = _apiMap(map['delivery']);
+    return _SensitiveSessionStartResult(
+      publicId: _apiText(map['publicId']),
+      level: _apiText(map['level'], fallback: 'SENSITIVE'),
+      status: _apiText(map['status'], fallback: 'PENDING'),
+      expiresAt: _apiDate(map['expiresAt']),
+      deliveryTargetMasked: _apiText(delivery['targetMasked']),
+      devCode: _apiText(map['devCode']),
+    );
+  }
+
+  final String publicId;
+  final String level;
+  final String status;
+  final DateTime? expiresAt;
+  final String deliveryTargetMasked;
+  final String devCode;
 }
 
 class _PeopleRuntimeData {
@@ -775,6 +871,11 @@ _AttachmentRecord _attachmentFromApi(Map<String, dynamic> attachment) {
     mimeType: _apiText(attachment['mimeType']),
     externalLink: _apiText(attachment['externalLink']),
     physicalLocation: _apiText(attachment['physicalLocation']),
+    accessSource: _apiText(attachment['accessSource']),
+    requiresSensitiveSession:
+        attachment['requiresSensitiveSession'] == true ||
+        attachment['requiresConfirmation'] == true ||
+        classification == _AttachmentClassification.sensitiveAttachment,
     canDownload: attachment['canDownload'] != false,
     canEdit: attachment['canEdit'] == true || attachment['canManage'] == true,
     canDelete:
