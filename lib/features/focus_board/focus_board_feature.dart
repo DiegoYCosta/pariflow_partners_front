@@ -21,6 +21,8 @@ enum _FocusBoardReplicaMode { ownerOnly, firstCompletesAll, allMustComplete }
 
 enum _FocusBoardAssignmentType { person, group, company, contract, other }
 
+enum _FocusBoardTextCommitResult { none, draftSaved, textUpdated }
+
 extension on _FocusBoardNotePriority {
   String get key => switch (this) {
     _FocusBoardNotePriority.normal => 'normal',
@@ -210,6 +212,20 @@ String _focusBoardActorId(_ViewerAccessProfile viewerProfile) {
   return viewerProfile.key.trim().isEmpty ? 'public' : viewerProfile.key.trim();
 }
 
+bool _focusBoardIsEmptyDraftText(String title, String description) {
+  final normalizedTitle = title.trim();
+  return (normalizedTitle.isEmpty || normalizedTitle == 'Nova nota') &&
+      description.trim().isEmpty;
+}
+
+String _focusBoardTitleForSavedDraft(String title, String description) {
+  final normalizedTitle = title.trim();
+  if (normalizedTitle.isNotEmpty && normalizedTitle != 'Nova nota') {
+    return normalizedTitle;
+  }
+  return description.trim().isEmpty ? 'Nova nota' : 'Recado';
+}
+
 class _FocusBoardAssignment {
   const _FocusBoardAssignment({
     required this.type,
@@ -375,6 +391,7 @@ class _FocusBoardNote {
     this.inTrash = false,
     this.trashedAt,
     this.restoredFromAutoTrash = false,
+    this.isDraft = false,
     this.audit = const [],
   });
 
@@ -401,6 +418,7 @@ class _FocusBoardNote {
   final bool inTrash;
   final DateTime? trashedAt;
   final bool restoredFromAutoTrash;
+  final bool isDraft;
   final List<_FocusBoardAuditEntry> audit;
 
   bool isCreator(_ViewerAccessProfile viewerProfile) {
@@ -508,6 +526,7 @@ class _FocusBoardNote {
     DateTime? trashedAt,
     bool clearTrashedAt = false,
     bool? restoredFromAutoTrash,
+    bool? isDraft,
     List<_FocusBoardAuditEntry>? audit,
   }) {
     return _FocusBoardNote(
@@ -537,6 +556,7 @@ class _FocusBoardNote {
       trashedAt: clearTrashedAt ? null : trashedAt ?? this.trashedAt,
       restoredFromAutoTrash:
           restoredFromAutoTrash ?? this.restoredFromAutoTrash,
+      isDraft: isDraft ?? this.isDraft,
       audit: audit ?? this.audit,
     );
   }
@@ -568,6 +588,7 @@ class _FocusBoardNote {
       'inTrash': inTrash,
       'trashedAt': trashedAt?.toIso8601String(),
       'restoredFromAutoTrash': restoredFromAutoTrash,
+      'isDraft': isDraft,
       'audit': audit.map((entry) => entry.toJson()).toList(),
     };
   }
@@ -616,6 +637,7 @@ class _FocusBoardNote {
       inTrash: json['inTrash'] == true,
       trashedAt: _focusBoardDateFromJson(json['trashedAt']),
       restoredFromAutoTrash: json['restoredFromAutoTrash'] == true,
+      isDraft: json['isDraft'] == true,
       audit: auditRaw is List
           ? [
               for (final entry in auditRaw)
@@ -899,6 +921,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
       visibility: _FocusBoardNoteVisibility.private,
       replicasEnabled: true,
       replicaMode: _FocusBoardReplicaMode.ownerOnly,
+      isDraft: true,
       audit: [
         _FocusBoardAuditEntry(
           at: now,
@@ -984,6 +1007,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
       replicasEnabled: draft.replicasEnabled,
       replicaMode: draft.replicaMode,
       assignments: draft.assignments,
+      isDraft: false,
       updatedAt: now,
       lastEditedAt: now,
       audit: [
@@ -1003,7 +1027,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
     await _persistNotes();
   }
 
-  Future<void> updateNoteText({
+  Future<_FocusBoardTextCommitResult> updateNoteText({
     required String id,
     required String title,
     required String description,
@@ -1012,16 +1036,41 @@ class _FocusBoardNotesController extends ChangeNotifier {
     await ensureLoaded();
     final index = _notes.indexWhere((note) => note.id == id);
     if (index < 0) {
-      return;
+      return _FocusBoardTextCommitResult.none;
     }
     final current = _notes[index];
     if (!current.isCreator(viewerProfile) || current.isClosed) {
-      return;
+      return _FocusBoardTextCommitResult.none;
     }
-    final nextTitle = title.trim().isEmpty ? 'Nova nota' : title.trim();
+    final nextTitle = current.isDraft
+        ? _focusBoardTitleForSavedDraft(title, description)
+        : title.trim().isEmpty
+        ? 'Nova nota'
+        : title.trim();
     final nextDescription = description.trim();
     if (current.title == nextTitle && current.description == nextDescription) {
-      return;
+      if (!current.isDraft) {
+        return _FocusBoardTextCommitResult.none;
+      }
+      _notes[index] = current.copyWith(isDraft: false);
+      notifyListeners();
+      await _persistNotes();
+      return _FocusBoardTextCommitResult.draftSaved;
+    }
+    if (current.isDraft) {
+      if (_focusBoardIsEmptyDraftText(title, description)) {
+        return _FocusBoardTextCommitResult.none;
+      }
+      _notes[index] = current.copyWith(
+        title: nextTitle,
+        description: nextDescription,
+        isDraft: false,
+        clearUpdatedAt: true,
+        clearLastEditedAt: true,
+      );
+      notifyListeners();
+      await _persistNotes();
+      return _FocusBoardTextCommitResult.draftSaved;
     }
     final now = DateTime.now();
     final changes = <String>[];
@@ -1047,6 +1096,39 @@ class _FocusBoardNotesController extends ChangeNotifier {
         ),
       ],
     );
+    notifyListeners();
+    await _persistNotes();
+    return _FocusBoardTextCommitResult.textUpdated;
+  }
+
+  Future<_FocusBoardNote?> discardDraft({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return null;
+    }
+    final current = _notes[index];
+    if (!current.isCreator(viewerProfile) ||
+        !current.isDraft ||
+        current.isClosed ||
+        !_focusBoardIsEmptyDraftText(current.title, current.description)) {
+      return null;
+    }
+    final removed = _notes.removeAt(index);
+    notifyListeners();
+    await _persistNotes();
+    return removed;
+  }
+
+  Future<void> restoreDiscardedDraft(_FocusBoardNote note) async {
+    await ensureLoaded();
+    if (_notes.any((entry) => entry.id == note.id)) {
+      return;
+    }
+    _notes.insert(0, note.copyWith(isDraft: true));
     notifyListeners();
     await _persistNotes();
   }

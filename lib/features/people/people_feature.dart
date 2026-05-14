@@ -1612,6 +1612,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       onToggleOwner: _toggleOwnerCompletion,
       onToggleAssignment: _toggleAssignmentCompletion,
       onUpdateText: _updateNoteText,
+      onDiscardDraft: _discardDraft,
       onEditNote: _openEditNoteDialog,
       onTrashNote: _confirmMoveToTrash,
       onRestoreNote: _restoreNote,
@@ -1980,7 +1981,8 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   bool _noteIsUntouchedQuickDraft(_FocusBoardNote note) {
-    return note.title.trim() == 'Nova nota' &&
+    return note.isDraft &&
+        note.title.trim() == 'Nova nota' &&
         note.description.trim().isEmpty &&
         note.lastEditedAt == null &&
         note.companyLabel.trim().isEmpty &&
@@ -2073,16 +2075,60 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     );
   }
 
-  Future<void> _updateNoteText(
+  Future<_FocusBoardTextCommitResult> _updateNoteText(
     _FocusBoardNote note,
     String title,
     String description,
   ) async {
-    await widget.notesController.updateNoteText(
+    final result = await widget.notesController.updateNoteText(
       id: note.id,
       title: title,
       description: description,
       viewerProfile: widget.viewerProfile,
+    );
+    if (!mounted) {
+      return result;
+    }
+    switch (result) {
+      case _FocusBoardTextCommitResult.draftSaved:
+        _showFocusBoardSnack('Recado salvo.');
+        break;
+      case _FocusBoardTextCommitResult.textUpdated:
+        _showFocusBoardSnack('Recado atualizado.');
+        break;
+      case _FocusBoardTextCommitResult.none:
+        break;
+    }
+    return result;
+  }
+
+  Future<void> _discardDraft(_FocusBoardNote note) async {
+    final removed = await widget.notesController.discardDraft(
+      id: note.id,
+      viewerProfile: widget.viewerProfile,
+    );
+    if (!mounted || removed == null) {
+      return;
+    }
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Recado vazio descartado.'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'Desfazer',
+          onPressed: () {
+            unawaited(widget.notesController.restoreDiscardedDraft(removed));
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showFocusBoardSnack(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
   }
 
@@ -2536,6 +2582,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.onToggleOwner,
     required this.onToggleAssignment,
     required this.onUpdateText,
+    required this.onDiscardDraft,
     required this.onEditNote,
     required this.onTrashNote,
     required this.onRestoreNote,
@@ -2558,7 +2605,13 @@ class _FocusBoardNotesStage extends StatelessWidget {
   final ValueChanged<_FocusBoardNote> onToggleOwner;
   final void Function(_FocusBoardNote, _FocusBoardAssignment)
   onToggleAssignment;
-  final void Function(_FocusBoardNote, String, String) onUpdateText;
+  final Future<_FocusBoardTextCommitResult> Function(
+    _FocusBoardNote,
+    String,
+    String,
+  )
+  onUpdateText;
+  final Future<void> Function(_FocusBoardNote) onDiscardDraft;
   final ValueChanged<_FocusBoardNote> onEditNote;
   final ValueChanged<_FocusBoardNote> onTrashNote;
   final ValueChanged<_FocusBoardNote> onRestoreNote;
@@ -2647,6 +2700,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
                     onToggleAssignment(note, assignment),
                 onUpdateText: (title, description) =>
                     onUpdateText(note, title, description),
+                onDiscardDraft: () => onDiscardDraft(note),
                 onEdit: note.isCreator(viewerProfile) && !note.isClosed
                     ? () => onEditNote(note)
                     : null,
@@ -2761,6 +2815,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
     required this.onToggleOwner,
     required this.onToggleAssignment,
     required this.onUpdateText,
+    required this.onDiscardDraft,
     required this.onTrash,
     required this.onShowAudit,
     this.onEdit,
@@ -2779,7 +2834,12 @@ class _FocusBoardNoteTile extends StatefulWidget {
   final VoidCallback onLongPress;
   final VoidCallback onToggleOwner;
   final ValueChanged<_FocusBoardAssignment> onToggleAssignment;
-  final void Function(String title, String description) onUpdateText;
+  final Future<_FocusBoardTextCommitResult> Function(
+    String title,
+    String description,
+  )
+  onUpdateText;
+  final Future<void> Function() onDiscardDraft;
   final VoidCallback? onEdit;
   final VoidCallback onTrash;
   final VoidCallback? onRestore;
@@ -2800,7 +2860,6 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
   late final AnimationController _attentionController;
   bool _hovered = false;
   bool _dirty = false;
-  bool _discardDialogOpen = false;
   bool _savingEdit = false;
 
   @override
@@ -2966,7 +3025,9 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
                     if (_dirty)
                       IconButton.filledTonal(
                         tooltip: 'Salvar edicao',
-                        onPressed: _saveEdits,
+                        onPressed: _savingEdit
+                            ? null
+                            : () => unawaited(_saveEdits()),
                         icon: const Icon(Icons.check_rounded),
                       ),
                     IconButton(
@@ -3123,7 +3184,7 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
         maxLines: 1,
         textInputAction: TextInputAction.done,
         onChanged: _handleTextChanged,
-        onSubmitted: (_) => _saveEdits(),
+        onSubmitted: (_) => unawaited(_saveEdits()),
         decoration: InputDecoration(
           isDense: true,
           border: InputBorder.none,
@@ -3163,7 +3224,7 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
         maxLines: 3,
         textInputAction: TextInputAction.done,
         onChanged: _handleTextChanged,
-        onSubmitted: (_) => _saveEdits(),
+        onSubmitted: (_) => unawaited(_saveEdits()),
         decoration: const InputDecoration(
           isDense: true,
           border: InputBorder.none,
@@ -3182,20 +3243,26 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
   }
 
   void _commitWhenFocusLeaves() {
-    if (!_titleFocusNode.hasFocus &&
-        !_descriptionFocusNode.hasFocus &&
-        _dirty &&
-        !_savingEdit) {
-      Future<void>.delayed(const Duration(milliseconds: 90), () {
-        if (mounted &&
-            !_titleFocusNode.hasFocus &&
-            !_descriptionFocusNode.hasFocus &&
-            _dirty &&
-            !_savingEdit) {
-          unawaited(_confirmDiscardEdits());
-        }
-      });
+    if (_titleFocusNode.hasFocus ||
+        _descriptionFocusNode.hasFocus ||
+        _savingEdit) {
+      return;
     }
+    Future<void>.delayed(const Duration(milliseconds: 90), () {
+      if (!mounted ||
+          _titleFocusNode.hasFocus ||
+          _descriptionFocusNode.hasFocus ||
+          _savingEdit) {
+        return;
+      }
+      if (widget.note.isDraft && _draftTextIsEmpty) {
+        unawaited(_discardDraft());
+        return;
+      }
+      if (_dirty) {
+        unawaited(_saveEdits(unfocus: false));
+      }
+    });
   }
 
   void _handleTextChanged(String _) {
@@ -3207,57 +3274,60 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
     }
   }
 
-  void _saveEdits() {
-    if (!_dirty) {
-      return;
-    }
-    _savingEdit = true;
-    widget.onUpdateText(_titleController.text, _descriptionController.text);
-    setState(() => _dirty = false);
-    _titleFocusNode.unfocus();
-    _descriptionFocusNode.unfocus();
-    _savingEdit = false;
+  bool get _draftTextIsEmpty {
+    return _focusBoardIsEmptyDraftText(
+      _titleController.text,
+      _descriptionController.text,
+    );
   }
 
-  Future<void> _confirmDiscardEdits() async {
-    if (_discardDialogOpen || !_dirty) {
+  Future<void> _saveEdits({bool unfocus = true}) async {
+    if (_savingEdit) {
       return;
     }
-    _discardDialogOpen = true;
-    final discard = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.15),
-      builder: (context) => AlertDialog(
-        title: const Text('Descartar edição?'),
-        content: const Text(
-          'Ha alterações não salvas no recado. Sair agora vai descartar as informações não-salvas',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Continuar editando'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.delete_sweep_outlined, size: 18),
-            label: const Text('Descartar'),
-          ),
-        ],
-      ),
-    );
-    _discardDialogOpen = false;
-    if (!mounted || !_dirty) {
+    if (widget.note.isDraft && _draftTextIsEmpty) {
+      await _discardDraft();
       return;
     }
-    if (discard == true) {
-      setState(() {
-        _titleController.text = widget.note.title;
-        _descriptionController.text = widget.note.description;
-        _dirty = false;
-      });
+    if (!_dirty && !widget.note.isDraft) {
       return;
     }
-    _titleFocusNode.requestFocus();
+    setState(() => _savingEdit = true);
+    try {
+      await widget.onUpdateText(
+        _titleController.text,
+        _descriptionController.text,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _dirty = false);
+      if (unfocus) {
+        _titleFocusNode.unfocus();
+        _descriptionFocusNode.unfocus();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _savingEdit = false);
+      }
+    }
+  }
+
+  Future<void> _discardDraft() async {
+    if (_savingEdit) {
+      return;
+    }
+    setState(() => _savingEdit = true);
+    try {
+      await widget.onDiscardDraft();
+      if (mounted) {
+        setState(() => _dirty = false);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _savingEdit = false);
+      }
+    }
   }
 
   String _noteMetaLabel(_FocusBoardNote note) {
