@@ -33,14 +33,45 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <script>
+    (function () {
+      const resetMarker = 'pariflow-sw-reset-v1';
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+      function unregisterServiceWorkers() {
+        if (!('serviceWorker' in navigator)) {
+          return Promise.resolve();
+        }
+
+        return navigator.serviceWorker
+          .getRegistrations()
+          .then((registrations) =>
+            Promise.all(registrations.map((registration) => registration.unregister()))
+          )
+          .catch(() => undefined);
+      }
+
+      function loadFlutter() {
+        const script = document.createElement('script');
+        script.src = 'flutter_bootstrap.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+
+      unregisterServiceWorkers().finally(() => {
+        if (
+          'serviceWorker' in navigator &&
+          navigator.serviceWorker.controller &&
+          sessionStorage.getItem(resetMarker) !== '1'
+        ) {
+          sessionStorage.setItem(resetMarker, '1');
+          window.location.reload();
+          return;
+        }
+
+        loadFlutter();
+        window.setTimeout(unregisterServiceWorkers, 3000);
+      });
+    })();
+  </script>
 </body>
 </html>

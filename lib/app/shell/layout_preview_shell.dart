@@ -292,15 +292,12 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         final sideSlot = constraints.maxWidth >= 980;
         final workspace = _buildCrmWorkspaceScroll(page, width, showSidebar);
         final baseExtent = sideSlot
-            ? min(420.0, max(340.0, constraints.maxWidth * 0.24))
+            ? min(430.0, max(360.0, constraints.maxWidth * 0.24))
             : min(360.0, max(260.0, constraints.maxHeight * 0.34));
         final slotScale = _focusBoardSlotScale.clamp(0.8, 1.2).toDouble();
         final slotExtent = baseExtent * slotScale;
         final panelExtent = sideSlot
-            ? min(
-                constraints.maxHeight - 24,
-                max(460.0, constraints.maxHeight * 0.68),
-              )
+            ? constraints.maxHeight
             : min(constraints.maxWidth - 24, max(320.0, constraints.maxWidth));
         final slotRect = sideSlot
             ? Rect.fromLTWH(

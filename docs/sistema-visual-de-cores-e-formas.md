@@ -1084,6 +1084,9 @@ Segundo ciclo implementado no front:
 - aplicacao de customizacoes locais em listas, detalhes, Timeline e Network
   quando o cache local esta carregado;
 - restauracao para identidade automatica;
+- diferenciacao entre entidade especifica e tipo generico: chips de filtro e
+  resumos por tipo nao usam cor/forma de entidade, enquanto a regua lateral da
+  Network preserva apenas forma neutra como referencia espacial;
 - testes de sugestoes e serializacao.
 
 Limitacoes do primeiro ciclo:

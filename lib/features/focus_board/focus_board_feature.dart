@@ -1,10 +1,1539 @@
 part of '../../app/app.dart';
 
+enum _FocusBoardNotePriority { normal, important, urgent }
+
+enum _FocusBoardNoteCompletionState { incomplete, partial, complete }
+
+enum _FocusBoardNoteStatusFilter { pending, completed, all }
+
+enum _FocusBoardNoteSort {
+  createdAt,
+  editedOrCreatedAt,
+  creatorName,
+  creatorId,
+  company,
+  status,
+}
+
+enum _FocusBoardNoteVisibility { private, shared }
+
+enum _FocusBoardReplicaMode { ownerOnly, firstCompletesAll, allMustComplete }
+
+enum _FocusBoardAssignmentType { person, group, company, contract, other }
+
+extension on _FocusBoardNotePriority {
+  String get key => switch (this) {
+    _FocusBoardNotePriority.normal => 'normal',
+    _FocusBoardNotePriority.important => 'important',
+    _FocusBoardNotePriority.urgent => 'urgent',
+  };
+
+  String get label => switch (this) {
+    _FocusBoardNotePriority.normal => 'Normal',
+    _FocusBoardNotePriority.important => 'Importante',
+    _FocusBoardNotePriority.urgent => 'Urgente',
+  };
+
+  Color get color => switch (this) {
+    _FocusBoardNotePriority.normal => _tealColor,
+    _FocusBoardNotePriority.important => const Color(0xFFE9A100),
+    _FocusBoardNotePriority.urgent => const Color(0xFFD81F2A),
+  };
+
+  IconData get icon => switch (this) {
+    _FocusBoardNotePriority.normal => Icons.check_circle_outline_rounded,
+    _FocusBoardNotePriority.important => Icons.star_rounded,
+    _FocusBoardNotePriority.urgent => Icons.priority_high_rounded,
+  };
+}
+
+extension on _FocusBoardNoteCompletionState {
+  String get label => switch (this) {
+    _FocusBoardNoteCompletionState.incomplete => 'Incompleto',
+    _FocusBoardNoteCompletionState.partial => 'Parcial',
+    _FocusBoardNoteCompletionState.complete => 'Completo',
+  };
+
+  int get sortRank => switch (this) {
+    _FocusBoardNoteCompletionState.incomplete => 0,
+    _FocusBoardNoteCompletionState.partial => 1,
+    _FocusBoardNoteCompletionState.complete => 2,
+  };
+
+  Color get color => switch (this) {
+    _FocusBoardNoteCompletionState.incomplete => _roseColor,
+    _FocusBoardNoteCompletionState.partial => _amberColor,
+    _FocusBoardNoteCompletionState.complete => _tealColor,
+  };
+}
+
+extension on _FocusBoardNoteStatusFilter {
+  String get label => switch (this) {
+    _FocusBoardNoteStatusFilter.pending => 'Pendentes',
+    _FocusBoardNoteStatusFilter.completed => 'Concluidos',
+    _FocusBoardNoteStatusFilter.all => 'Todos',
+  };
+}
+
+extension on _FocusBoardNoteSort {
+  String get label => switch (this) {
+    _FocusBoardNoteSort.createdAt => 'Data de criacao',
+    _FocusBoardNoteSort.editedOrCreatedAt => 'Edicao/criacao',
+    _FocusBoardNoteSort.creatorName => 'Nome de quem escreveu',
+    _FocusBoardNoteSort.creatorId => 'ID de quem escreveu',
+    _FocusBoardNoteSort.company => 'Empresa vinculada',
+    _FocusBoardNoteSort.status => 'Status',
+  };
+}
+
+extension on _FocusBoardNoteVisibility {
+  String get key => switch (this) {
+    _FocusBoardNoteVisibility.private => 'private',
+    _FocusBoardNoteVisibility.shared => 'shared',
+  };
+
+  String get label => switch (this) {
+    _FocusBoardNoteVisibility.private => 'Somente eu',
+    _FocusBoardNoteVisibility.shared => 'Compartilhada',
+  };
+}
+
+extension on _FocusBoardReplicaMode {
+  String get key => switch (this) {
+    _FocusBoardReplicaMode.ownerOnly => 'ownerOnly',
+    _FocusBoardReplicaMode.firstCompletesAll => 'firstCompletesAll',
+    _FocusBoardReplicaMode.allMustComplete => 'allMustComplete',
+  };
+
+  String get label => switch (this) {
+    _FocusBoardReplicaMode.ownerOnly => 'Sem replicas',
+    _FocusBoardReplicaMode.firstCompletesAll => 'Primeiro completa todos',
+    _FocusBoardReplicaMode.allMustComplete => 'Todos precisam preencher',
+  };
+}
+
+extension on _FocusBoardAssignmentType {
+  String get key => switch (this) {
+    _FocusBoardAssignmentType.person => 'person',
+    _FocusBoardAssignmentType.group => 'group',
+    _FocusBoardAssignmentType.company => 'company',
+    _FocusBoardAssignmentType.contract => 'contract',
+    _FocusBoardAssignmentType.other => 'other',
+  };
+
+  String get label => switch (this) {
+    _FocusBoardAssignmentType.person => 'Pessoa',
+    _FocusBoardAssignmentType.group => 'Grupo',
+    _FocusBoardAssignmentType.company => 'Empresa',
+    _FocusBoardAssignmentType.contract => 'Contrato',
+    _FocusBoardAssignmentType.other => 'Outro',
+  };
+}
+
+_FocusBoardNoteVisibility _focusBoardVisibilityFromKey(String value) {
+  final key = value.trim().toLowerCase();
+  for (final visibility in _FocusBoardNoteVisibility.values) {
+    if (visibility.key.toLowerCase() == key) {
+      return visibility;
+    }
+  }
+  return _FocusBoardNoteVisibility.private;
+}
+
+_FocusBoardReplicaMode _focusBoardReplicaModeFromKey(String value) {
+  final key = value.trim();
+  for (final mode in _FocusBoardReplicaMode.values) {
+    if (mode.key == key) {
+      return mode;
+    }
+  }
+  return _FocusBoardReplicaMode.ownerOnly;
+}
+
+_FocusBoardNotePriority _focusBoardPriorityFromKey(String value) {
+  final key = value.trim().toLowerCase();
+  for (final priority in _FocusBoardNotePriority.values) {
+    if (priority.key == key) {
+      return priority;
+    }
+  }
+  return _FocusBoardNotePriority.normal;
+}
+
+_FocusBoardAssignmentType _focusBoardAssignmentTypeFromKey(String value) {
+  final key = value.trim().toLowerCase();
+  for (final type in _FocusBoardAssignmentType.values) {
+    if (type.key == key) {
+      return type;
+    }
+  }
+  return _FocusBoardAssignmentType.other;
+}
+
+String _focusBoardDateKey(DateTime value) {
+  final local = value.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')}';
+}
+
+String _focusBoardShortDateLabel(DateTime value) {
+  final local = value.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/'
+      '${local.month.toString().padLeft(2, '0')}/${local.year}';
+}
+
+String _focusBoardShortDateTimeLabel(DateTime value) {
+  final local = value.toLocal();
+  return '${_focusBoardShortDateLabel(local)} '
+      '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
+}
+
+DateTime? _focusBoardDateFromJson(Object? value) {
+  if (value is! String || value.trim().isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(value)?.toLocal();
+}
+
+String _focusBoardText(Object? value, {String fallback = ''}) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? fallback : text;
+}
+
+String _focusBoardActorId(_ViewerAccessProfile viewerProfile) {
+  final publicId = viewerProfile.publicId?.trim();
+  if (publicId != null && publicId.isNotEmpty) {
+    return publicId;
+  }
+  return viewerProfile.key.trim().isEmpty ? 'public' : viewerProfile.key.trim();
+}
+
+class _FocusBoardAssignment {
+  const _FocusBoardAssignment({
+    required this.type,
+    required this.id,
+    required this.label,
+    this.completed = false,
+    this.completedAt,
+    this.completedById = '',
+    this.completedByName = '',
+  });
+
+  final _FocusBoardAssignmentType type;
+  final String id;
+  final String label;
+  final bool completed;
+  final DateTime? completedAt;
+  final String completedById;
+  final String completedByName;
+
+  bool matchesViewer(_ViewerAccessProfile viewerProfile) {
+    final actorId = _focusBoardActorId(viewerProfile);
+    final normalizedId = id.trim().toLowerCase();
+    return switch (type) {
+      _FocusBoardAssignmentType.person => normalizedId == actorId.toLowerCase(),
+      _FocusBoardAssignmentType.group => viewerProfile.groups.any(
+        (group) => group.key.toLowerCase() == normalizedId,
+      ),
+      _FocusBoardAssignmentType.company =>
+        viewerProfile.organizationLabel?.trim().toLowerCase() == normalizedId,
+      _FocusBoardAssignmentType.contract => false,
+      _FocusBoardAssignmentType.other => false,
+    };
+  }
+
+  _FocusBoardAssignment copyWith({
+    _FocusBoardAssignmentType? type,
+    String? id,
+    String? label,
+    bool? completed,
+    DateTime? completedAt,
+    bool clearCompletedAt = false,
+    String? completedById,
+    String? completedByName,
+  }) {
+    return _FocusBoardAssignment(
+      type: type ?? this.type,
+      id: id ?? this.id,
+      label: label ?? this.label,
+      completed: completed ?? this.completed,
+      completedAt: clearCompletedAt ? null : completedAt ?? this.completedAt,
+      completedById: completedById ?? this.completedById,
+      completedByName: completedByName ?? this.completedByName,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type.key,
+      'id': id,
+      'label': label,
+      'completed': completed,
+      'completedAt': completedAt?.toIso8601String(),
+      'completedById': completedById,
+      'completedByName': completedByName,
+    };
+  }
+
+  static _FocusBoardAssignment fromJson(Map<String, dynamic> json) {
+    return _FocusBoardAssignment(
+      type: _focusBoardAssignmentTypeFromKey(_focusBoardText(json['type'])),
+      id: _focusBoardText(json['id']),
+      label: _focusBoardText(json['label'], fallback: 'Responsavel'),
+      completed: json['completed'] == true,
+      completedAt: _focusBoardDateFromJson(json['completedAt']),
+      completedById: _focusBoardText(json['completedById']),
+      completedByName: _focusBoardText(json['completedByName']),
+    );
+  }
+}
+
+class _FocusBoardAuditEntry {
+  const _FocusBoardAuditEntry({
+    required this.at,
+    required this.actorId,
+    required this.actorName,
+    required this.action,
+    required this.details,
+  });
+
+  final DateTime at;
+  final String actorId;
+  final String actorName;
+  final String action;
+  final String details;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'at': at.toIso8601String(),
+      'actorId': actorId,
+      'actorName': actorName,
+      'action': action,
+      'details': details,
+    };
+  }
+
+  static _FocusBoardAuditEntry fromJson(Map<String, dynamic> json) {
+    return _FocusBoardAuditEntry(
+      at: _focusBoardDateFromJson(json['at']) ?? DateTime.now(),
+      actorId: _focusBoardText(json['actorId'], fallback: 'system'),
+      actorName: _focusBoardText(json['actorName'], fallback: 'Sistema'),
+      action: _focusBoardText(json['action'], fallback: 'registro'),
+      details: _focusBoardText(json['details']),
+    );
+  }
+}
+
+class _FocusBoardNoteDraft {
+  const _FocusBoardNoteDraft({
+    required this.title,
+    required this.description,
+    required this.priority,
+    required this.dueAt,
+    required this.companyLabel,
+    required this.assignments,
+    this.visibility = _FocusBoardNoteVisibility.private,
+    this.replicasEnabled = true,
+    this.replicaMode = _FocusBoardReplicaMode.ownerOnly,
+  });
+
+  final String title;
+  final String description;
+  final _FocusBoardNotePriority priority;
+  final DateTime dueAt;
+  final String companyLabel;
+  final List<_FocusBoardAssignment> assignments;
+  final _FocusBoardNoteVisibility visibility;
+  final bool replicasEnabled;
+  final _FocusBoardReplicaMode replicaMode;
+}
+
+class _FocusBoardNote {
+  const _FocusBoardNote({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.priority,
+    required this.dueAt,
+    required this.createdAt,
+    required this.createdById,
+    required this.createdByName,
+    this.updatedAt,
+    this.lastEditedAt,
+    this.companyLabel = '',
+    this.visibility = _FocusBoardNoteVisibility.private,
+    this.replicasEnabled = true,
+    this.replicaMode = _FocusBoardReplicaMode.ownerOnly,
+    this.closedAt,
+    this.closedById = '',
+    this.closedByName = '',
+    this.assignments = const [],
+    this.completedByOwner = false,
+    this.completedAt,
+    this.inTrash = false,
+    this.trashedAt,
+    this.restoredFromAutoTrash = false,
+    this.audit = const [],
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final _FocusBoardNotePriority priority;
+  final DateTime dueAt;
+  final DateTime createdAt;
+  final String createdById;
+  final String createdByName;
+  final DateTime? updatedAt;
+  final DateTime? lastEditedAt;
+  final String companyLabel;
+  final _FocusBoardNoteVisibility visibility;
+  final bool replicasEnabled;
+  final _FocusBoardReplicaMode replicaMode;
+  final DateTime? closedAt;
+  final String closedById;
+  final String closedByName;
+  final List<_FocusBoardAssignment> assignments;
+  final bool completedByOwner;
+  final DateTime? completedAt;
+  final bool inTrash;
+  final DateTime? trashedAt;
+  final bool restoredFromAutoTrash;
+  final List<_FocusBoardAuditEntry> audit;
+
+  bool isCreator(_ViewerAccessProfile viewerProfile) {
+    return createdById == _focusBoardActorId(viewerProfile);
+  }
+
+  bool canViewerRead(_ViewerAccessProfile viewerProfile) {
+    if (isCreator(viewerProfile)) {
+      return true;
+    }
+    if (visibility == _FocusBoardNoteVisibility.private) {
+      return false;
+    }
+    if (assignments.isEmpty) {
+      return viewerProfile.isAuthenticated;
+    }
+    if (viewerAssigned(viewerProfile)) {
+      return true;
+    }
+    final hasBroadTarget = assignments.any(
+      (assignment) =>
+          assignment.type == _FocusBoardAssignmentType.contract ||
+          assignment.type == _FocusBoardAssignmentType.other,
+    );
+    return hasBroadTarget && viewerProfile.isAuthenticated;
+  }
+
+  bool viewerAssigned(_ViewerAccessProfile viewerProfile) {
+    return assignments.any(
+      (assignment) => assignment.matchesViewer(viewerProfile),
+    );
+  }
+
+  bool get hasAssignments => assignments.isNotEmpty;
+
+  bool get hasMultipleAssignments => assignments.length > 1;
+
+  int get completedAssignmentCount {
+    return assignments.where((assignment) => assignment.completed).length;
+  }
+
+  bool get isClosed => closedAt != null;
+
+  _FocusBoardNoteCompletionState get completionState {
+    if (isClosed) {
+      return _FocusBoardNoteCompletionState.complete;
+    }
+    final anyAssignmentComplete = completedAssignmentCount > 0;
+    final allAssignmentsComplete =
+        assignments.isNotEmpty &&
+        completedAssignmentCount == assignments.length;
+    final fullyComplete = switch (replicasEnabled
+        ? replicaMode
+        : _FocusBoardReplicaMode.ownerOnly) {
+      _FocusBoardReplicaMode.ownerOnly => completedByOwner,
+      _FocusBoardReplicaMode.firstCompletesAll =>
+        completedByOwner || anyAssignmentComplete,
+      _FocusBoardReplicaMode.allMustComplete =>
+        assignments.isEmpty ? completedByOwner : allAssignmentsComplete,
+    };
+    if (fullyComplete) {
+      return _FocusBoardNoteCompletionState.complete;
+    }
+    if (completedByOwner || completedAssignmentCount > 0) {
+      return _FocusBoardNoteCompletionState.partial;
+    }
+    return _FocusBoardNoteCompletionState.incomplete;
+  }
+
+  DateTime get editedOrCreatedAt => lastEditedAt ?? updatedAt ?? createdAt;
+
+  bool get isComplete =>
+      completionState == _FocusBoardNoteCompletionState.complete;
+
+  _FocusBoardNote copyWith({
+    String? id,
+    String? title,
+    String? description,
+    _FocusBoardNotePriority? priority,
+    DateTime? dueAt,
+    DateTime? createdAt,
+    String? createdById,
+    String? createdByName,
+    DateTime? updatedAt,
+    bool clearUpdatedAt = false,
+    DateTime? lastEditedAt,
+    bool clearLastEditedAt = false,
+    String? companyLabel,
+    _FocusBoardNoteVisibility? visibility,
+    bool? replicasEnabled,
+    _FocusBoardReplicaMode? replicaMode,
+    DateTime? closedAt,
+    bool clearClosedAt = false,
+    String? closedById,
+    String? closedByName,
+    List<_FocusBoardAssignment>? assignments,
+    bool? completedByOwner,
+    DateTime? completedAt,
+    bool clearCompletedAt = false,
+    bool? inTrash,
+    DateTime? trashedAt,
+    bool clearTrashedAt = false,
+    bool? restoredFromAutoTrash,
+    List<_FocusBoardAuditEntry>? audit,
+  }) {
+    return _FocusBoardNote(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      priority: priority ?? this.priority,
+      dueAt: dueAt ?? this.dueAt,
+      createdAt: createdAt ?? this.createdAt,
+      createdById: createdById ?? this.createdById,
+      createdByName: createdByName ?? this.createdByName,
+      updatedAt: clearUpdatedAt ? null : updatedAt ?? this.updatedAt,
+      lastEditedAt: clearLastEditedAt
+          ? null
+          : lastEditedAt ?? this.lastEditedAt,
+      companyLabel: companyLabel ?? this.companyLabel,
+      visibility: visibility ?? this.visibility,
+      replicasEnabled: replicasEnabled ?? this.replicasEnabled,
+      replicaMode: replicaMode ?? this.replicaMode,
+      closedAt: clearClosedAt ? null : closedAt ?? this.closedAt,
+      closedById: clearClosedAt ? '' : closedById ?? this.closedById,
+      closedByName: clearClosedAt ? '' : closedByName ?? this.closedByName,
+      assignments: assignments ?? this.assignments,
+      completedByOwner: completedByOwner ?? this.completedByOwner,
+      completedAt: clearCompletedAt ? null : completedAt ?? this.completedAt,
+      inTrash: inTrash ?? this.inTrash,
+      trashedAt: clearTrashedAt ? null : trashedAt ?? this.trashedAt,
+      restoredFromAutoTrash:
+          restoredFromAutoTrash ?? this.restoredFromAutoTrash,
+      audit: audit ?? this.audit,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'priority': priority.key,
+      'dueAt': dueAt.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'createdById': createdById,
+      'createdByName': createdByName,
+      'updatedAt': updatedAt?.toIso8601String(),
+      'lastEditedAt': lastEditedAt?.toIso8601String(),
+      'companyLabel': companyLabel,
+      'visibility': visibility.key,
+      'replicasEnabled': replicasEnabled,
+      'replicaMode': replicaMode.key,
+      'closedAt': closedAt?.toIso8601String(),
+      'closedById': closedById,
+      'closedByName': closedByName,
+      'assignments': assignments
+          .map((assignment) => assignment.toJson())
+          .toList(),
+      'completedByOwner': completedByOwner,
+      'completedAt': completedAt?.toIso8601String(),
+      'inTrash': inTrash,
+      'trashedAt': trashedAt?.toIso8601String(),
+      'restoredFromAutoTrash': restoredFromAutoTrash,
+      'audit': audit.map((entry) => entry.toJson()).toList(),
+    };
+  }
+
+  static _FocusBoardNote fromJson(Map<String, dynamic> json) {
+    final assignmentsRaw = json['assignments'];
+    final auditRaw = json['audit'];
+    return _FocusBoardNote(
+      id: _focusBoardText(json['id']),
+      title: _focusBoardText(json['title'], fallback: 'Recado'),
+      description: _focusBoardText(json['description']),
+      priority: _focusBoardPriorityFromKey(_focusBoardText(json['priority'])),
+      dueAt:
+          _focusBoardDateFromJson(json['dueAt']) ??
+          DateTime.now().add(const Duration(days: 7)),
+      createdAt: _focusBoardDateFromJson(json['createdAt']) ?? DateTime.now(),
+      createdById: _focusBoardText(json['createdById'], fallback: 'system'),
+      createdByName: _focusBoardText(
+        json['createdByName'],
+        fallback: 'Sistema',
+      ),
+      updatedAt: _focusBoardDateFromJson(json['updatedAt']),
+      lastEditedAt: _focusBoardDateFromJson(json['lastEditedAt']),
+      companyLabel: _focusBoardText(json['companyLabel']),
+      visibility: _focusBoardVisibilityFromKey(
+        _focusBoardText(json['visibility']),
+      ),
+      replicasEnabled: json['replicasEnabled'] != false,
+      replicaMode: _focusBoardReplicaModeFromKey(
+        _focusBoardText(json['replicaMode']),
+      ),
+      closedAt: _focusBoardDateFromJson(json['closedAt']),
+      closedById: _focusBoardText(json['closedById']),
+      closedByName: _focusBoardText(json['closedByName']),
+      assignments: assignmentsRaw is List
+          ? [
+              for (final assignment in assignmentsRaw)
+                if (assignment is Map)
+                  _FocusBoardAssignment.fromJson(
+                    Map<String, dynamic>.from(assignment),
+                  ),
+            ]
+          : const [],
+      completedByOwner: json['completedByOwner'] == true,
+      completedAt: _focusBoardDateFromJson(json['completedAt']),
+      inTrash: json['inTrash'] == true,
+      trashedAt: _focusBoardDateFromJson(json['trashedAt']),
+      restoredFromAutoTrash: json['restoredFromAutoTrash'] == true,
+      audit: auditRaw is List
+          ? [
+              for (final entry in auditRaw)
+                if (entry is Map)
+                  _FocusBoardAuditEntry.fromJson(
+                    Map<String, dynamic>.from(entry),
+                  ),
+            ]
+          : const [],
+    );
+  }
+}
+
+class _FocusBoardFilterProfile {
+  const _FocusBoardFilterProfile({
+    required this.id,
+    required this.name,
+    this.excludedCreatorIds = const [],
+    this.excludedAssignmentLabels = const [],
+    this.excludedCompanyLabels = const [],
+    this.showTrash = false,
+  });
+
+  final String id;
+  final String name;
+  final List<String> excludedCreatorIds;
+  final List<String> excludedAssignmentLabels;
+  final List<String> excludedCompanyLabels;
+  final bool showTrash;
+
+  static const generic = _FocusBoardFilterProfile(
+    id: 'generic',
+    name: 'Perfil generico',
+  );
+
+  bool excludes(_FocusBoardNote note) {
+    if (!showTrash && note.inTrash) {
+      return true;
+    }
+    if (showTrash && !note.inTrash) {
+      return true;
+    }
+    if (excludedCreatorIds.contains(note.createdById)) {
+      return true;
+    }
+    final company = note.companyLabel.trim().toLowerCase();
+    if (company.isNotEmpty &&
+        excludedCompanyLabels
+            .map((label) => label.trim().toLowerCase())
+            .contains(company)) {
+      return true;
+    }
+    final excludedAssignments = excludedAssignmentLabels
+        .map((label) => label.trim().toLowerCase())
+        .toSet();
+    return note.assignments.any(
+      (assignment) =>
+          excludedAssignments.contains(assignment.label.trim().toLowerCase()),
+    );
+  }
+
+  _FocusBoardFilterProfile copyWith({
+    String? id,
+    String? name,
+    List<String>? excludedCreatorIds,
+    List<String>? excludedAssignmentLabels,
+    List<String>? excludedCompanyLabels,
+    bool? showTrash,
+  }) {
+    return _FocusBoardFilterProfile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      excludedCreatorIds: excludedCreatorIds ?? this.excludedCreatorIds,
+      excludedAssignmentLabels:
+          excludedAssignmentLabels ?? this.excludedAssignmentLabels,
+      excludedCompanyLabels:
+          excludedCompanyLabels ?? this.excludedCompanyLabels,
+      showTrash: showTrash ?? this.showTrash,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'excludedCreatorIds': excludedCreatorIds,
+      'excludedAssignmentLabels': excludedAssignmentLabels,
+      'excludedCompanyLabels': excludedCompanyLabels,
+      'showTrash': showTrash,
+    };
+  }
+
+  static _FocusBoardFilterProfile fromJson(Map<String, dynamic> json) {
+    return _FocusBoardFilterProfile(
+      id: _focusBoardText(json['id'], fallback: 'profile'),
+      name: _focusBoardText(json['name'], fallback: 'Perfil salvo'),
+      excludedCreatorIds: _focusBoardStringList(json['excludedCreatorIds']),
+      excludedAssignmentLabels: _focusBoardStringList(
+        json['excludedAssignmentLabels'],
+      ),
+      excludedCompanyLabels: _focusBoardStringList(
+        json['excludedCompanyLabels'],
+      ),
+      showTrash: json['showTrash'] == true,
+    );
+  }
+}
+
+List<String> _focusBoardStringList(Object? value) {
+  if (value is! List) {
+    return const [];
+  }
+  return [
+    for (final item in value)
+      if (item.toString().trim().isNotEmpty) item.toString().trim(),
+  ];
+}
+
+class _FocusBoardNotesController extends ChangeNotifier {
+  static const _notesStorageKey = 'pariflow.focus_board.notes.v1';
+  static const _profilesStorageKey = 'pariflow.focus_board.filters.v1';
+  static const _activeProfileStorageKey =
+      'pariflow.focus_board.active_filter.v1';
+
+  final List<_FocusBoardNote> _notes = [];
+  final List<_FocusBoardFilterProfile> _filterProfiles = [];
+  bool _loaded = false;
+  bool _loading = false;
+  _FocusBoardNoteStatusFilter _statusFilter =
+      _FocusBoardNoteStatusFilter.pending;
+  _FocusBoardNoteSort _sort = _FocusBoardNoteSort.editedOrCreatedAt;
+  _FocusBoardFilterProfile _activeFilter = _FocusBoardFilterProfile.generic;
+
+  bool get loaded => _loaded;
+  bool get loading => _loading;
+  _FocusBoardNoteStatusFilter get statusFilter => _statusFilter;
+  _FocusBoardNoteSort get sort => _sort;
+  _FocusBoardFilterProfile get activeFilter => _activeFilter;
+  List<_FocusBoardFilterProfile> get savedFilterProfiles =>
+      List.unmodifiable(_filterProfiles);
+  List<_FocusBoardNote> get notes => List.unmodifiable(_notes);
+
+  Future<void> ensureLoaded() async {
+    if (_loaded || _loading) {
+      return;
+    }
+    _loading = true;
+    notifyListeners();
+    final preferences = await SharedPreferences.getInstance();
+    _notes
+      ..clear()
+      ..addAll(_readNotes(preferences.getString(_notesStorageKey)));
+    _filterProfiles
+      ..clear()
+      ..addAll(_readProfiles(preferences.getString(_profilesStorageKey)));
+    final activeRaw = preferences.getString(_activeProfileStorageKey);
+    if (activeRaw != null && activeRaw.isNotEmpty) {
+      final active = [
+        _FocusBoardFilterProfile.generic,
+        ..._filterProfiles,
+      ].where((profile) => profile.id == activeRaw).firstOrNull;
+      if (active != null) {
+        _activeFilter = active;
+      }
+    }
+    _applyAutomaticTrash();
+    _loaded = true;
+    _loading = false;
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  List<_FocusBoardNote> visibleNotes(_ViewerAccessProfile viewerProfile) {
+    final filtered = [
+      for (final note in _notes)
+        if (note.canViewerRead(viewerProfile) &&
+            !_activeFilter.excludes(note) &&
+            _matchesStatusFilter(note))
+          note,
+    ];
+    filtered.sort(_compareNotes);
+    return filtered;
+  }
+
+  int get urgentCount {
+    return _notes
+        .where(
+          (note) =>
+              !note.inTrash &&
+              note.priority == _FocusBoardNotePriority.urgent &&
+              !note.isComplete,
+        )
+        .length;
+  }
+
+  int get importantCount {
+    return _notes
+        .where(
+          (note) =>
+              !note.inTrash &&
+              note.priority == _FocusBoardNotePriority.important &&
+              !note.isComplete,
+        )
+        .length;
+  }
+
+  int get normalCount {
+    return _notes
+        .where(
+          (note) =>
+              !note.inTrash &&
+              note.priority == _FocusBoardNotePriority.normal &&
+              !note.isComplete,
+        )
+        .length;
+  }
+
+  int get pendingCount {
+    return _notes.where((note) => !note.inTrash && !note.isComplete).length;
+  }
+
+  int get completedCount {
+    return _notes.where((note) => !note.inTrash && note.isComplete).length;
+  }
+
+  int get trashCount {
+    return _notes.where((note) => note.inTrash).length;
+  }
+
+  Future<void> addNote({
+    required _FocusBoardNoteDraft draft,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final now = DateTime.now();
+    final actorId = _focusBoardActorId(viewerProfile);
+    final note = _FocusBoardNote(
+      id: 'fbn-${now.microsecondsSinceEpoch}',
+      title: draft.title.trim().isEmpty ? 'Recado' : draft.title.trim(),
+      description: draft.description.trim(),
+      priority: draft.priority,
+      dueAt: draft.dueAt,
+      createdAt: now,
+      createdById: actorId,
+      createdByName: viewerProfile.name,
+      companyLabel: draft.companyLabel.trim(),
+      visibility: draft.visibility,
+      replicasEnabled: draft.replicasEnabled,
+      replicaMode: draft.replicaMode,
+      assignments: draft.assignments,
+      audit: [
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: actorId,
+          actorName: viewerProfile.name,
+          action: 'criado',
+          details:
+              'Recado criado com prazo ${_focusBoardShortDateLabel(draft.dueAt)}.',
+        ),
+      ],
+    );
+    _notes.insert(0, note);
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<_FocusBoardNote> createSimpleNote({
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final now = DateTime.now();
+    final actorId = _focusBoardActorId(viewerProfile);
+    final note = _FocusBoardNote(
+      id: 'fbn-${now.microsecondsSinceEpoch}',
+      title: 'Nova nota',
+      description: '',
+      priority: _FocusBoardNotePriority.normal,
+      dueAt: now.add(const Duration(days: 7)),
+      createdAt: now,
+      createdById: actorId,
+      createdByName: viewerProfile.name,
+      visibility: _FocusBoardNoteVisibility.private,
+      replicasEnabled: true,
+      replicaMode: _FocusBoardReplicaMode.ownerOnly,
+      audit: [
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: actorId,
+          actorName: viewerProfile.name,
+          action: 'criado',
+          details:
+              'Nota simples criada privada por padrao com prazo de 7 dias.',
+        ),
+      ],
+    );
+    _notes.insert(0, note);
+    notifyListeners();
+    await _persistNotes();
+    return note;
+  }
+
+  Future<void> updateNote({
+    required String id,
+    required _FocusBoardNoteDraft draft,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    if (!current.isCreator(viewerProfile)) {
+      return;
+    }
+    if (current.isClosed) {
+      return;
+    }
+    final now = DateTime.now();
+    final changes = <String>[];
+    if (current.title != draft.title.trim()) {
+      changes.add('titulo: "${current.title}" -> "${draft.title.trim()}"');
+    }
+    if (current.description != draft.description.trim()) {
+      changes.add(
+        'texto: "${current.description}" -> "${draft.description.trim()}"',
+      );
+    }
+    if (current.priority != draft.priority) {
+      changes.add(
+        'prioridade: ${current.priority.label} -> ${draft.priority.label}',
+      );
+    }
+    if (_focusBoardDateKey(current.dueAt) != _focusBoardDateKey(draft.dueAt)) {
+      changes.add(
+        'prazo: ${_focusBoardShortDateLabel(current.dueAt)} -> ${_focusBoardShortDateLabel(draft.dueAt)}',
+      );
+    }
+    if (current.companyLabel.trim() != draft.companyLabel.trim()) {
+      changes.add(
+        'empresa: ${current.companyLabel} -> ${draft.companyLabel.trim()}',
+      );
+    }
+    if (current.visibility != draft.visibility) {
+      changes.add(
+        'visibilidade: ${current.visibility.label} -> ${draft.visibility.label}',
+      );
+    }
+    if (current.replicasEnabled != draft.replicasEnabled) {
+      changes.add(
+        'replicas: ${current.replicasEnabled ? 'habilitadas' : 'desabilitadas'} -> ${draft.replicasEnabled ? 'habilitadas' : 'desabilitadas'}',
+      );
+    }
+    if (current.replicaMode != draft.replicaMode) {
+      changes.add(
+        'modo de replica: ${current.replicaMode.label} -> ${draft.replicaMode.label}',
+      );
+    }
+    final actorId = _focusBoardActorId(viewerProfile);
+    _notes[index] = current.copyWith(
+      title: draft.title.trim().isEmpty ? 'Recado' : draft.title.trim(),
+      description: draft.description.trim(),
+      priority: draft.priority,
+      dueAt: draft.dueAt,
+      companyLabel: draft.companyLabel.trim(),
+      visibility: draft.visibility,
+      replicasEnabled: draft.replicasEnabled,
+      replicaMode: draft.replicaMode,
+      assignments: draft.assignments,
+      updatedAt: now,
+      lastEditedAt: now,
+      audit: [
+        ...current.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: actorId,
+          actorName: viewerProfile.name,
+          action: 'editado',
+          details: changes.isEmpty
+              ? 'Edicao sem alteracao textual.'
+              : changes.join(' | '),
+        ),
+      ],
+    );
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> updateNoteText({
+    required String id,
+    required String title,
+    required String description,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    if (!current.isCreator(viewerProfile) || current.isClosed) {
+      return;
+    }
+    final nextTitle = title.trim().isEmpty ? 'Nova nota' : title.trim();
+    final nextDescription = description.trim();
+    if (current.title == nextTitle && current.description == nextDescription) {
+      return;
+    }
+    final now = DateTime.now();
+    final changes = <String>[];
+    if (current.title != nextTitle) {
+      changes.add('titulo: "${current.title}" -> "$nextTitle"');
+    }
+    if (current.description != nextDescription) {
+      changes.add('texto: "${current.description}" -> "$nextDescription"');
+    }
+    _notes[index] = current.copyWith(
+      title: nextTitle,
+      description: nextDescription,
+      updatedAt: now,
+      lastEditedAt: now,
+      audit: [
+        ...current.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: _focusBoardActorId(viewerProfile),
+          actorName: viewerProfile.name,
+          action: 'texto atualizado',
+          details: changes.join(' | '),
+        ),
+      ],
+    );
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> toggleOwnerCompletion({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    if (current.isClosed) {
+      return;
+    }
+    final now = DateTime.now();
+    final nextCompleted = !current.completedByOwner;
+    final actorId = _focusBoardActorId(viewerProfile);
+    var nextAssignments = current.assignments;
+    if (nextCompleted &&
+        current.replicasEnabled &&
+        current.replicaMode == _FocusBoardReplicaMode.firstCompletesAll) {
+      nextAssignments = [
+        for (final assignment in current.assignments)
+          assignment.copyWith(
+            completed: true,
+            completedAt: now,
+            completedById: actorId,
+            completedByName: viewerProfile.name,
+          ),
+      ];
+    }
+    var next = current.copyWith(
+      completedByOwner: nextCompleted,
+      assignments: nextAssignments,
+      restoredFromAutoTrash: false,
+      updatedAt: now,
+      audit: [
+        ...current.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: actorId,
+          actorName: viewerProfile.name,
+          action: nextCompleted ? 'concluido' : 'reaberto',
+          details: nextCompleted
+              ? 'Marcado como concluido; lixeira automatica em 1 dia.'
+              : 'Conclusao removida manualmente.',
+        ),
+      ],
+    );
+    next = next.copyWith(
+      completedAt: next.isComplete ? current.completedAt ?? now : null,
+      clearCompletedAt: !next.isComplete,
+    );
+    _notes[index] = next;
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> toggleAssignmentCompletion({
+    required String noteId,
+    required String assignmentId,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == noteId);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    if (current.isClosed || !current.replicasEnabled) {
+      return;
+    }
+    final assignmentIndex = current.assignments.indexWhere(
+      (assignment) => assignment.id == assignmentId,
+    );
+    if (assignmentIndex < 0) {
+      return;
+    }
+    final now = DateTime.now();
+    final actorId = _focusBoardActorId(viewerProfile);
+    final assignment = current.assignments[assignmentIndex];
+    final nextCompleted = !assignment.completed;
+    final nextAssignments = [...current.assignments];
+    nextAssignments[assignmentIndex] = assignment.copyWith(
+      completed: nextCompleted,
+      completedAt: nextCompleted ? now : null,
+      clearCompletedAt: !nextCompleted,
+      completedById: nextCompleted ? actorId : '',
+      completedByName: nextCompleted ? viewerProfile.name : '',
+    );
+    if (nextCompleted &&
+        current.replicaMode == _FocusBoardReplicaMode.firstCompletesAll) {
+      for (
+        var assignmentIndex = 0;
+        assignmentIndex < nextAssignments.length;
+        assignmentIndex += 1
+      ) {
+        nextAssignments[assignmentIndex] = nextAssignments[assignmentIndex]
+            .copyWith(
+              completed: true,
+              completedAt: now,
+              completedById: actorId,
+              completedByName: viewerProfile.name,
+            );
+      }
+    }
+    var next = current.copyWith(
+      assignments: nextAssignments,
+      updatedAt: now,
+      audit: [
+        ...current.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: actorId,
+          actorName: viewerProfile.name,
+          action: nextCompleted ? 'replica concluida' : 'replica reaberta',
+          details:
+              '${assignment.label} ${nextCompleted ? 'concluiu' : 'removeu conclusao'}.',
+        ),
+      ],
+    );
+    next = next.copyWith(
+      completedAt: next.isComplete ? current.completedAt ?? now : null,
+      clearCompletedAt: !next.isComplete,
+    );
+    _notes[index] = next;
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> moveToTrash({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    final now = DateTime.now();
+    _notes[index] = current.copyWith(
+      inTrash: true,
+      trashedAt: now,
+      updatedAt: now,
+      audit: [
+        ...current.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: _focusBoardActorId(viewerProfile),
+          actorName: viewerProfile.name,
+          action: 'movido para lixeira',
+          details: current.isComplete
+              ? 'Recado completo movido para lixeira.'
+              : 'Recado incompleto movido para lixeira com confirmacao.',
+        ),
+      ],
+    );
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> closeNote({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    if (!current.isCreator(viewerProfile) || current.isClosed) {
+      return;
+    }
+    final now = DateTime.now();
+    _notes[index] = current.copyWith(
+      closedAt: now,
+      closedById: _focusBoardActorId(viewerProfile),
+      closedByName: viewerProfile.name,
+      completedAt: now,
+      updatedAt: now,
+      audit: [
+        ...current.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: _focusBoardActorId(viewerProfile),
+          actorName: viewerProfile.name,
+          action: 'encerrado',
+          details: 'Criador encerrou o recado e bloqueou novas alteracoes.',
+        ),
+      ],
+    );
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> replicateNote({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final source = _notes.where((note) => note.id == id).firstOrNull;
+    if (source == null || source.isClosed || !source.replicasEnabled) {
+      return;
+    }
+    final now = DateTime.now();
+    final actorId = _focusBoardActorId(viewerProfile);
+    final replica = _FocusBoardNote(
+      id: 'fbn-${now.microsecondsSinceEpoch}',
+      title: source.title,
+      description: source.description,
+      priority: source.priority,
+      dueAt: source.dueAt,
+      createdAt: now,
+      createdById: actorId,
+      createdByName: viewerProfile.name,
+      companyLabel: source.companyLabel,
+      visibility: _FocusBoardNoteVisibility.private,
+      replicasEnabled: source.replicasEnabled,
+      replicaMode: _FocusBoardReplicaMode.ownerOnly,
+      audit: [
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: actorId,
+          actorName: viewerProfile.name,
+          action: 'replicado',
+          details: 'Replica criada a partir do recado ${source.id}.',
+        ),
+      ],
+    );
+    _notes.insert(0, replica);
+    _notes[_notes.indexWhere((note) => note.id == id)] = source.copyWith(
+      updatedAt: now,
+      audit: [
+        ...source.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: actorId,
+          actorName: viewerProfile.name,
+          action: 'replica gerada',
+          details: '${viewerProfile.name} replicou este recado.',
+        ),
+      ],
+    );
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> restoreFromTrash({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final index = _notes.indexWhere((note) => note.id == id);
+    if (index < 0) {
+      return;
+    }
+    final current = _notes[index];
+    final now = DateTime.now();
+    _notes[index] = current.copyWith(
+      inTrash: false,
+      clearTrashedAt: true,
+      restoredFromAutoTrash: true,
+      updatedAt: now,
+      audit: [
+        ...current.audit,
+        _FocusBoardAuditEntry(
+          at: now,
+          actorId: _focusBoardActorId(viewerProfile),
+          actorName: viewerProfile.name,
+          action: 'restaurado',
+          details: 'Recado movido manualmente para fora da lixeira.',
+        ),
+      ],
+    );
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> moveManyToTrash({
+    required Iterable<String> ids,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    for (final id in ids) {
+      await moveToTrash(id: id, viewerProfile: viewerProfile);
+    }
+  }
+
+  Future<void> completeMany({
+    required Iterable<String> ids,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    for (final id in ids) {
+      final note = _notes.where((entry) => entry.id == id).firstOrNull;
+      if (note != null && !note.completedByOwner) {
+        await toggleOwnerCompletion(id: id, viewerProfile: viewerProfile);
+      }
+    }
+  }
+
+  Future<void> setStatusFilter(_FocusBoardNoteStatusFilter filter) async {
+    _statusFilter = filter;
+    notifyListeners();
+  }
+
+  Future<void> setSort(_FocusBoardNoteSort sort) async {
+    _sort = sort;
+    notifyListeners();
+  }
+
+  Future<void> setActiveFilter(_FocusBoardFilterProfile profile) async {
+    _activeFilter = profile;
+    notifyListeners();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_activeProfileStorageKey, profile.id);
+  }
+
+  Future<void> saveFilterProfile(_FocusBoardFilterProfile profile) async {
+    await ensureLoaded();
+    final normalized = profile.copyWith(
+      id: profile.id == 'generic'
+          ? 'profile-${DateTime.now().microsecondsSinceEpoch}'
+          : profile.id,
+      name: profile.name.trim().isEmpty ? 'Perfil salvo' : profile.name.trim(),
+    );
+    final index = _filterProfiles.indexWhere(
+      (entry) => entry.id == normalized.id,
+    );
+    if (index >= 0) {
+      _filterProfiles[index] = normalized;
+    } else {
+      if (_filterProfiles.length >= 4) {
+        _filterProfiles.removeAt(0);
+      }
+      _filterProfiles.add(normalized);
+    }
+    _activeFilter = normalized;
+    notifyListeners();
+    await _persistProfiles();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_activeProfileStorageKey, normalized.id);
+  }
+
+  Future<void> resetFilters() async {
+    _activeFilter = _FocusBoardFilterProfile.generic;
+    _statusFilter = _FocusBoardNoteStatusFilter.pending;
+    notifyListeners();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_activeProfileStorageKey, _activeFilter.id);
+  }
+
+  List<_FocusBoardNote> _readNotes(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return const [];
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return const [];
+      }
+      return [
+        for (final item in decoded)
+          if (item is Map)
+            _FocusBoardNote.fromJson(Map<String, dynamic>.from(item)),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  List<_FocusBoardFilterProfile> _readProfiles(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return const [];
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return const [];
+      }
+      return [
+        for (final item in decoded)
+          if (item is Map)
+            _FocusBoardFilterProfile.fromJson(Map<String, dynamic>.from(item)),
+      ].take(4).toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  bool _matchesStatusFilter(_FocusBoardNote note) {
+    return switch (_statusFilter) {
+      _FocusBoardNoteStatusFilter.pending => !note.isComplete,
+      _FocusBoardNoteStatusFilter.completed => note.isComplete,
+      _FocusBoardNoteStatusFilter.all => true,
+    };
+  }
+
+  int _compareNotes(_FocusBoardNote left, _FocusBoardNote right) {
+    final comparison = switch (_sort) {
+      _FocusBoardNoteSort.createdAt => right.createdAt.compareTo(
+        left.createdAt,
+      ),
+      _FocusBoardNoteSort.editedOrCreatedAt =>
+        right.editedOrCreatedAt.compareTo(left.editedOrCreatedAt),
+      _FocusBoardNoteSort.creatorName =>
+        left.createdByName.toLowerCase().compareTo(
+          right.createdByName.toLowerCase(),
+        ),
+      _FocusBoardNoteSort.creatorId => left.createdById.toLowerCase().compareTo(
+        right.createdById.toLowerCase(),
+      ),
+      _FocusBoardNoteSort.company => left.companyLabel.toLowerCase().compareTo(
+        right.companyLabel.toLowerCase(),
+      ),
+      _FocusBoardNoteSort.status => left.completionState.sortRank.compareTo(
+        right.completionState.sortRank,
+      ),
+    };
+    if (comparison != 0) {
+      return comparison;
+    }
+    return right.createdAt.compareTo(left.createdAt);
+  }
+
+  void _applyAutomaticTrash() {
+    final now = DateTime.now();
+    var changed = false;
+    for (var index = 0; index < _notes.length; index += 1) {
+      final note = _notes[index];
+      final completedAt = note.completedAt;
+      if (note.inTrash ||
+          note.restoredFromAutoTrash ||
+          completedAt == null ||
+          !note.isComplete) {
+        continue;
+      }
+      if (now.difference(completedAt) < const Duration(days: 1)) {
+        continue;
+      }
+      _notes[index] = note.copyWith(
+        inTrash: true,
+        trashedAt: now,
+        updatedAt: now,
+        audit: [
+          ...note.audit,
+          _FocusBoardAuditEntry(
+            at: now,
+            actorId: 'system',
+            actorName: 'Sistema',
+            action: 'lixeira automatica',
+            details: 'Recado completo ha 1 dia movido para lixeira.',
+          ),
+        ],
+      );
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> _persistNotes() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      _notesStorageKey,
+      jsonEncode(_notes.map((note) => note.toJson()).toList()),
+    );
+  }
+
+  Future<void> _persistProfiles() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      _profilesStorageKey,
+      jsonEncode(_filterProfiles.map((profile) => profile.toJson()).toList()),
+    );
+  }
+}
+
 class _FocusBoardPersistentController extends ChangeNotifier {
   _FocusBoardPersistentController({ApiClient? apiClient})
-    : _repository = _PeopleApiRepository(apiClient: apiClient);
+    : _repository = _PeopleApiRepository(apiClient: apiClient),
+      notesController = _FocusBoardNotesController();
 
   final _PeopleApiRepository _repository;
+  final _FocusBoardNotesController notesController;
   _PeopleRuntimeData _runtimeData = _PeopleRuntimeData.initial();
   Future<void>? _activeLoad;
   bool _requestedInitialLoad = false;
@@ -29,6 +1558,7 @@ class _FocusBoardPersistentController extends ChangeNotifier {
   }
 
   Future<void> ensureLoaded() {
+    unawaited(notesController.ensureLoaded());
     if (_requestedInitialLoad) {
       return _activeLoad ?? Future<void>.value();
     }
@@ -92,6 +1622,12 @@ class _FocusBoardPersistentController extends ChangeNotifier {
         !people.any((item) => item.publicId == selectedPublicId)) {
       _selectedPersonPublicId = people.first.publicId;
     }
+  }
+
+  @override
+  void dispose() {
+    notesController.dispose();
+    super.dispose();
   }
 }
 
@@ -183,12 +1719,7 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
                           widget.extent - delta.delta.dx,
                         ),
                       ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 12, 14, 14),
-                          child: board,
-                        ),
-                      ),
+                      Expanded(child: board),
                     ],
                   )
                 : Column(
@@ -215,19 +1746,34 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
 
   Widget _focusBoardSlotContent(bool compact) {
     if (widget.detached) {
-      return _FocusBoardSlotPlaceholder(
-        icon: Icons.open_in_new_rounded,
-        title: 'Focus Board destacada',
-        message:
-            'O slot permanece reservado. Arraste a janela para ca ou use Acoplar.',
-        primaryLabel: 'Acoplar',
-        primaryIcon: Icons.call_received_rounded,
-        onPrimary: widget.onAttach,
-        onToolbarDetach: widget.onAttach,
-        onToolbarAttach: widget.onAttach,
-        detached: true,
-        visible: widget.visible,
-        onToggleVisibility: widget.onToggleVisibility,
+      return Column(
+        children: [
+          _FocusBoardSlotToolbar(
+            visible: widget.visible,
+            detached: widget.detached,
+            onToggleVisibility: widget.onToggleVisibility,
+            onDetach: widget.onAttach,
+            onAttach: widget.onAttach,
+          ),
+          Expanded(
+            child: _FocusBoardSlotPlaceholder(
+              icon: Icons.open_in_new_rounded,
+              title: 'Board destacado',
+              message:
+                  'A area de recados esta em janela separada. Agenda e tarefas continuam fixas aqui.',
+              primaryLabel: 'Acoplar',
+              primaryIcon: Icons.call_received_rounded,
+              onPrimary: widget.onAttach,
+              onToolbarDetach: widget.onAttach,
+              onToolbarAttach: widget.onAttach,
+              detached: true,
+              visible: widget.visible,
+              onToggleVisibility: widget.onToggleVisibility,
+              showToolbar: false,
+            ),
+          ),
+          SizedBox(height: 320, child: _fixedFooterForSlot()),
+        ],
       );
     }
 
@@ -257,7 +1803,6 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
           onDetach: widget.onDetach,
           onAttach: widget.onAttach,
         ),
-        const SizedBox(height: 8),
         Expanded(
           child: Material(
             color: Colors.transparent,
@@ -279,6 +1824,68 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _fixedFooterForSlot() {
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        return AnimatedBuilder(
+          animation: widget.controller.notesController,
+          builder: (context, _) {
+            final item = widget.controller.selectedItem;
+            final profile = item?.personProfile;
+            if (item == null || profile == null) {
+              return const _FocusBoardFooterEmpty(
+                icon: Icons.event_busy_outlined,
+                text: 'Agenda fixa indisponivel enquanto os dados carregam.',
+              );
+            }
+            final entries =
+                profile.calendarEntries.where((entry) {
+                  final status = entry.status.toUpperCase();
+                  return status != 'CANCELED' && status != 'COMPLETED';
+                }).toList()..sort(
+                  (left, right) => left.startsAt.compareTo(right.startsAt),
+                );
+            final notes = widget.controller.notesController.visibleNotes(
+              widget.viewerProfile,
+            );
+            return _FocusBoardFixedFooter(
+              notesController: widget.controller.notesController,
+              visibleNotes: notes,
+              calendarEntries: entries,
+              selectedCount: 0,
+              cardsHidden: false,
+              onAddCalendarEntry: () => _openCreateReminder(item),
+              onAddNote: () => unawaited(
+                widget.controller.notesController.createSimpleNote(
+                  viewerProfile: widget.viewerProfile,
+                ),
+              ),
+              onCancelCalendarEntry: _confirmCancelReminder,
+              onToggleTrashView: _toggleTrashViewForFooter,
+              onClearSelection: () {},
+              onBulkComplete: () {},
+              onBulkTrash: () {},
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleTrashViewForFooter() async {
+    final notesController = widget.controller.notesController;
+    final active = notesController.activeFilter;
+    final showTrash = !active.showTrash;
+    await notesController.setActiveFilter(
+      active.copyWith(
+        id: showTrash ? 'trash-view' : 'generic',
+        name: showTrash ? 'Lixeira' : 'Perfil generico',
+        showTrash: showTrash,
+      ),
     );
   }
 
@@ -386,13 +1993,18 @@ class _FocusBoardSlotToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 32,
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: const BoxDecoration(
+        color: _deepTealColor,
+        border: Border(bottom: BorderSide(color: Color(0x26000000))),
+      ),
       child: Row(
         children: [
           const Icon(
             Icons.dashboard_customize_outlined,
-            color: _deepTealColor,
+            color: Colors.white,
             size: 18,
           ),
           const SizedBox(width: 8),
@@ -402,7 +2014,7 @@ class _FocusBoardSlotToolbar extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: _inkColor,
+                color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -410,6 +2022,7 @@ class _FocusBoardSlotToolbar extends StatelessWidget {
           IconButton(
             tooltip: visible ? 'Ocultar slot' : 'Mostrar slot',
             onPressed: onToggleVisibility,
+            color: Colors.white,
             icon: Icon(
               visible
                   ? Icons.visibility_outlined
@@ -420,6 +2033,7 @@ class _FocusBoardSlotToolbar extends StatelessWidget {
           IconButton(
             tooltip: detached ? 'Acoplar Focus Board' : 'Destacar Focus Board',
             onPressed: detached ? onAttach : onDetach,
+            color: Colors.white,
             icon: Icon(
               detached
                   ? Icons.call_received_rounded
@@ -446,6 +2060,7 @@ class _FocusBoardSlotPlaceholder extends StatelessWidget {
     required this.detached,
     required this.visible,
     required this.onToggleVisibility,
+    this.showToolbar = true,
   });
 
   final IconData icon;
@@ -459,18 +2074,20 @@ class _FocusBoardSlotPlaceholder extends StatelessWidget {
   final bool detached;
   final bool visible;
   final VoidCallback onToggleVisibility;
+  final bool showToolbar;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _FocusBoardSlotToolbar(
-          visible: visible,
-          detached: detached,
-          onToggleVisibility: onToggleVisibility,
-          onDetach: onToolbarDetach,
-          onAttach: onToolbarAttach,
-        ),
+        if (showToolbar)
+          _FocusBoardSlotToolbar(
+            visible: visible,
+            detached: detached,
+            onToggleVisibility: onToggleVisibility,
+            onDetach: onToolbarDetach,
+            onAttach: onToolbarAttach,
+          ),
         Expanded(
           child: Center(
             child: Padding(
@@ -971,25 +2588,29 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
     final notes = [...item.sensitiveNotes]
       ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
     final sections = _buildSensitiveSections(notes);
+    final docked = detachedLabel == null;
+    final hub = _FocusBoardHubPanel(
+      viewerProfile: viewerProfile,
+      item: item,
+      profile: profile,
+      people: controller.people,
+      notesController: controller.notesController,
+      attachments: item.attachments,
+      sections: sections,
+      calendarEntries: profile.calendarEntries,
+      docked: docked,
+      onAddCalendarEntry: () => onCreateReminder(item),
+      onCancelCalendarEntry: onCancelReminder,
+      onDetach: onDetach,
+      onRefresh: onRefresh,
+      detachLabel: detachedLabel,
+    );
 
     return _FocusBoardShellCard(
       compact: compact,
-      child: _FocusBoardResponsiveViewport(
-        compact: compact,
-        child: _FocusBoardHubPanel(
-          viewerProfile: viewerProfile,
-          item: item,
-          profile: profile,
-          attachments: item.attachments,
-          sections: sections,
-          calendarEntries: profile.calendarEntries,
-          onAddCalendarEntry: () => onCreateReminder(item),
-          onCancelCalendarEntry: onCancelReminder,
-          onDetach: onDetach,
-          onRefresh: onRefresh,
-          detachLabel: detachedLabel,
-        ),
-      ),
+      child: docked
+          ? hub
+          : _FocusBoardResponsiveViewport(compact: compact, child: hub),
     );
   }
 }
