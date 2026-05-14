@@ -1414,7 +1414,7 @@ class _FocusBoardHubPanel extends StatefulWidget {
   final List<_CalendarEntryRecord> calendarEntries;
   final bool docked;
   final bool dockedFooterInitiallyCollapsed;
-  final VoidCallback onAddCalendarEntry;
+  final ValueChanged<_FocusBoardTaskMode> onAddCalendarEntry;
   final ValueChanged<_CalendarEntryRecord> onCancelCalendarEntry;
   final VoidCallback? onDetach;
   final VoidCallback? onRefresh;
@@ -1518,7 +1518,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
           final footerHeight = tightHeight
               ? (availableHeight * 0.30).clamp(132.0, 220.0).toDouble()
               : (availableHeight * 0.37).clamp(240.0, 360.0).toDouble();
-          // Janela separada: calendario/compromissos/recados continuam
+          // Janela separada: calendario/compromissos/tarefas continuam
           // disponiveis para compatibilidade com futuras integracoes do
           // Focus Board, mas nascem recolhidos enquanto a API e avaliada.
           final footerExpanded =
@@ -1534,11 +1534,21 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
                 child: _buildHeader(context, compact: true),
               ),
               const Divider(height: 1, color: _lineColor),
+              if (_selectedNoteIds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                  child: _FocusBoardBulkBar(
+                    selectedCount: _selectedNoteIds.length,
+                    onClear: _clearSelection,
+                    onComplete: _bulkComplete,
+                    onTrash: _bulkTrash,
+                  ),
+                ),
               Expanded(child: _notesStage(boardNotes)),
               SizedBox(
                 height: effectiveFooterHeight,
                 child: footerExpanded
-                    ? _footer(boardNotes, upcomingEntries)
+                    ? _footer(upcomingEntries)
                     : _collapsedFooterHandle(context),
               ),
             ],
@@ -1564,6 +1574,15 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
           const SizedBox(height: 14),
           _HubAccessNotice(viewerProfile: widget.viewerProfile),
           const SizedBox(height: 14),
+          if (_selectedNoteIds.isNotEmpty) ...[
+            _FocusBoardBulkBar(
+              selectedCount: _selectedNoteIds.length,
+              onClear: _clearSelection,
+              onComplete: _bulkComplete,
+              onTrash: _bulkTrash,
+            ),
+            const SizedBox(height: 12),
+          ],
           SizedBox(height: 560, child: _notesStage(boardNotes)),
           const SizedBox(height: 10),
           Theme(
@@ -1622,23 +1641,11 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     );
   }
 
-  Widget _footer(
-    List<_FocusBoardNote> boardNotes,
-    List<_CalendarEntryRecord> upcomingEntries,
-  ) {
+  Widget _footer(List<_CalendarEntryRecord> upcomingEntries) {
     return _FocusBoardFixedFooter(
-      notesController: widget.notesController,
-      visibleNotes: boardNotes,
       calendarEntries: upcomingEntries,
-      selectedCount: _selectedNoteIds.length,
-      cardsHidden: _cardsHidden,
       onAddCalendarEntry: widget.onAddCalendarEntry,
-      onAddNote: _createSimpleNote,
       onCancelCalendarEntry: widget.onCancelCalendarEntry,
-      onToggleTrashView: _toggleTrashView,
-      onClearSelection: _clearSelection,
-      onBulkComplete: _bulkComplete,
-      onBulkTrash: _bulkTrash,
     );
   }
 
@@ -1650,7 +1657,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       ),
       child: Center(
         child: Tooltip(
-          message: 'Mostrar calendario, compromissos e recados',
+          message: 'Mostrar calendario, compromissos e tarefas',
           child: InkWell(
             borderRadius: BorderRadius.circular(99),
             onTap: () => setState(() => _footerExpandedOverride = true),
@@ -1730,7 +1737,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
             FilledButton.icon(
               onPressed: _creatingQuickNote ? null : _createSimpleNote,
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Recado'),
+              label: const Text('Nota'),
             ),
             IconButton.outlined(
               tooltip: 'Prioridades urgentes',
@@ -1756,6 +1763,22 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
               ),
             ),
             _FocusBoardStatusFilterButton(controller: widget.notesController),
+            IconButton.outlined(
+              tooltip: widget.notesController.activeFilter.showTrash
+                  ? 'Sair da lixeira de notas'
+                  : 'Ver lixeira de notas (${widget.notesController.trashCount})',
+              onPressed: _toggleTrashView,
+              icon: Badge.count(
+                count: widget.notesController.trashCount,
+                isLabelVisible: widget.notesController.trashCount > 0,
+                child: Icon(
+                  Icons.recycling_rounded,
+                  color: widget.notesController.activeFilter.showTrash
+                      ? _tealColor
+                      : null,
+                ),
+              ),
+            ),
             IconButton.outlined(
               tooltip: 'Filtros e perfis salvos',
               onPressed: _openFilterDialog,
@@ -1792,7 +1815,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
           FilledButton.icon(
             onPressed: _creatingQuickNote ? null : _createSimpleNote,
             icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Recado'),
+            label: const Text('Nota'),
           ),
           const SizedBox(width: 6),
           IconButton.outlined(
@@ -1819,6 +1842,22 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
             ),
           ),
           _FocusBoardStatusFilterButton(controller: widget.notesController),
+          IconButton.outlined(
+            tooltip: widget.notesController.activeFilter.showTrash
+                ? 'Sair da lixeira de notas'
+                : 'Ver lixeira de notas (${widget.notesController.trashCount})',
+            onPressed: _toggleTrashView,
+            icon: Badge.count(
+              count: widget.notesController.trashCount,
+              isLabelVisible: widget.notesController.trashCount > 0,
+              child: Icon(
+                Icons.recycling_rounded,
+                color: widget.notesController.activeFilter.showTrash
+                    ? _tealColor
+                    : null,
+              ),
+            ),
+          ),
           IconButton.outlined(
             tooltip: 'Filtros e perfis salvos',
             onPressed: _openFilterDialog,
@@ -1949,7 +1988,15 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     }
     final pendingDraft = _recentUntouchedQuickNote();
     if (pendingDraft != null) {
-      _pulseExistingDraft(pendingDraft.id);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await Future<void>.delayed(const Duration(milliseconds: 140));
+      if (!mounted) {
+        return;
+      }
+      final stillPendingDraft = _recentUntouchedQuickNote();
+      if (stillPendingDraft != null) {
+        _pulseExistingDraft(stillPendingDraft.id);
+      }
       return;
     }
     setState(() => _creatingQuickNote = true);
@@ -2091,10 +2138,10 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     }
     switch (result) {
       case _FocusBoardTextCommitResult.draftSaved:
-        _showFocusBoardSnack('Recado salvo.');
+        _showFocusBoardSnack('Nota salva.');
         break;
       case _FocusBoardTextCommitResult.textUpdated:
-        _showFocusBoardSnack('Recado atualizado.');
+        _showFocusBoardSnack('Nota atualizada.');
         break;
       case _FocusBoardTextCommitResult.none:
         break;
@@ -2113,7 +2160,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Recado vazio descartado.'),
+        content: const Text('Nota vazia descartada.'),
         duration: const Duration(seconds: 4),
         action: SnackBarAction(
           label: 'Desfazer',
@@ -2138,7 +2185,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Mover recado para lixeira?'),
+          title: const Text('Mover nota para lixeira?'),
           content: Text(warning),
           actions: [
             TextButton(
@@ -2173,7 +2220,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
         note.description.trim().isNotEmpty;
     final warnings = <String>[];
     if (hasUserContent && !note.isComplete) {
-      warnings.add('o recado tem conteudo e ainda nao foi concluido');
+      warnings.add('a nota tem conteudo e ainda nao foi concluida');
     }
     if (pendingAssignments.isNotEmpty) {
       warnings.add(
@@ -3177,7 +3224,7 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
       );
     }
     return Tooltip(
-      message: 'Digite o conteudo do recado aqui.',
+      message: 'Digite o conteudo da nota aqui.',
       child: TextField(
         controller: _titleController,
         focusNode: _titleFocusNode,
@@ -3189,7 +3236,7 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
           isDense: true,
           border: InputBorder.none,
           hintText: widget.autofocusTitle
-              ? 'Digite o conteudo do recado aqui'
+              ? 'Digite o conteudo da nota aqui'
               : null,
           contentPadding: EdgeInsets.zero,
         ),
@@ -3467,44 +3514,21 @@ class _FocusBoardMiniChip extends StatelessWidget {
 
 class _FocusBoardFixedFooter extends StatelessWidget {
   const _FocusBoardFixedFooter({
-    required this.notesController,
-    required this.visibleNotes,
     required this.calendarEntries,
-    required this.selectedCount,
-    required this.cardsHidden,
     required this.onAddCalendarEntry,
-    required this.onAddNote,
     required this.onCancelCalendarEntry,
-    required this.onToggleTrashView,
-    required this.onClearSelection,
-    required this.onBulkComplete,
-    required this.onBulkTrash,
   });
 
-  final _FocusBoardNotesController notesController;
-  final List<_FocusBoardNote> visibleNotes;
   final List<_CalendarEntryRecord> calendarEntries;
-  final int selectedCount;
-  final bool cardsHidden;
-  final VoidCallback onAddCalendarEntry;
-  final VoidCallback onAddNote;
+  final ValueChanged<_FocusBoardTaskMode> onAddCalendarEntry;
   final ValueChanged<_CalendarEntryRecord> onCancelCalendarEntry;
-  final VoidCallback onToggleTrashView;
-  final VoidCallback onClearSelection;
-  final VoidCallback onBulkComplete;
-  final VoidCallback onBulkTrash;
 
   @override
   Widget build(BuildContext context) {
-    final today = _focusBoardDateKey(DateTime.now());
-    final todayEntries = calendarEntries
-        .where((entry) => _focusBoardDateKey(entry.startsAt) == today)
-        .take(2)
+    final taskEntries = calendarEntries
+        .where((entry) => entry.kind.toUpperCase() != 'NOTICE')
         .toList(growable: false);
-    final taskPreview = visibleNotes
-        .where((note) => !note.inTrash)
-        .take(2)
-        .toList(growable: false);
+    final taskPreview = taskEntries.take(3).toList(growable: false);
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -3517,107 +3541,147 @@ class _FocusBoardFixedFooter extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (selectedCount > 0) ...[
-              _FocusBoardBulkBar(
-                selectedCount: selectedCount,
-                onClear: onClearSelection,
-                onComplete: onBulkComplete,
-                onTrash: onBulkTrash,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _lineColor),
               ),
-              const SizedBox(height: 8),
-            ],
-            _FocusBoardFooterHeader(
-              icon: Icons.notifications_none_rounded,
-              title: 'Calendario Hoje',
-              actionLabel: 'Lembrete',
-              actionIcon: Icons.add_rounded,
-              onAction: onAddCalendarEntry,
+              child: Column(
+                children: [
+                  _FocusBoardTaskFooterHeader(
+                    count: taskEntries.length,
+                    onAdd: () =>
+                        onAddCalendarEntry(_FocusBoardTaskMode.reminder),
+                  ),
+                  const SizedBox(height: 8),
+                  if (taskPreview.isEmpty)
+                    const _FocusBoardFooterEmpty(
+                      icon: Icons.task_alt_rounded,
+                      text: 'Nenhuma tarefa, alarme ou timer agendado.',
+                    )
+                  else
+                    for (final entry in taskPreview) ...[
+                      _FocusBoardTaskFooterRow(
+                        entry: entry,
+                        onCancel: entry.canCancel
+                            ? () => onCancelCalendarEntry(entry)
+                            : null,
+                      ),
+                      if (entry != taskPreview.last) const SizedBox(height: 6),
+                    ],
+                ],
+              ),
             ),
             const SizedBox(height: 8),
-            if (cardsHidden)
-              const _FocusBoardFooterEmpty(
-                icon: Icons.visibility_off_outlined,
-                text: 'Compromissos ocultos.',
-              )
-            else if (todayEntries.isEmpty)
-              const _FocusBoardFooterEmpty(
-                icon: Icons.event_available_outlined,
-                text: 'Sem compromissos para hoje.',
-              )
-            else
-              for (final entry in todayEntries) ...[
-                _FocusBoardCalendarFooterRow(
-                  entry: entry,
-                  onCancel: entry.canCancel
-                      ? () => onCancelCalendarEntry(entry)
-                      : null,
-                ),
-                const SizedBox(height: 6),
-              ],
-            const SizedBox(height: 10),
-            _FocusBoardFooterHeader(
-              icon: Icons.check_circle_outline_rounded,
-              title: 'Recados (${visibleNotes.length})',
-              actionLabel: 'Recado',
-              actionIcon: Icons.add_rounded,
-              onAction: onAddNote,
-            ),
-            const SizedBox(height: 8),
-            if (cardsHidden)
-              const _FocusBoardFooterEmpty(
-                icon: Icons.visibility_off_outlined,
-                text: 'Mensagens ocultas.',
-              )
-            else if (taskPreview.isEmpty)
-              const _FocusBoardFooterEmpty(
-                icon: Icons.task_alt_rounded,
-                text: 'Sem recados neste filtro.',
-              )
-            else
-              for (final note in taskPreview) ...[
-                _FocusBoardTaskFooterRow(note: note),
-                const SizedBox(height: 6),
-              ],
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _FocusBoardCounterDot(
-                    color: const Color(0xFFD81F2A),
-                    label: 'Urgentes: ${notesController.urgentCount}',
-                  ),
-                ),
-                Expanded(
-                  child: _FocusBoardCounterDot(
-                    color: const Color(0xFFE9A100),
-                    label: 'Importantes: ${notesController.importantCount}',
-                  ),
-                ),
-                Expanded(
-                  child: _FocusBoardCounterDot(
-                    color: _mutedColor.withValues(alpha: 0.28),
-                    label: 'Normais: ${notesController.normalCount}',
-                  ),
-                ),
-                IconButton(
-                  tooltip: notesController.activeFilter.showTrash
-                      ? 'Sair da lixeira'
-                      : 'Ver lixeira (${notesController.trashCount})',
-                  onPressed: onToggleTrashView,
-                  icon: Badge.count(
-                    count: notesController.trashCount,
-                    isLabelVisible: notesController.trashCount > 0,
-                    child: Icon(
-                      Icons.recycling_rounded,
-                      color: notesController.activeFilter.showTrash
-                          ? _tealColor
-                          : _mutedColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            _FocusBoardTaskActionBar(onSelect: onAddCalendarEntry),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FocusBoardTaskFooterHeader extends StatelessWidget {
+  const _FocusBoardTaskFooterHeader({required this.count, required this.onAdd});
+
+  final int count;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.check_circle_outline_rounded, color: _tealColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'TAREFAS ($count)',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: _deepTealColor,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Adicionar'),
+          style: OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            foregroundColor: _deepTealColor,
+            side: const BorderSide(color: _tealColor),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FocusBoardTaskActionBar extends StatelessWidget {
+  const _FocusBoardTaskActionBar({required this.onSelect});
+
+  final ValueChanged<_FocusBoardTaskMode> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          for (final mode in _FocusBoardTaskMode.values) ...[
+            Expanded(
+              child: _FocusBoardTaskActionButton(
+                mode: mode,
+                onPressed: () => onSelect(mode),
+              ),
+            ),
+            if (mode != _FocusBoardTaskMode.values.last)
+              const VerticalDivider(width: 1, color: _lineColor),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FocusBoardTaskActionButton extends StatelessWidget {
+  const _FocusBoardTaskActionButton({
+    required this.mode,
+    required this.onPressed,
+  });
+
+  final _FocusBoardTaskMode mode;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Criar ${mode.label.toLowerCase()} com notificacoes externas',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(mode.icon, color: _deepTealColor, size: 26),
+              const SizedBox(height: 3),
+              Text(
+                mode.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: _deepTealColor,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3678,50 +3742,8 @@ class _FocusBoardBulkBar extends StatelessWidget {
   }
 }
 
-class _FocusBoardFooterHeader extends StatelessWidget {
-  const _FocusBoardFooterHeader({
-    required this.icon,
-    required this.title,
-    required this.actionLabel,
-    required this.actionIcon,
-    required this.onAction,
-  });
-
-  final IconData icon;
-  final String title;
-  final String actionLabel;
-  final IconData actionIcon;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: _deepTealColor, size: 20),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: _deepTealColor,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        OutlinedButton.icon(
-          onPressed: onAction,
-          icon: Icon(actionIcon, size: 18),
-          label: Text(actionLabel),
-        ),
-      ],
-    );
-  }
-}
-
-class _FocusBoardCalendarFooterRow extends StatelessWidget {
-  const _FocusBoardCalendarFooterRow({required this.entry, this.onCancel});
+class _FocusBoardTaskFooterRow extends StatelessWidget {
+  const _FocusBoardTaskFooterRow({required this.entry, this.onCancel});
 
   final _CalendarEntryRecord entry;
   final VoidCallback? onCancel;
@@ -3733,17 +3755,33 @@ class _FocusBoardCalendarFooterRow extends StatelessWidget {
       'HIGH' => const Color(0xFFE9A100),
       _ => _tealColor,
     };
+    final priorityIcon = switch (entry.priority.toUpperCase()) {
+      'CRITICAL' => Icons.priority_high_rounded,
+      'HIGH' => Icons.star_rounded,
+      _ => entry.taskMode.icon,
+    };
+    final priorityBadge = switch (entry.priority.toUpperCase()) {
+      'CRITICAL' => 'URGENTE',
+      'HIGH' => 'IMPORTANTE',
+      _ => '',
+    };
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFB),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: _lineColor),
       ),
       child: Row(
         children: [
-          Icon(Icons.event_outlined, color: color, size: 20),
-          const SizedBox(width: 9),
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: Icon(priorityIcon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3754,69 +3792,25 @@ class _FocusBoardCalendarFooterRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: _inkColor,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  entry.startsAtLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: _mutedColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'Cancelar lembrete',
-            onPressed: onCancel,
-            icon: const Icon(Icons.more_vert_rounded),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FocusBoardTaskFooterRow extends StatelessWidget {
-  const _FocusBoardTaskFooterRow({required this.note});
-
-  final _FocusBoardNote note;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: note.priority.color.withValues(alpha: 0.20)),
-      ),
-      child: Row(
-        children: [
-          _FocusBoardPriorityBadge(priority: note.priority),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  note.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: _inkColor,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (entry.description.trim().isNotEmpty)
+                  Text(
+                    entry.description.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: _mutedColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 Text(
-                  note.description,
+                  entry.notificationChannelsLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: _mutedColor,
+                    color: _deepTealColor,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -3824,14 +3818,56 @@ class _FocusBoardTaskFooterRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Icon(Icons.event_outlined, color: _mutedColor, size: 18),
-          const SizedBox(width: 4),
-          Text(
-            _focusBoardShortDateLabel(note.dueAt),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: _inkColor,
-              fontWeight: FontWeight.w700,
+          if (priorityBadge.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                priorityBadge,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 9,
+                ),
+              ),
             ),
+          const SizedBox(width: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.calendar_month_outlined,
+                color: _mutedColor,
+                size: 17,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                _focusBoardShortDateLabel(entry.startsAt),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: _inkColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Acoes da tarefa',
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (value) {
+              if (value == 'cancel' && onCancel != null) {
+                onCancel!();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                enabled: onCancel != null,
+                value: 'cancel',
+                child: const Text('Cancelar item'),
+              ),
+            ],
           ),
         ],
       ),
@@ -3870,39 +3906,6 @@ class _FocusBoardFooterEmpty extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _FocusBoardCounterDot extends StatelessWidget {
-  const _FocusBoardCounterDot({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: _inkColor,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -6329,11 +6332,13 @@ class _CalendarEntryCrudDialog extends StatefulWidget {
     required this.personPublicId,
     required this.personName,
     required this.profile,
+    this.mode = _FocusBoardTaskMode.reminder,
   });
 
   final String personPublicId;
   final String personName;
   final _PersonProfileData profile;
+  final _FocusBoardTaskMode mode;
 
   @override
   State<_CalendarEntryCrudDialog> createState() =>
@@ -6358,21 +6363,27 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
   @override
   void initState() {
     super.initState();
-    _kind = 'REMINDER';
-    _priority = 'NORMAL';
-    _notificationPolicy = 'ONE_BUSINESS_DAY_BEFORE';
-    _channels = {'IN_APP', 'EMAIL'};
-    _title = TextEditingController(
-      text: 'Encerramento de periodo de experiencia',
-    );
-    _description = TextEditingController(
+    final defaultTarget = switch (widget.mode) {
+      _FocusBoardTaskMode.timer => DateTime.now().add(
+        const Duration(minutes: 30),
+      ),
+      _FocusBoardTaskMode.alarm => DateTime.now().add(const Duration(hours: 1)),
+      _FocusBoardTaskMode.reminder => DateTime.now().add(
+        const Duration(days: 7),
+      ),
+    };
+    _kind = widget.mode.kind;
+    _priority = widget.mode.defaultPriority;
+    _notificationPolicy = widget.mode.defaultNotificationPolicy;
+    _channels = {'IN_APP', 'EMAIL', 'WHATSAPP', 'SMS'};
+    _title = TextEditingController(text: widget.mode.defaultTitle);
+    _description = TextEditingController(text: widget.mode.defaultDescription);
+    _startsAt = TextEditingController(text: _inputDateFor(defaultTarget));
+    _notificationTime = TextEditingController(
       text:
-          'Revisar documentos, contrato e decisao operacional antes do prazo.',
+          '${defaultTarget.hour.toString().padLeft(2, '0')}:'
+          '${defaultTarget.minute.toString().padLeft(2, '0')}',
     );
-    _startsAt = TextEditingController(
-      text: _inputDateFor(DateTime.now().add(const Duration(days: 30))),
-    );
-    _notificationTime = TextEditingController(text: '09:00');
     _offsetBusinessDays = TextEditingController(text: '2');
     _holidayRegionCode = TextEditingController(text: 'BR-SP-CAMPINAS');
     _appliesToStateCode = TextEditingController(text: 'SP');
@@ -6395,7 +6406,7 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Novo lembrete'),
+      title: Text(widget.mode.dialogTitle),
       content: SizedBox(
         width: min(MediaQuery.sizeOf(context).width - 48, 640),
         child: Form(
@@ -6578,8 +6589,8 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
                   children: [
                     _channelChip('IN_APP', 'No app', Icons.notifications_none),
                     _channelChip('EMAIL', 'Email', Icons.mail_outline),
-                    _channelChip('PUSH', 'Push', Icons.phone_iphone_outlined),
-                    _channelChip('WEBHOOK', 'Webhook', Icons.webhook_outlined),
+                    _channelChip('WHATSAPP', 'WhatsApp', Icons.chat_outlined),
+                    _channelChip('SMS', 'SMS', Icons.sms_outlined),
                   ],
                 ),
               ],
@@ -6694,6 +6705,7 @@ class _CalendarEntryCrudDialogState extends State<_CalendarEntryCrudDialog> {
       _cleanMutationBody({
         'personPublicId': widget.personPublicId,
         'kind': _kind,
+        'category': widget.mode.category,
         'title': _title.text,
         'description': _description.text,
         'startsAt': _startsAt.text,
@@ -7066,6 +7078,7 @@ class _CalendarEntryRecord {
     required this.statusLabel,
     required this.priority,
     required this.priorityLabel,
+    required this.category,
     required this.title,
     required this.description,
     required this.startsAt,
@@ -7086,6 +7099,7 @@ class _CalendarEntryRecord {
   final String statusLabel;
   final String priority;
   final String priorityLabel;
+  final String category;
   final String title;
   final String description;
   final DateTime startsAt;
@@ -7097,6 +7111,17 @@ class _CalendarEntryRecord {
   final String notificationChannelsLabel;
   final bool canEdit;
   final bool canCancel;
+
+  _FocusBoardTaskMode get taskMode {
+    final normalized = category.toUpperCase();
+    if (normalized.contains('TIMER')) {
+      return _FocusBoardTaskMode.timer;
+    }
+    if (normalized.contains('ALARM')) {
+      return _FocusBoardTaskMode.alarm;
+    }
+    return _FocusBoardTaskMode.reminder;
+  }
 }
 
 class _PersonInfoField {

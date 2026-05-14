@@ -23,6 +23,66 @@ enum _FocusBoardAssignmentType { person, group, company, contract, other }
 
 enum _FocusBoardTextCommitResult { none, draftSaved, textUpdated }
 
+enum _FocusBoardTaskMode { reminder, alarm, timer }
+
+extension on _FocusBoardTaskMode {
+  String get label => switch (this) {
+    _FocusBoardTaskMode.reminder => 'Lembrete',
+    _FocusBoardTaskMode.alarm => 'Alarme',
+    _FocusBoardTaskMode.timer => 'Timer',
+  };
+
+  String get dialogTitle => switch (this) {
+    _FocusBoardTaskMode.reminder => 'Novo lembrete',
+    _FocusBoardTaskMode.alarm => 'Novo alarme',
+    _FocusBoardTaskMode.timer => 'Novo timer',
+  };
+
+  String get defaultTitle => switch (this) {
+    _FocusBoardTaskMode.reminder => 'Novo lembrete',
+    _FocusBoardTaskMode.alarm => 'Novo alarme',
+    _FocusBoardTaskMode.timer => 'Novo timer',
+  };
+
+  String get defaultDescription => switch (this) {
+    _FocusBoardTaskMode.reminder =>
+      'Registrar lembrete com notificacao por canais externos.',
+    _FocusBoardTaskMode.alarm =>
+      'Configurar alarme para aviso ativo no horario definido.',
+    _FocusBoardTaskMode.timer =>
+      'Criar timer com aviso ao fim do periodo configurado.',
+  };
+
+  String get category => switch (this) {
+    _FocusBoardTaskMode.reminder => 'TASK_REMINDER',
+    _FocusBoardTaskMode.alarm => 'TASK_ALARM',
+    _FocusBoardTaskMode.timer => 'TASK_TIMER',
+  };
+
+  String get kind => switch (this) {
+    _FocusBoardTaskMode.reminder ||
+    _FocusBoardTaskMode.alarm ||
+    _FocusBoardTaskMode.timer => 'REMINDER',
+  };
+
+  String get defaultPriority => switch (this) {
+    _FocusBoardTaskMode.reminder => 'NORMAL',
+    _FocusBoardTaskMode.alarm => 'HIGH',
+    _FocusBoardTaskMode.timer => 'NORMAL',
+  };
+
+  String get defaultNotificationPolicy => switch (this) {
+    _FocusBoardTaskMode.reminder => 'ONE_BUSINESS_DAY_BEFORE',
+    _FocusBoardTaskMode.alarm || _FocusBoardTaskMode.timer => 'ON_DUE_DATE',
+  };
+
+  IconData get icon => switch (this) {
+    _FocusBoardTaskMode.reminder => Icons.add_circle_outline_rounded,
+    _FocusBoardTaskMode.alarm => Icons.notifications_none_rounded,
+    _FocusBoardTaskMode.timer => Icons.timer_outlined,
+  };
+}
+
 extension on _FocusBoardNotePriority {
   String get key => switch (this) {
     _FocusBoardNotePriority.normal => 'normal',
@@ -223,7 +283,7 @@ String _focusBoardTitleForSavedDraft(String title, String description) {
   if (normalizedTitle.isNotEmpty && normalizedTitle != 'Nova nota') {
     return normalizedTitle;
   }
-  return description.trim().isEmpty ? 'Nova nota' : 'Recado';
+  return description.trim().isEmpty ? 'Nova nota' : 'Nota';
 }
 
 class _FocusBoardAssignment {
@@ -598,7 +658,7 @@ class _FocusBoardNote {
     final auditRaw = json['audit'];
     return _FocusBoardNote(
       id: _focusBoardText(json['id']),
-      title: _focusBoardText(json['title'], fallback: 'Recado'),
+      title: _focusBoardText(json['title'], fallback: 'Nota'),
       description: _focusBoardText(json['description']),
       priority: _focusBoardPriorityFromKey(_focusBoardText(json['priority'])),
       dueAt:
@@ -875,7 +935,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
     final actorId = _focusBoardActorId(viewerProfile);
     final note = _FocusBoardNote(
       id: 'fbn-${now.microsecondsSinceEpoch}',
-      title: draft.title.trim().isEmpty ? 'Recado' : draft.title.trim(),
+      title: draft.title.trim().isEmpty ? 'Nota' : draft.title.trim(),
       description: draft.description.trim(),
       priority: draft.priority,
       dueAt: draft.dueAt,
@@ -894,7 +954,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
           actorName: viewerProfile.name,
           action: 'criado',
           details:
-              'Recado criado com prazo ${_focusBoardShortDateLabel(draft.dueAt)}.',
+              'Nota criada com prazo ${_focusBoardShortDateLabel(draft.dueAt)}.',
         ),
       ],
     );
@@ -998,7 +1058,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
     }
     final actorId = _focusBoardActorId(viewerProfile);
     _notes[index] = current.copyWith(
-      title: draft.title.trim().isEmpty ? 'Recado' : draft.title.trim(),
+      title: draft.title.trim().isEmpty ? 'Nota' : draft.title.trim(),
       description: draft.description.trim(),
       priority: draft.priority,
       dueAt: draft.dueAt,
@@ -1285,8 +1345,8 @@ class _FocusBoardNotesController extends ChangeNotifier {
           actorName: viewerProfile.name,
           action: 'movido para lixeira',
           details: current.isComplete
-              ? 'Recado completo movido para lixeira.'
-              : 'Recado incompleto movido para lixeira com confirmacao.',
+              ? 'Nota completa movida para lixeira.'
+              : 'Nota incompleta movida para lixeira com confirmacao.',
         ),
       ],
     );
@@ -1321,7 +1381,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
           actorId: _focusBoardActorId(viewerProfile),
           actorName: viewerProfile.name,
           action: 'encerrado',
-          details: 'Criador encerrou o recado e bloqueou novas alteracoes.',
+          details: 'Criador encerrou a nota e bloqueou novas alteracoes.',
         ),
       ],
     );
@@ -1359,7 +1419,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
           actorId: actorId,
           actorName: viewerProfile.name,
           action: 'replicado',
-          details: 'Replica criada a partir do recado ${source.id}.',
+          details: 'Replica criada a partir da nota ${source.id}.',
         ),
       ],
     );
@@ -1373,7 +1433,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
           actorId: actorId,
           actorName: viewerProfile.name,
           action: 'replica gerada',
-          details: '${viewerProfile.name} replicou este recado.',
+          details: '${viewerProfile.name} replicou esta nota.',
         ),
       ],
     );
@@ -1404,7 +1464,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
           actorId: _focusBoardActorId(viewerProfile),
           actorName: viewerProfile.name,
           action: 'restaurado',
-          details: 'Recado movido manualmente para fora da lixeira.',
+          details: 'Nota movida manualmente para fora da lixeira.',
         ),
       ],
     );
@@ -1584,7 +1644,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
             actorId: 'system',
             actorName: 'Sistema',
             action: 'lixeira automatica',
-            details: 'Recado completo ha 1 dia movido para lixeira.',
+            details: 'Nota completa ha 1 dia movida para lixeira.',
           ),
         ],
       );
@@ -2000,7 +2060,8 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
                   compact: compact,
                   onDetach: widget.onDetach,
                   onRefresh: widget.controller.refresh,
-                  onCreateReminder: _openCreateReminder,
+                  onCreateReminder: (item, mode) =>
+                      _openCreateReminder(item, mode),
                   onCancelReminder: _confirmCancelReminder,
                 );
               },
@@ -2033,26 +2094,10 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
                 }).toList()..sort(
                   (left, right) => left.startsAt.compareTo(right.startsAt),
                 );
-            final notes = widget.controller.notesController.visibleNotes(
-              widget.viewerProfile,
-            );
             return _FocusBoardFixedFooter(
-              notesController: widget.controller.notesController,
-              visibleNotes: notes,
               calendarEntries: entries,
-              selectedCount: 0,
-              cardsHidden: false,
-              onAddCalendarEntry: () => _openCreateReminder(item),
-              onAddNote: () => unawaited(
-                widget.controller.notesController.createSimpleNote(
-                  viewerProfile: widget.viewerProfile,
-                ),
-              ),
+              onAddCalendarEntry: (mode) => _openCreateReminder(item, mode),
               onCancelCalendarEntry: _confirmCancelReminder,
-              onToggleTrashView: _toggleTrashViewForFooter,
-              onClearSelection: () {},
-              onBulkComplete: () {},
-              onBulkTrash: () {},
             );
           },
         );
@@ -2060,20 +2105,10 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
     );
   }
 
-  Future<void> _toggleTrashViewForFooter() async {
-    final notesController = widget.controller.notesController;
-    final active = notesController.activeFilter;
-    final showTrash = !active.showTrash;
-    await notesController.setActiveFilter(
-      active.copyWith(
-        id: showTrash ? 'trash-view' : 'generic',
-        name: showTrash ? 'Lixeira' : 'Perfil generico',
-        showTrash: showTrash,
-      ),
-    );
-  }
-
-  Future<void> _openCreateReminder(_EntityItem item) async {
+  Future<void> _openCreateReminder(
+    _EntityItem item, [
+    _FocusBoardTaskMode mode = _FocusBoardTaskMode.reminder,
+  ]) async {
     final profile = item.personProfile;
     if (profile == null) {
       return;
@@ -2085,6 +2120,7 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
         personPublicId: item.publicId,
         personName: item.title,
         profile: profile,
+        mode: mode,
       ),
     );
 
@@ -2098,7 +2134,7 @@ class _PersistentFocusBoardDockState extends State<_PersistentFocusBoardDock> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lembrete criado na Focus Board.')),
+        SnackBar(content: Text('${mode.label} criado na Focus Board.')),
       );
     } catch (error) {
       if (!mounted) {
@@ -2599,7 +2635,8 @@ class _FocusBoardDetachedWorkspaceState
                     detachedLabel: 'Acoplar',
                     dockedPresentation: true,
                     collapseDockedFooterInitially: true,
-                    onCreateReminder: _openCreateReminder,
+                    onCreateReminder: (item, mode) =>
+                        _openCreateReminder(item, mode),
                     onCancelReminder: _confirmCancelReminder,
                   ),
                 ),
@@ -2663,7 +2700,8 @@ class _FocusBoardDetachedWorkspaceState
                                     onDetach: widget.onAttach,
                                     onRefresh: widget.controller.refresh,
                                     detachedLabel: 'Acoplar',
-                                    onCreateReminder: _openCreateReminder,
+                                    onCreateReminder: (item, mode) =>
+                                        _openCreateReminder(item, mode),
                                     onCancelReminder: _confirmCancelReminder,
                                   ),
                                 ),
@@ -2684,7 +2722,8 @@ class _FocusBoardDetachedWorkspaceState
                             onDetach: widget.onAttach,
                             onRefresh: widget.controller.refresh,
                             detachedLabel: 'Acoplar',
-                            onCreateReminder: _openCreateReminder,
+                            onCreateReminder: (item, mode) =>
+                                _openCreateReminder(item, mode),
                             onCancelReminder: _confirmCancelReminder,
                           ),
                         ],
@@ -2696,7 +2735,8 @@ class _FocusBoardDetachedWorkspaceState
                           onDetach: widget.onAttach,
                           onRefresh: widget.controller.refresh,
                           detachedLabel: 'Acoplar',
-                          onCreateReminder: _openCreateReminder,
+                          onCreateReminder: (item, mode) =>
+                              _openCreateReminder(item, mode),
                           onCancelReminder: _confirmCancelReminder,
                         ),
                     ],
@@ -2710,7 +2750,10 @@ class _FocusBoardDetachedWorkspaceState
     );
   }
 
-  Future<void> _openCreateReminder(_EntityItem item) async {
+  Future<void> _openCreateReminder(
+    _EntityItem item, [
+    _FocusBoardTaskMode mode = _FocusBoardTaskMode.reminder,
+  ]) async {
     final profile = item.personProfile;
     if (profile == null) {
       return;
@@ -2722,6 +2765,7 @@ class _FocusBoardDetachedWorkspaceState
         personPublicId: item.publicId,
         personName: item.title,
         profile: profile,
+        mode: mode,
       ),
     );
 
@@ -2735,7 +2779,7 @@ class _FocusBoardDetachedWorkspaceState
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lembrete criado na Focus Board.')),
+        SnackBar(content: Text('${mode.label} criado na Focus Board.')),
       );
     } catch (error) {
       if (!mounted) {
@@ -2816,7 +2860,7 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
   final bool compact;
   final VoidCallback onDetach;
   final VoidCallback onRefresh;
-  final ValueChanged<_EntityItem> onCreateReminder;
+  final void Function(_EntityItem, _FocusBoardTaskMode) onCreateReminder;
   final ValueChanged<_CalendarEntryRecord> onCancelReminder;
   final bool dockedPresentation;
   final bool collapseDockedFooterInitially;
@@ -2870,7 +2914,7 @@ class _FocusBoardRuntimeFrame extends StatelessWidget {
       docked: useDockedPresentation,
       dockedFooterInitiallyCollapsed:
           useDockedPresentation && collapseDockedFooterInitially,
-      onAddCalendarEntry: () => onCreateReminder(item),
+      onAddCalendarEntry: (mode) => onCreateReminder(item, mode),
       onCancelCalendarEntry: onCancelReminder,
       onDetach: onDetach,
       onRefresh: onRefresh,

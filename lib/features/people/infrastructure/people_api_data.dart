@@ -712,6 +712,7 @@ _CalendarEntryRecord _calendarEntryFromApi(Map<String, dynamic> entry) {
     statusLabel: _apiText(entry['statusLabel'], fallback: 'Agendado'),
     priority: _apiText(entry['priority'], fallback: 'NORMAL'),
     priorityLabel: _apiText(entry['priorityLabel'], fallback: 'Normal'),
+    category: _apiText(entry['category']),
     title: _apiText(entry['title'], fallback: 'Lembrete sem titulo'),
     description: _apiText(entry['description']),
     startsAt:
