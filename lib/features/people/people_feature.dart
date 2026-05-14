@@ -1635,6 +1635,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       onEditNote: _openEditNoteDialog,
       onTrashNote: _confirmMoveToTrash,
       onArchiveNote: _confirmMoveToArchive,
+      onDeletePermanentlyNote: _confirmDeleteThreadSegmentPermanently,
       onRestoreNote: _restoreNote,
       onShowAudit: _showAudit,
       onReplicateNote: _replicateNote,
@@ -2215,10 +2216,15 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   Future<void> _confirmMoveToTrash(_FocusBoardNote note) async {
     final warning = _trashWarningFor(note);
     if (warning != null) {
+      final movesRootThread = !widget.notesController.isRootNote(note.id);
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Mover nota para lixeira?'),
+          title: Text(
+            movesRootThread
+                ? 'Mover encadeamento para lixeira?'
+                : 'Mover nota para lixeira?',
+          ),
           content: Text(warning),
           actions: [
             TextButton(
@@ -2244,14 +2250,26 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   Future<void> _confirmMoveToArchive(_FocusBoardNote note) async {
-    final warning = _threadPendingWarningFor(note, includeSingle: true);
-    if (warning != null) {
+    final scopeWarning = _threadScopeWarningFor(note, 'arquivar');
+    final pendingWarning = _threadPendingWarningFor(note, includeSingle: true);
+    final warnings = <String>[];
+    if (scopeWarning != null) {
+      warnings.add(scopeWarning);
+    }
+    if (pendingWarning != null) {
+      warnings.add(pendingWarning);
+    }
+    if (warnings.isNotEmpty) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Arquivar nota?'),
+          title: Text(
+            widget.notesController.isRootNote(note.id)
+                ? 'Arquivar nota?'
+                : 'Arquivar encadeamento?',
+          ),
           content: Text(
-            'Antes de mover para os arquivados, confirme se deseja continuar: $warning.',
+            'Antes de mover para os arquivados, confirme se deseja continuar: ${warnings.join('; ')}.',
           ),
           actions: [
             TextButton(
@@ -2277,16 +2295,26 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   String? _trashWarningFor(_FocusBoardNote note) {
-    final pendingAssignments = note.assignments
+    final linked = widget.notesController.fullThreadNotes(note.id);
+    final pendingAssignments = linked
+        .expand((entry) => entry.assignments)
         .where((assignment) => !assignment.completed)
         .map((assignment) => assignment.label)
         .toList(growable: false);
-    final hasUserContent =
-        (note.title.trim().isNotEmpty && note.title.trim() != 'Nova nota') ||
-        note.description.trim().isNotEmpty;
+    final hasUserContent = linked.any(
+      (entry) =>
+          !entry.isComplete &&
+          ((entry.title.trim().isNotEmpty &&
+                  entry.title.trim() != 'Nova nota') ||
+              entry.description.trim().isNotEmpty),
+    );
     final warnings = <String>[];
-    if (hasUserContent && !note.isComplete) {
-      warnings.add('a nota tem conteudo e ainda nao foi concluida');
+    final scopeWarning = _threadScopeWarningFor(note, 'mover para a lixeira');
+    if (scopeWarning != null) {
+      warnings.add(scopeWarning);
+    }
+    if (hasUserContent) {
+      warnings.add('ha conteudo vinculado ainda sem check de concluido');
     }
     if (pendingAssignments.isNotEmpty) {
       warnings.add(
@@ -2303,11 +2331,21 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     return 'Antes de mover para a lixeira, confirme se deseja continuar: ${warnings.join('; ')}.';
   }
 
+  String? _threadScopeWarningFor(_FocusBoardNote note, String actionLabel) {
+    final linked = widget.notesController.fullThreadNotes(note.id);
+    if (linked.isEmpty || linked.first.id == note.id) {
+      return null;
+    }
+    final root = linked.first;
+    final replies = linked.length - 1;
+    return 'voce selecionou uma resposta; $actionLabel vai afetar a nota principal "${root.title}" e $replies resposta(s) vinculada(s)';
+  }
+
   String? _threadPendingWarningFor(
     _FocusBoardNote note, {
     required bool includeSingle,
   }) {
-    final linked = widget.notesController.threadNotes(note.id);
+    final linked = widget.notesController.fullThreadNotes(note.id);
     final pendingCount = linked.where((entry) => !entry.isComplete).length;
     if (pendingCount == 0 || (!includeSingle && linked.length <= 1)) {
       return null;
@@ -2316,6 +2354,50 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       return 'a nota ainda esta sem check de concluido';
     }
     return 'o encadeamento vinculado tem ${linked.length} notas e $pendingCount ainda estao sem check de concluido';
+  }
+
+  Future<void> _confirmDeleteThreadSegmentPermanently(
+    _FocusBoardNote note,
+  ) async {
+    if (widget.notesController.isRootNote(note.id)) {
+      _showFocusBoardSnack(
+        'Use a nota principal para mover o encadeamento para a lixeira.',
+      );
+      return;
+    }
+    final linked = widget.notesController.threadNotes(note.id);
+    if (linked.isEmpty) {
+      return;
+    }
+    final pendingCount = linked.where((entry) => !entry.isComplete).length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir resposta permanentemente?'),
+        content: Text(
+          'Esta acao remove ${linked.length} item(ns) deste trecho do encadeamento sem enviar para a lixeira.'
+          '${pendingCount > 0 ? ' Ha $pendingCount item(ns) sem check de concluido.' : ''} Deseja continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    await widget.notesController.deleteThreadSegmentPermanently(
+      id: note.id,
+      viewerProfile: widget.viewerProfile,
+    );
   }
 
   Future<void> _restoreNote(_FocusBoardNote note) async {
@@ -2333,14 +2415,22 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   Future<void> _closeNote(_FocusBoardNote note) async {
-    final warning = _threadPendingWarningFor(note, includeSingle: false);
-    if (warning != null) {
+    final scopeWarning = _threadScopeWarningFor(note, 'encerrar');
+    final pendingWarning = _threadPendingWarningFor(note, includeSingle: false);
+    final warnings = <String>[];
+    if (scopeWarning != null) {
+      warnings.add(scopeWarning);
+    }
+    if (pendingWarning != null) {
+      warnings.add(pendingWarning);
+    }
+    if (warnings.isNotEmpty) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Encerrar encadeamento?'),
           content: Text(
-            'Esta acao marca a nota e suas respostas como concluidas. $warning. Deseja continuar?',
+            'Esta acao marca a nota e suas respostas como concluidas. ${warnings.join('; ')}. Deseja continuar?',
           ),
           actions: [
             TextButton(
@@ -2765,6 +2855,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.onEditNote,
     required this.onTrashNote,
     required this.onArchiveNote,
+    required this.onDeletePermanentlyNote,
     required this.onRestoreNote,
     required this.onShowAudit,
     required this.onReplicateNote,
@@ -2795,6 +2886,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
   final ValueChanged<_FocusBoardNote> onEditNote;
   final Future<void> Function(_FocusBoardNote) onTrashNote;
   final Future<void> Function(_FocusBoardNote) onArchiveNote;
+  final Future<void> Function(_FocusBoardNote) onDeletePermanentlyNote;
   final Future<void> Function(_FocusBoardNote) onRestoreNote;
   final ValueChanged<_FocusBoardNote> onShowAudit;
   final Future<void> Function(_FocusBoardNote) onReplicateNote;
@@ -2869,6 +2961,19 @@ class _FocusBoardNotesStage extends StatelessWidget {
       return depth;
     }
 
+    _FocusBoardNote rootFor(_FocusBoardNote note) {
+      var current = note;
+      final visited = <String>{note.id};
+      while (current.parentNoteId.isNotEmpty) {
+        final parent = notesById[current.parentNoteId];
+        if (parent == null || !visited.add(parent.id)) {
+          break;
+        }
+        current = parent;
+      }
+      return current;
+    }
+
     return _FocusBoardPaperCanvas(
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(14, 18, 14, 22),
@@ -2877,6 +2982,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
         itemBuilder: (context, index) {
           final note = notes[index];
           final threadDepth = depthFor(note);
+          final rootNote = rootFor(note);
           final tile = _FocusBoardNoteTile(
             key: ValueKey(note.id),
             note: note,
@@ -2902,6 +3008,10 @@ class _FocusBoardNotesStage extends StatelessWidget {
             onArchive: !note.inTrash && !note.inArchive
                 ? () => onArchiveNote(note)
                 : null,
+            onDeletePermanently:
+                threadDepth > 0 && note.isCreator(viewerProfile)
+                ? () => onDeletePermanentlyNote(note)
+                : null,
             onRestore: note.inTrash || note.inArchive
                 ? () => onRestoreNote(note)
                 : null,
@@ -2910,12 +3020,15 @@ class _FocusBoardNotesStage extends StatelessWidget {
                 note.replicasEnabled && !note.isClosed && threadDepth < 2
                 ? () => onReplicateNote(note)
                 : null,
-            onClose: note.isCreator(viewerProfile) && !note.isClosed
+            onClose: rootNote.isCreator(viewerProfile) && !rootNote.isClosed
                 ? () => onCloseNote(note)
                 : null,
           );
           final swipeable =
-              !note.inTrash && !note.inArchive && selectedNoteIds.isEmpty;
+              threadDepth == 0 &&
+              !note.inTrash &&
+              !note.inArchive &&
+              selectedNoteIds.isEmpty;
           final child = swipeable
               ? Dismissible(
                   key: ValueKey('swipe-${note.id}'),
@@ -3109,6 +3222,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
     required this.onShowAudit,
     this.onEdit,
     this.onArchive,
+    this.onDeletePermanently,
     this.onRestore,
     this.onReplicate,
     this.onClose,
@@ -3135,6 +3249,7 @@ class _FocusBoardNoteTile extends StatefulWidget {
   final VoidCallback? onEdit;
   final Future<void> Function() onTrash;
   final Future<void> Function()? onArchive;
+  final Future<void> Function()? onDeletePermanently;
   final Future<void> Function()? onRestore;
   final VoidCallback onShowAudit;
   final Future<void> Function()? onReplicate;
@@ -3365,6 +3480,9 @@ class _FocusBoardNoteTileState extends State<_FocusBoardNoteTile>
                         onArchive: widget.onArchive == null
                             ? null
                             : () => unawaited(widget.onArchive!()),
+                        onDeletePermanently: widget.onDeletePermanently == null
+                            ? null
+                            : () => unawaited(widget.onDeletePermanently!()),
                         onRestore: widget.onRestore == null
                             ? null
                             : () => unawaited(widget.onRestore!()),
@@ -3697,6 +3815,7 @@ class _FocusBoardNoteMenu extends StatelessWidget {
     required this.onShowAudit,
     this.onEdit,
     this.onArchive,
+    this.onDeletePermanently,
     this.onRestore,
     this.onReplicate,
     this.onClose,
@@ -3706,6 +3825,7 @@ class _FocusBoardNoteMenu extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback onTrash;
   final VoidCallback? onArchive;
+  final VoidCallback? onDeletePermanently;
   final VoidCallback? onRestore;
   final VoidCallback onShowAudit;
   final VoidCallback? onReplicate;
@@ -3724,6 +3844,8 @@ class _FocusBoardNoteMenu extends StatelessWidget {
             onTrash();
           case 'archive':
             onArchive?.call();
+          case 'deletePermanently':
+            onDeletePermanently?.call();
           case 'restore':
             onRestore?.call();
           case 'audit':
@@ -3743,6 +3865,11 @@ class _FocusBoardNoteMenu extends StatelessWidget {
           const PopupMenuItem(value: 'close', child: Text('Encerrar')),
         if (onArchive != null)
           const PopupMenuItem(value: 'archive', child: Text('Arquivar')),
+        if (onDeletePermanently != null)
+          const PopupMenuItem(
+            value: 'deletePermanently',
+            child: Text('Excluir resposta permanente'),
+          ),
         if (onRestore != null)
           PopupMenuItem(
             value: 'restore',
@@ -3834,17 +3961,25 @@ class _FocusBoardFixedFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final today = _focusBoardDateKey(DateTime.now());
-    final calendarPreview = calendarEntries
-        .where(
-          (entry) =>
-              !entry.isFocusBoardTask &&
-              _focusBoardDateKey(entry.startsAt) == today,
-        )
-        .take(2)
-        .toList(growable: false);
-    final taskEntries = calendarEntries
-        .where((entry) => entry.isFocusBoardTask)
+    bool isActiveEntry(_CalendarEntryRecord entry) {
+      final status = entry.status.toUpperCase();
+      return status != 'CANCELED' &&
+          status != 'COMPLETED' &&
+          status != 'DISMISSED';
+    }
+
+    final calendarPreview =
+        calendarEntries
+            .where((entry) => isActiveEntry(entry) && !entry.isFocusBoardTask)
+            .toList(growable: false)
+          ..sort((left, right) => left.startsAt.compareTo(right.startsAt));
+    final taskEntries =
+        calendarEntries
+            .where((entry) => isActiveEntry(entry) && entry.isFocusBoardTask)
+            .toList(growable: false)
+          ..sort((left, right) => left.startsAt.compareTo(right.startsAt));
+    final calendarPreviewItems = calendarPreview
+        .take(4)
         .toList(growable: false);
     final taskPreview = taskEntries.take(3).toList(growable: false);
 
@@ -3860,7 +3995,7 @@ class _FocusBoardFixedFooter extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _FocusBoardCalendarFooterSection(
-              entries: calendarPreview,
+              entries: calendarPreviewItems,
               onCancelCalendarEntry: onCancelCalendarEntry,
             ),
             const SizedBox(height: 8),
@@ -4057,7 +4192,7 @@ class _FocusBoardCalendarFooterSection extends StatelessWidget {
           if (entries.isEmpty)
             const _FocusBoardFooterEmpty(
               icon: Icons.event_available_outlined,
-              text: 'Sem compromissos de calendario para hoje.',
+              text: 'Sem compromissos de calendario ativos.',
             )
           else
             for (final entry in entries) ...[

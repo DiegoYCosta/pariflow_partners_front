@@ -1458,7 +1458,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final linked = threadNotes(id);
+    final linked = fullThreadNotes(id);
     if (linked.isEmpty) {
       return;
     }
@@ -1498,7 +1498,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final linked = threadNotes(id);
+    final linked = fullThreadNotes(id);
     if (linked.isEmpty) {
       return;
     }
@@ -1536,28 +1536,29 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final current = _notes.where((note) => note.id == id).firstOrNull;
-    if (current == null) {
+    final linked = fullThreadNotes(id);
+    if (linked.isEmpty) {
       return;
     }
-    if (!current.isCreator(viewerProfile) || current.isClosed) {
+    final root = linked.first;
+    if (!root.isCreator(viewerProfile) || root.isClosed) {
       return;
     }
     final now = DateTime.now();
     final actorId = _focusBoardActorId(viewerProfile);
-    for (final linked in threadNotes(id)) {
-      final index = _notes.indexWhere((note) => note.id == linked.id);
+    for (final current in linked) {
+      final index = _notes.indexWhere((note) => note.id == current.id);
       if (index < 0) {
         continue;
       }
-      _notes[index] = linked.copyWith(
+      _notes[index] = current.copyWith(
         closedAt: now,
         closedById: actorId,
         closedByName: viewerProfile.name,
         completedAt: now,
         updatedAt: now,
         audit: [
-          ...linked.audit,
+          ...current.audit,
           _FocusBoardAuditEntry(
             at: now,
             actorId: actorId,
@@ -1684,7 +1685,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
   }
 
   bool threadHasPending(String noteId) {
-    return threadNotes(noteId).any((note) => !note.isComplete);
+    return fullThreadNotes(noteId).any((note) => !note.isComplete);
   }
 
   Future<void> restoreFromTrash({
@@ -1692,7 +1693,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final linked = threadNotes(id);
+    final linked = fullThreadNotes(id);
     if (linked.isEmpty) {
       return;
     }
@@ -1729,7 +1730,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
-    final linked = threadNotes(id);
+    final linked = fullThreadNotes(id);
     if (linked.isEmpty) {
       return;
     }
@@ -1756,6 +1757,49 @@ class _FocusBoardNotesController extends ChangeNotifier {
         ],
       );
     }
+    notifyListeners();
+    await _persistNotes();
+  }
+
+  Future<void> deleteThreadSegmentPermanently({
+    required String id,
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    final target = _notes.where((note) => note.id == id).firstOrNull;
+    if (target == null ||
+        target.parentNoteId.isEmpty ||
+        !target.isCreator(viewerProfile)) {
+      return;
+    }
+    final linked = threadNotes(id);
+    if (linked.isEmpty) {
+      return;
+    }
+    final linkedIds = linked.map((note) => note.id).toSet();
+    final now = DateTime.now();
+    final actorId = _focusBoardActorId(viewerProfile);
+    final parentIndex = _notes.indexWhere(
+      (note) => note.id == target.parentNoteId,
+    );
+    if (parentIndex >= 0) {
+      final parent = _notes[parentIndex];
+      _notes[parentIndex] = parent.copyWith(
+        updatedAt: now,
+        audit: [
+          ...parent.audit,
+          _FocusBoardAuditEntry(
+            at: now,
+            actorId: actorId,
+            actorName: viewerProfile.name,
+            action: 'resposta excluida permanentemente',
+            details:
+                '${linked.length} item(ns) do encadeamento foram removidos sem passar pela lixeira.',
+          ),
+        ],
+      );
+    }
+    _notes.removeWhere((note) => linkedIds.contains(note.id));
     notifyListeners();
     await _persistNotes();
   }
@@ -1935,6 +1979,37 @@ class _FocusBoardNotesController extends ChangeNotifier {
       appendThread(root);
     }
     return ordered;
+  }
+
+  String? rootNoteIdFor(String noteId) {
+    final byId = {for (final note in _notes) note.id: note};
+    var current = byId[noteId];
+    if (current == null) {
+      return null;
+    }
+    final visited = <String>{};
+    while (current != null && visited.add(current.id)) {
+      final parentId = current.parentNoteId;
+      if (parentId.isEmpty) {
+        return current.id;
+      }
+      final parent = byId[parentId];
+      if (parent == null) {
+        return current.id;
+      }
+      current = parent;
+    }
+    return current?.id;
+  }
+
+  bool isRootNote(String noteId) => rootNoteIdFor(noteId) == noteId;
+
+  List<_FocusBoardNote> fullThreadNotes(String noteId) {
+    final rootId = rootNoteIdFor(noteId);
+    if (rootId == null) {
+      return const [];
+    }
+    return threadNotes(rootId);
   }
 
   void _applyAutomaticTrash() {
