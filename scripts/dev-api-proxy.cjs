@@ -1,6 +1,7 @@
 const http = require('http');
+const https = require('https');
 
-const target = process.env.PARIFLOW_PROXY_TARGET || 'http://3.18.213.49';
+const target = process.env.PARIFLOW_PROXY_TARGET || 'https://pariflowpartners.com.br';
 const port = Number(process.env.PARIFLOW_PROXY_PORT || 3002);
 const host = process.env.PARIFLOW_PROXY_HOST || '127.0.0.1';
 
@@ -27,8 +28,9 @@ const server = http.createServer((req, res) => {
   const upstream = new URL(req.url, target);
   const headers = { ...req.headers, host: upstream.host };
   delete headers.origin;
+  const transport = upstream.protocol === 'https:' ? https : http;
 
-  const proxyReq = http.request(
+  const proxyReq = transport.request(
     upstream,
     { method: req.method, headers },
     (proxyRes) => {

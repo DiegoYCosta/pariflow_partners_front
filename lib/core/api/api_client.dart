@@ -480,7 +480,7 @@ String get _defaultApiBaseUrl {
     return 'http://127.0.0.1:3002/api/v1';
   }
 
-  return 'http://3.18.213.49/api/v1';
+  return 'https://pariflowpartners.com.br/api/v1';
 }
 
 String get defaultApiBaseUrl => _defaultApiBaseUrl;

@@ -1,7 +1,7 @@
 param(
   [string]$WebPort = "8082",
   [string]$ProxyPort = "3002",
-  [string]$ProxyTarget = "http://3.18.213.49",
+  [string]$ProxyTarget = "https://pariflowpartners.com.br",
   [string]$EnvFile = ".env.front.preview",
   [switch]$UseDevToken
 )
