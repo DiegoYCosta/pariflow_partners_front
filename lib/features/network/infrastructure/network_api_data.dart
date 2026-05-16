@@ -288,14 +288,15 @@ const _emptyNetworkGraphPayload = _NetworkGraphPayload(
 const _emptyNetworkTimelinePayload = _NetworkTimelinePayload(
   period: _NetworkGraphPeriod(preset: '1y', from: '', to: ''),
   focus: _NetworkTimelineFocus(),
-  contractsCount: 0,
-  collaboratorsCount: 0,
+  contracts: [],
+  collaborators: [],
   events: [],
   currentSnapshot: _NetworkTimelineCurrentSnapshot(
-    contractsCount: 0,
-    positionsCount: 0,
-    collaboratorsCount: 0,
+    contracts: [],
+    positions: [],
+    collaborators: [],
   ),
+  legend: _NetworkTimelineLegend(eventTypes: [], relationshipStates: []),
   warnings: [],
   meta: _NetworkGraphMeta(traceId: ''),
 );

@@ -117,6 +117,45 @@ class _NetworkWorkspace extends StatelessWidget {
   }
 }
 
+enum _NetworkWorkspaceMode {
+  timeline(
+    label: 'Timeline',
+    icon: Icons.timeline_outlined,
+    tooltip: 'Visualizar contratos, postos e alocacoes no tempo',
+  ),
+  current(
+    label: 'Atual',
+    icon: Icons.account_tree_outlined,
+    tooltip: 'Visualizar a hierarquia ativa na data de referencia',
+  ),
+  relational(
+    label: 'Relacional',
+    icon: Icons.hub_outlined,
+    tooltip: 'Manter o grafo relacional atual',
+  );
+
+  const _NetworkWorkspaceMode({
+    required this.label,
+    required this.icon,
+    required this.tooltip,
+  });
+
+  final String label;
+  final IconData icon;
+  final String tooltip;
+}
+
+enum _NetworkTimelineSelectionKind { contract, position, collaborator, event }
+
+class _NetworkTimelineSelection {
+  const _NetworkTimelineSelection({required this.kind, required this.publicId});
+
+  final _NetworkTimelineSelectionKind kind;
+  final String publicId;
+
+  String get signature => '${kind.name}:$publicId';
+}
+
 class _RelationalNetworkWorkspaceBody extends StatefulWidget {
   const _RelationalNetworkWorkspaceBody({
     required this.selectedNodeId,
@@ -165,6 +204,8 @@ class _RelationalNetworkWorkspaceBodyState
   bool _clusterEmployees = true;
   bool _showFilters = false;
   bool _showDetailPanel = true;
+  _NetworkWorkspaceMode _workspaceMode = _NetworkWorkspaceMode.relational;
+  _NetworkTimelineSelection? _timelineSelection;
   double _zoom = 1.0;
   Size _canvasViewportSize = Size.zero;
   _NetworkGraphLane? _selectedLaneForDetails;
@@ -360,6 +401,7 @@ class _RelationalNetworkWorkspaceBodyState
     _clusterEmployees = true;
     _selectedLaneForDetails = null;
     _drillDownNodeId = null;
+    _timelineSelection = null;
     _hiddenLanes.clear();
     _activeOnlyLanes.clear();
   }
@@ -406,12 +448,12 @@ class _RelationalNetworkWorkspaceBodyState
     _pushHistoryState();
   }
 
-  void _syncZoomFromCanvas() {
+  void _syncZoomFromCanvas({bool force = false}) {
     final nextZoom = _canvasController.value
         .getMaxScaleOnAxis()
         .clamp(_minCanvasZoom, _maxCanvasZoom)
         .toDouble();
-    if ((nextZoom - _zoom).abs() < 0.005) {
+    if (!force && (nextZoom - _zoom).abs() < 0.005) {
       return;
     }
     setState(() {
@@ -588,6 +630,7 @@ class _RelationalNetworkWorkspaceBodyState
       attentionOnly: _attentionOnly,
       clusterEmployees: _clusterEmployees,
       drillDownNodeId: _drillDownNodeId,
+      workspaceMode: _workspaceMode,
       hiddenLanes: _hiddenLanes,
       activeOnlyLanes: _activeOnlyLanes,
     );
@@ -641,6 +684,7 @@ class _RelationalNetworkWorkspaceBodyState
       _attentionOnly = entry.attentionOnly;
       _clusterEmployees = entry.clusterEmployees;
       _drillDownNodeId = entry.drillDownNodeId;
+      _workspaceMode = entry.workspaceMode;
       _hiddenLanes
         ..clear()
         ..addAll(entry.hiddenLanes);
@@ -727,6 +771,45 @@ class _RelationalNetworkWorkspaceBodyState
           context,
           selectedNode: selectedNode,
         );
+        final timelineSection = _NetworkTimelineCanvasSection(
+          payload: _timelineRuntimeData.payload,
+          runtimeData: _timelineRuntimeData,
+          controller: _canvasController,
+          selectedItem: _timelineSelection,
+          onViewportChanged: (size) {
+            _canvasViewportSize = size;
+          },
+          onInteractionUpdate: () => _syncZoomFromCanvas(force: true),
+          onInteractionEnd: () {
+            _syncZoomFromCanvas(force: true);
+            _pushHistoryState();
+          },
+          onSelectItem: (selection) {
+            setState(() {
+              _timelineSelection = selection;
+              _showDetailPanel = true;
+            });
+          },
+          onRetry: () => _loadNetworkGraph(resetFilters: true),
+        );
+        final timelineDetailPanel = _NetworkTimelineDetailPanel(
+          payload: _timelineRuntimeData.payload,
+          selectedItem: _timelineSelection,
+          onSelectItem: (selection) {
+            setState(() {
+              _timelineSelection = selection;
+            });
+          },
+          onClose: () {
+            setState(() {
+              _showDetailPanel = false;
+            });
+          },
+        );
+        final currentSection = _NetworkCurrentSnapshotSection(
+          runtimeData: _timelineRuntimeData,
+          onRetry: () => _loadNetworkGraph(resetFilters: true),
+        );
 
         return SizedBox(
           height: workspaceHeight,
@@ -762,110 +845,129 @@ class _RelationalNetworkWorkspaceBodyState
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
-                  child: _NetworkManagementMenuBar(
-                    onOpenReport: _openManagementReport,
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _NetworkModeSwitcher(
+                        selectedMode: _workspaceMode,
+                        onChanged: (mode) {
+                          setState(() {
+                            _workspaceMode = mode;
+                            _selectedLaneForDetails = null;
+                          });
+                          _pushHistoryState();
+                        },
+                      ),
+                      _NetworkManagementMenuBar(
+                        onOpenReport: _openManagementReport,
+                      ),
+                    ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _VisualIdentityLegend(
-                      entries: _networkVisualLegendEntries(view.nodes),
-                      dense: true,
+                if (_workspaceMode == _NetworkWorkspaceMode.relational) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _VisualIdentityLegend(
+                        entries: _networkVisualLegendEntries(view.nodes),
+                        dense: true,
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
-                  child: _RelationalInsightBar(
-                    data: insightData,
-                    query: searchQuery,
-                    selectedRootIds: _selectedRootIds,
-                    selectedClientIds: _selectedClientIds,
-                    contractStatuses: _contractStatuses,
-                    employeeStatuses: _employeeStatuses,
-                    selectedDepartments: _selectedDepartments,
-                    selectedPositions: _selectedPositions,
-                    selectedTenurePreset: _selectedTenurePreset,
-                    customTenureYears: _customTenureYears,
-                    hireDateRange: _hireDateRange,
-                    reportPreset: _reportPreset,
-                    attentionOnly: _attentionOnly,
-                    clusterEmployees: _clusterEmployees,
-                    focusedNode: _drillDownNodeId == null
-                        ? null
-                        : _payload.nodeByPublicId(_drillDownNodeId!),
-                    onToggleCompany: _toggleCompanyFacet,
-                    onToggleStatus: _toggleStatusFacet,
-                    onToggleDepartment: _toggleDepartmentFacet,
-                    onTogglePosition: _togglePositionFacet,
-                    onTenurePreset: _applyTenurePreset,
-                    onCustomTenure: _openCustomTenureDialog,
-                    onHireDateRange: _applyHireDateRange,
-                    onCustomHireDateRange: _openHireDateRangeDialog,
-                    onReportPreset: _applyReportPreset,
-                    onToggleAttention: () {
-                      setState(() {
-                        _attentionOnly = !_attentionOnly;
-                        _selectedLaneForDetails = null;
-                      });
-                      _pushHistoryState();
-                    },
-                    onToggleCluster: _toggleClusterEmployees,
-                    onClearCompany: (value) {
-                      setState(() {
-                        switch (value.type) {
-                          case _NetworkCompanyFacetType.root:
-                            _selectedRootIds.remove(value.publicId);
-                            break;
-                          case _NetworkCompanyFacetType.client:
-                            _selectedClientIds.remove(value.publicId);
-                            break;
-                        }
-                      });
-                      _pushHistoryState();
-                    },
-                    onClearStatus: (value) {
-                      setState(() {
-                        switch (value.type) {
-                          case _NetworkStatusFacetType.contract:
-                            _contractStatuses.remove(value.status);
-                            break;
-                          case _NetworkStatusFacetType.employee:
-                            _employeeStatuses.remove(value.status);
-                            break;
-                        }
-                      });
-                      _pushHistoryState();
-                    },
-                    onClearDepartment: (value) {
-                      setState(() {
-                        _selectedDepartments.remove(value);
-                      });
-                      _pushHistoryState();
-                    },
-                    onClearPosition: (value) {
-                      setState(() {
-                        _selectedPositions.remove(value);
-                      });
-                      _pushHistoryState();
-                    },
-                    onClearSearch: () {
-                      setState(() {
-                        _searchController.clear();
-                      });
-                      _pushHistoryState();
-                    },
-                    onClearFocus: () {
-                      setState(() {
-                        _drillDownNodeId = null;
-                      });
-                      _pushHistoryState();
-                    },
-                    onClearAll: _clearAnalysisFilters,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
+                    child: _RelationalInsightBar(
+                      data: insightData,
+                      query: searchQuery,
+                      selectedRootIds: _selectedRootIds,
+                      selectedClientIds: _selectedClientIds,
+                      contractStatuses: _contractStatuses,
+                      employeeStatuses: _employeeStatuses,
+                      selectedDepartments: _selectedDepartments,
+                      selectedPositions: _selectedPositions,
+                      selectedTenurePreset: _selectedTenurePreset,
+                      customTenureYears: _customTenureYears,
+                      hireDateRange: _hireDateRange,
+                      reportPreset: _reportPreset,
+                      attentionOnly: _attentionOnly,
+                      clusterEmployees: _clusterEmployees,
+                      focusedNode: _drillDownNodeId == null
+                          ? null
+                          : _payload.nodeByPublicId(_drillDownNodeId!),
+                      onToggleCompany: _toggleCompanyFacet,
+                      onToggleStatus: _toggleStatusFacet,
+                      onToggleDepartment: _toggleDepartmentFacet,
+                      onTogglePosition: _togglePositionFacet,
+                      onTenurePreset: _applyTenurePreset,
+                      onCustomTenure: _openCustomTenureDialog,
+                      onHireDateRange: _applyHireDateRange,
+                      onCustomHireDateRange: _openHireDateRangeDialog,
+                      onReportPreset: _applyReportPreset,
+                      onToggleAttention: () {
+                        setState(() {
+                          _attentionOnly = !_attentionOnly;
+                          _selectedLaneForDetails = null;
+                        });
+                        _pushHistoryState();
+                      },
+                      onToggleCluster: _toggleClusterEmployees,
+                      onClearCompany: (value) {
+                        setState(() {
+                          switch (value.type) {
+                            case _NetworkCompanyFacetType.root:
+                              _selectedRootIds.remove(value.publicId);
+                              break;
+                            case _NetworkCompanyFacetType.client:
+                              _selectedClientIds.remove(value.publicId);
+                              break;
+                          }
+                        });
+                        _pushHistoryState();
+                      },
+                      onClearStatus: (value) {
+                        setState(() {
+                          switch (value.type) {
+                            case _NetworkStatusFacetType.contract:
+                              _contractStatuses.remove(value.status);
+                              break;
+                            case _NetworkStatusFacetType.employee:
+                              _employeeStatuses.remove(value.status);
+                              break;
+                          }
+                        });
+                        _pushHistoryState();
+                      },
+                      onClearDepartment: (value) {
+                        setState(() {
+                          _selectedDepartments.remove(value);
+                        });
+                        _pushHistoryState();
+                      },
+                      onClearPosition: (value) {
+                        setState(() {
+                          _selectedPositions.remove(value);
+                        });
+                        _pushHistoryState();
+                      },
+                      onClearSearch: () {
+                        setState(() {
+                          _searchController.clear();
+                        });
+                        _pushHistoryState();
+                      },
+                      onClearFocus: () {
+                        setState(() {
+                          _drillDownNodeId = null;
+                        });
+                        _pushHistoryState();
+                      },
+                      onClearAll: _clearAnalysisFilters,
+                    ),
                   ),
-                ),
+                ],
                 AnimatedCrossFade(
                   duration: const Duration(milliseconds: 220),
                   crossFadeState: _showFilters
@@ -922,7 +1024,8 @@ class _RelationalNetworkWorkspaceBodyState
                   ),
                   secondChild: const SizedBox.shrink(),
                 ),
-                if (_runtimeData.errorMessage != null)
+                if (_workspaceMode == _NetworkWorkspaceMode.relational &&
+                    _runtimeData.errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(28, 14, 28, 0),
                     child: _NetworkRuntimeNotice(
@@ -930,38 +1033,66 @@ class _RelationalNetworkWorkspaceBodyState
                       onRetry: () => _loadNetworkGraph(resetFilters: true),
                     ),
                   ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 14, 28, 0),
-                  child: _NetworkTimelineOverview(
-                    payload: _timelineRuntimeData.payload,
-                    sourceLabel: _timelineRuntimeData.sourceLabel,
-                    isLoading: _timelineRuntimeData.isLoading,
-                    errorMessage: _timelineRuntimeData.errorMessage,
+                if (_workspaceMode != _NetworkWorkspaceMode.relational)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 14, 28, 0),
+                    child: _NetworkTimelineOverview(
+                      payload: _timelineRuntimeData.payload,
+                      sourceLabel: _timelineRuntimeData.sourceLabel,
+                      isLoading: _timelineRuntimeData.isLoading,
+                      errorMessage: _timelineRuntimeData.errorMessage,
+                    ),
                   ),
-                ),
                 Expanded(
-                  child: wide
-                      ? Row(
-                          children: [
-                            Expanded(child: graphSection),
-                            if (_showDetailPanel)
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  minWidth: 320,
-                                  maxWidth: 380,
-                                ),
-                                child: detailPanel,
+                  child: switch (_workspaceMode) {
+                    _NetworkWorkspaceMode.relational =>
+                      wide
+                          ? Row(
+                              children: [
+                                Expanded(child: graphSection),
+                                if (_showDetailPanel)
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 320,
+                                      maxWidth: 380,
+                                    ),
+                                    child: detailPanel,
+                                  ),
+                              ],
+                            )
+                          : SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  SizedBox(height: 720, child: graphSection),
+                                  if (_showDetailPanel) detailPanel,
+                                ],
                               ),
-                          ],
-                        )
-                      : SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              SizedBox(height: 720, child: graphSection),
-                              if (_showDetailPanel) detailPanel,
-                            ],
-                          ),
-                        ),
+                            ),
+                    _NetworkWorkspaceMode.timeline =>
+                      wide
+                          ? Row(
+                              children: [
+                                Expanded(child: timelineSection),
+                                if (_showDetailPanel)
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 320,
+                                      maxWidth: 390,
+                                    ),
+                                    child: timelineDetailPanel,
+                                  ),
+                              ],
+                            )
+                          : SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  SizedBox(height: 720, child: timelineSection),
+                                  if (_showDetailPanel) timelineDetailPanel,
+                                ],
+                              ),
+                            ),
+                    _NetworkWorkspaceMode.current => currentSection,
+                  },
                 ),
               ],
             ),
@@ -1492,6 +1623,1551 @@ class _RelationalNetworkWorkspaceBodyState
             .where((node) => node.lane == _NetworkGraphLane.employee)
             .length >=
         8;
+  }
+}
+
+class _NetworkModeSwitcher extends StatelessWidget {
+  const _NetworkModeSwitcher({
+    required this.selectedMode,
+    required this.onChanged,
+  });
+
+  final _NetworkWorkspaceMode selectedMode;
+  final ValueChanged<_NetworkWorkspaceMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<_NetworkWorkspaceMode>(
+      segments: [
+        for (final mode in _NetworkWorkspaceMode.values)
+          ButtonSegment<_NetworkWorkspaceMode>(
+            value: mode,
+            icon: Icon(mode.icon, size: 18),
+            label: Text(mode.label),
+            tooltip: mode.tooltip,
+          ),
+      ],
+      selected: {selectedMode},
+      showSelectedIcon: false,
+      onSelectionChanged: (selection) {
+        if (selection.isNotEmpty) {
+          onChanged(selection.first);
+        }
+      },
+      style: ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        textStyle: WidgetStatePropertyAll(
+          Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkTimelineCanvasSection extends StatelessWidget {
+  const _NetworkTimelineCanvasSection({
+    required this.payload,
+    required this.runtimeData,
+    required this.controller,
+    required this.selectedItem,
+    required this.onViewportChanged,
+    required this.onInteractionUpdate,
+    required this.onInteractionEnd,
+    required this.onSelectItem,
+    required this.onRetry,
+  });
+
+  final _NetworkTimelinePayload payload;
+  final _NetworkTimelineRuntimeData runtimeData;
+  final TransformationController controller;
+  final _NetworkTimelineSelection? selectedItem;
+  final ValueChanged<Size> onViewportChanged;
+  final VoidCallback onInteractionUpdate;
+  final VoidCallback onInteractionEnd;
+  final ValueChanged<_NetworkTimelineSelection?> onSelectItem;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!runtimeData.isLoading &&
+        !runtimeData.isLive &&
+        runtimeData.errorMessage != null) {
+      return _NetworkTimelineStateNotice(
+        icon: Icons.cloud_off_outlined,
+        title: 'Timeline indisponivel',
+        message: runtimeData.errorMessage!,
+        actionLabel: 'Tentar novamente',
+        onAction: onRetry,
+      );
+    }
+
+    final hasTimelineData =
+        payload.contracts.isNotEmpty ||
+        payload.collaborators.isNotEmpty ||
+        payload.events.isNotEmpty;
+    if (!runtimeData.isLoading && !hasTimelineData) {
+      return const _NetworkTimelineStateNotice(
+        icon: Icons.timeline_outlined,
+        title: 'Sem dados de timeline',
+        message:
+            'O endpoint retornou um payload valido, mas sem contratos, colaboradores ou eventos para este recorte.',
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportHeight = constraints.maxHeight.isFinite
+            ? max(560.0, constraints.maxHeight)
+            : 640.0;
+        final viewportSize = Size(max(1, constraints.maxWidth), viewportHeight);
+        onViewportChanged(viewportSize);
+
+        final layout = _NetworkTimelineCanvasLayout.compute(
+          payload: payload,
+          viewportWidth: viewportSize.width,
+        );
+        final visibleSceneRect = _visibleTimelineSceneRect(
+          controller.value,
+          viewportSize,
+          Size(layout.sceneWidth, layout.sceneHeight),
+        );
+
+        return SizedBox(
+          height: viewportHeight,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(color: Colors.white),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: InteractiveViewer(
+                      transformationController: controller,
+                      constrained: false,
+                      boundaryMargin: const EdgeInsets.all(620),
+                      minScale:
+                          _RelationalNetworkWorkspaceBodyState._minCanvasZoom,
+                      maxScale:
+                          _RelationalNetworkWorkspaceBodyState._maxCanvasZoom,
+                      scaleFactor: 180,
+                      trackpadScrollCausesScale: true,
+                      panEnabled: true,
+                      scaleEnabled: true,
+                      clipBehavior: Clip.none,
+                      onInteractionUpdate: (_) => onInteractionUpdate(),
+                      onInteractionEnd: (_) => onInteractionEnd(),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapUp: (details) {
+                          onSelectItem(layout.hitTest(details.localPosition));
+                        },
+                        child: RepaintBoundary(
+                          child: CustomPaint(
+                            size: Size(layout.sceneWidth, layout.sceneHeight),
+                            painter: _NetworkTimelineCanvasPainter(
+                              payload: payload,
+                              layout: layout,
+                              selectedItem: selectedItem,
+                              visibleSceneRect: visibleSceneRect,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 18,
+                  bottom: 18,
+                  child: _RelationalViewportDock(
+                    canGoBack: false,
+                    canGoForward: false,
+                    onBackTap: () {},
+                    onForwardTap: () {},
+                    onCenterTap: () {
+                      controller.value = Matrix4.identity();
+                      onInteractionEnd();
+                    },
+                    onResetTap: () {
+                      controller.value = Matrix4.identity();
+                      onInteractionEnd();
+                    },
+                  ),
+                ),
+                if (runtimeData.isLoading)
+                  const Positioned(
+                    right: 24,
+                    top: 20,
+                    child: SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NetworkTimelineStateNotice extends StatelessWidget {
+  const _NetworkTimelineStateNotice({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 44, color: _slateColor),
+              const SizedBox(height: 14),
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: _mutedColor),
+              ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: 18),
+                FilledButton.tonalIcon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text(actionLabel!),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkTimelineCanvasLayout {
+  const _NetworkTimelineCanvasLayout({
+    required this.periodStart,
+    required this.periodEnd,
+    required this.leftRailWidth,
+    required this.axisWidth,
+    required this.sceneWidth,
+    required this.sceneHeight,
+    required this.contractRects,
+    required this.positionRects,
+    required this.allocationRects,
+    required this.eventRects,
+    required this.rowLabels,
+    required this.monthTicks,
+  });
+
+  factory _NetworkTimelineCanvasLayout.compute({
+    required _NetworkTimelinePayload payload,
+    required double viewportWidth,
+  }) {
+    final fallbackEnd = DateTime.now();
+    final parsedStart = _parseNetworkDate(payload.period.from);
+    final parsedEnd = _parseNetworkDate(payload.period.to);
+    final periodEnd = parsedEnd ?? fallbackEnd;
+    final periodStart =
+        parsedStart ?? DateTime(periodEnd.year - 1, periodEnd.month, 1);
+    final safeEnd = periodEnd.isAfter(periodStart)
+        ? periodEnd
+        : _addMonths(periodStart, 12);
+    final monthSpan = max(1, _monthSpan(periodStart, safeEnd));
+    final leftRailWidth = viewportWidth < 920 ? 180.0 : 220.0;
+    final axisWidth = max(viewportWidth - leftRailWidth - 80, monthSpan * 92.0);
+    final sceneWidth = leftRailWidth + axisWidth + 82;
+
+    final contractRects = <String, Rect>{};
+    final positionRects = <String, Rect>{};
+    final allocationRects = <String, Rect>{};
+    final eventRects = <String, Rect>{};
+    final rowLabels = <_NetworkTimelineRowLabel>[];
+    var cursorY = 70.0;
+
+    void addSection(String label, IconData icon) {
+      rowLabels.add(
+        _NetworkTimelineRowLabel(
+          label: label,
+          icon: icon,
+          top: cursorY,
+          section: true,
+        ),
+      );
+      cursorY += 34;
+    }
+
+    Rect rangeRect(
+      String? startsAt,
+      String? endsAt,
+      double top,
+      double height,
+    ) {
+      final startDate = _parseNetworkDate(startsAt ?? '') ?? periodStart;
+      final endDate = _parseNetworkDate(endsAt ?? '') ?? safeEnd;
+      final left = _xForDate(
+        startDate,
+        periodStart: periodStart,
+        periodEnd: safeEnd,
+        leftRailWidth: leftRailWidth,
+        axisWidth: axisWidth,
+      );
+      final right = _xForDate(
+        endDate,
+        periodStart: periodStart,
+        periodEnd: safeEnd,
+        leftRailWidth: leftRailWidth,
+        axisWidth: axisWidth,
+      );
+      final clampedLeft = left.clamp(leftRailWidth, leftRailWidth + axisWidth);
+      final clampedRight = right.clamp(
+        leftRailWidth,
+        leftRailWidth + axisWidth,
+      );
+      final width = max(24.0, clampedRight - clampedLeft);
+      return Rect.fromLTWH(clampedLeft.toDouble(), top, width, height);
+    }
+
+    addSection('Contratos', Icons.description_outlined);
+    for (final contract in payload.contracts) {
+      final top = cursorY;
+      rowLabels.add(
+        _NetworkTimelineRowLabel(
+          label: contract.displayName.isEmpty
+              ? contract.publicId
+              : contract.displayName,
+          icon: Icons.description_outlined,
+          top: top,
+        ),
+      );
+      contractRects[contract.publicId] = rangeRect(
+        contract.startsAt,
+        contract.endsAt,
+        top + 5,
+        32,
+      );
+      cursorY += 46;
+    }
+
+    addSection('Postos', Icons.work_outline_rounded);
+    for (final contract in payload.contracts) {
+      for (final position in contract.positions) {
+        final top = cursorY;
+        rowLabels.add(
+          _NetworkTimelineRowLabel(
+            label: position.displayName.isEmpty
+                ? position.publicId
+                : position.displayName,
+            icon: Icons.work_outline_rounded,
+            top: top,
+          ),
+        );
+        positionRects[position.publicId] = rangeRect(
+          position.startsAt,
+          position.endsAt,
+          top + 6,
+          26,
+        );
+        cursorY += 40;
+      }
+    }
+
+    addSection('Colaboradores', Icons.badge_outlined);
+    for (final collaborator in payload.collaborators) {
+      final top = cursorY;
+      rowLabels.add(
+        _NetworkTimelineRowLabel(
+          label: collaborator.personName.isEmpty
+              ? collaborator.personPublicId
+              : collaborator.personName,
+          icon: Icons.badge_outlined,
+          top: top,
+        ),
+      );
+      for (final segment in collaborator.segments) {
+        allocationRects[segment.employmentLinkPublicId] = rangeRect(
+          segment.startsAt,
+          segment.endsAt,
+          top + 7,
+          22,
+        );
+      }
+      cursorY += 36;
+    }
+
+    addSection('Eventos', Icons.event_note_outlined);
+    final eventTop = cursorY + 16;
+    for (final event in payload.events) {
+      final date = _parseNetworkDate(event.occurredAt ?? '');
+      final x = _xForDate(
+        date ?? periodStart,
+        periodStart: periodStart,
+        periodEnd: safeEnd,
+        leftRailWidth: leftRailWidth,
+        axisWidth: axisWidth,
+      );
+      eventRects[event.publicId] = Rect.fromCenter(
+        center: Offset(x, eventTop),
+        width: 26,
+        height: 26,
+      );
+    }
+    cursorY += 74;
+
+    return _NetworkTimelineCanvasLayout(
+      periodStart: periodStart,
+      periodEnd: safeEnd,
+      leftRailWidth: leftRailWidth,
+      axisWidth: axisWidth,
+      sceneWidth: sceneWidth,
+      sceneHeight: max(cursorY + 32, 560),
+      contractRects: contractRects,
+      positionRects: positionRects,
+      allocationRects: allocationRects,
+      eventRects: eventRects,
+      rowLabels: rowLabels,
+      monthTicks: _timelineMonthTicks(
+        periodStart,
+        safeEnd,
+        leftRailWidth: leftRailWidth,
+        axisWidth: axisWidth,
+      ),
+    );
+  }
+
+  final DateTime periodStart;
+  final DateTime periodEnd;
+  final double leftRailWidth;
+  final double axisWidth;
+  final double sceneWidth;
+  final double sceneHeight;
+  final Map<String, Rect> contractRects;
+  final Map<String, Rect> positionRects;
+  final Map<String, Rect> allocationRects;
+  final Map<String, Rect> eventRects;
+  final List<_NetworkTimelineRowLabel> rowLabels;
+  final List<_NetworkTimelineMonthTick> monthTicks;
+
+  _NetworkTimelineSelection? hitTest(Offset point) {
+    for (final entry in eventRects.entries.toList().reversed) {
+      if (entry.value.inflate(8).contains(point)) {
+        return _NetworkTimelineSelection(
+          kind: _NetworkTimelineSelectionKind.event,
+          publicId: entry.key,
+        );
+      }
+    }
+    for (final entry in allocationRects.entries.toList().reversed) {
+      if (entry.value.inflate(4).contains(point)) {
+        return _NetworkTimelineSelection(
+          kind: _NetworkTimelineSelectionKind.collaborator,
+          publicId: entry.key,
+        );
+      }
+    }
+    for (final entry in positionRects.entries.toList().reversed) {
+      if (entry.value.contains(point)) {
+        return _NetworkTimelineSelection(
+          kind: _NetworkTimelineSelectionKind.position,
+          publicId: entry.key,
+        );
+      }
+    }
+    for (final entry in contractRects.entries.toList().reversed) {
+      if (entry.value.contains(point)) {
+        return _NetworkTimelineSelection(
+          kind: _NetworkTimelineSelectionKind.contract,
+          publicId: entry.key,
+        );
+      }
+    }
+    return null;
+  }
+}
+
+class _NetworkTimelineRowLabel {
+  const _NetworkTimelineRowLabel({
+    required this.label,
+    required this.icon,
+    required this.top,
+    this.section = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final double top;
+  final bool section;
+}
+
+class _NetworkTimelineMonthTick {
+  const _NetworkTimelineMonthTick({required this.date, required this.x});
+
+  final DateTime date;
+  final double x;
+}
+
+class _NetworkTimelineCanvasPainter extends CustomPainter {
+  const _NetworkTimelineCanvasPainter({
+    required this.payload,
+    required this.layout,
+    required this.selectedItem,
+    required this.visibleSceneRect,
+  });
+
+  final _NetworkTimelinePayload payload;
+  final _NetworkTimelineCanvasLayout layout;
+  final _NetworkTimelineSelection? selectedItem;
+  final Rect visibleSceneRect;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final background = Paint()..color = Colors.white;
+    canvas.drawRect(Offset.zero & size, background);
+    _paintTimelineGrid(canvas, size);
+    _paintRowLabels(canvas);
+    _paintContracts(canvas);
+    _paintPositions(canvas);
+    _paintAllocations(canvas);
+    _paintStructuredMoveConnections(canvas);
+    _paintEvents(canvas);
+  }
+
+  void _paintTimelineGrid(Canvas canvas, Size size) {
+    final railPaint = Paint()..color = const Color(0xFFF8FAF9);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, layout.leftRailWidth, size.height),
+      railPaint,
+    );
+
+    final headerPaint = Paint()..color = const Color(0xFFFBF8F2);
+    canvas.drawRect(
+      Rect.fromLTWH(layout.leftRailWidth, 0, layout.axisWidth, 52),
+      headerPaint,
+    );
+
+    final linePaint = Paint()
+      ..color = _lineColor
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(layout.leftRailWidth, 0),
+      Offset(layout.leftRailWidth, size.height),
+      linePaint,
+    );
+    canvas.drawLine(const Offset(0, 52), Offset(size.width, 52), linePaint);
+
+    for (var i = 0; i < layout.monthTicks.length; i++) {
+      final tick = layout.monthTicks[i];
+      if (tick.x < visibleSceneRect.left - 80 ||
+          tick.x > visibleSceneRect.right + 80) {
+        continue;
+      }
+      final major = tick.date.month == 1 || i == 0;
+      final paint = Paint()
+        ..color = major ? _lineColor : _lineColor.withValues(alpha: 0.45)
+        ..strokeWidth = major ? 1.2 : 1;
+      canvas.drawLine(Offset(tick.x, 0), Offset(tick.x, size.height), paint);
+      if (major || i.isEven) {
+        _paintText(
+          canvas,
+          _timelineMonthLabel(tick.date, showYear: major),
+          Offset(tick.x + 6, major ? 11 : 18),
+          maxWidth: 78,
+          style: TextStyle(
+            color: major ? _inkColor : _mutedColor,
+            fontSize: major ? 12 : 11,
+            fontWeight: FontWeight.w800,
+          ),
+        );
+      }
+    }
+  }
+
+  void _paintRowLabels(Canvas canvas) {
+    for (final row in layout.rowLabels) {
+      if (row.top < visibleSceneRect.top - 48 ||
+          row.top > visibleSceneRect.bottom + 48) {
+        continue;
+      }
+      if (row.section) {
+        final paint = Paint()..color = _deepTealColor.withValues(alpha: 0.05);
+        canvas.drawRect(
+          Rect.fromLTWH(0, row.top, layout.sceneWidth, 30),
+          paint,
+        );
+        _paintIcon(canvas, row.icon, Offset(16, row.top + 7), _deepTealColor);
+        _paintText(
+          canvas,
+          row.label,
+          Offset(42, row.top + 6),
+          maxWidth: layout.leftRailWidth - 52,
+          style: const TextStyle(
+            color: _deepTealColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        );
+        continue;
+      }
+
+      _paintIcon(canvas, row.icon, Offset(18, row.top + 12), _slateColor);
+      _paintText(
+        canvas,
+        row.label,
+        Offset(44, row.top + 9),
+        maxWidth: layout.leftRailWidth - 56,
+        style: const TextStyle(
+          color: _inkColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+    }
+  }
+
+  void _paintContracts(Canvas canvas) {
+    for (final contract in payload.contracts) {
+      final rect = layout.contractRects[contract.publicId];
+      if (rect == null) {
+        continue;
+      }
+      if (!_shouldPaintRect(rect)) {
+        continue;
+      }
+      _paintBar(
+        canvas,
+        rect,
+        color: _timelineStatusColor(contract.status),
+        label: contract.clientCompanyName.isEmpty
+            ? contract.displayName
+            : contract.clientCompanyName,
+        selected: _isSelected(
+          _NetworkTimelineSelectionKind.contract,
+          contract.publicId,
+        ),
+      );
+    }
+  }
+
+  void _paintPositions(Canvas canvas) {
+    for (final contract in payload.contracts) {
+      for (final position in contract.positions) {
+        final rect = layout.positionRects[position.publicId];
+        if (rect == null) {
+          continue;
+        }
+        if (!_shouldPaintRect(rect)) {
+          continue;
+        }
+        _paintBar(
+          canvas,
+          rect,
+          color: _timelineStatusColor(position.status),
+          label: position.serviceName.isEmpty
+              ? position.displayName
+              : position.serviceName,
+          selected: _isSelected(
+            _NetworkTimelineSelectionKind.position,
+            position.publicId,
+          ),
+          compact: true,
+        );
+      }
+    }
+  }
+
+  void _paintAllocations(Canvas canvas) {
+    for (final collaborator in payload.collaborators) {
+      for (final segment in collaborator.segments) {
+        final rect = layout.allocationRects[segment.employmentLinkPublicId];
+        if (rect == null) {
+          continue;
+        }
+        if (!_shouldPaintRect(rect)) {
+          continue;
+        }
+        _paintBar(
+          canvas,
+          rect,
+          color: _timelineStatusColor(segment.status),
+          label: collaborator.personName,
+          selected: _isSelected(
+            _NetworkTimelineSelectionKind.collaborator,
+            segment.employmentLinkPublicId,
+          ),
+          compact: true,
+        );
+      }
+    }
+  }
+
+  void _paintEvents(Canvas canvas) {
+    for (final event in payload.events) {
+      final rect = layout.eventRects[event.publicId];
+      if (rect == null) {
+        continue;
+      }
+      if (!_shouldPaintRect(rect.inflate(18))) {
+        continue;
+      }
+      final color = _timelineEventColor(event.eventType);
+      final selected = _isSelected(
+        _NetworkTimelineSelectionKind.event,
+        event.publicId,
+      );
+      final path = Path()
+        ..moveTo(rect.center.dx, rect.top)
+        ..lineTo(rect.right, rect.center.dy)
+        ..lineTo(rect.center.dx, rect.bottom)
+        ..lineTo(rect.left, rect.center.dy)
+        ..close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = selected ? color : color.withValues(alpha: 0.88)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = selected ? _inkColor : Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = selected ? 2.4 : 1.4,
+      );
+      if (event.eventType == 'move' && !event.hasStructuredMove) {
+        canvas.drawCircle(
+          rect.topRight + const Offset(-1, 1),
+          4,
+          Paint()..color = _amberColor,
+        );
+      }
+    }
+  }
+
+  void _paintStructuredMoveConnections(Canvas canvas) {
+    final paint = Paint()
+      ..color = _deepTealColor.withValues(alpha: 0.34)
+      ..strokeWidth = 1.6
+      ..style = PaintingStyle.stroke;
+
+    for (final event in payload.events) {
+      if (event.eventType != 'move' || !event.hasStructuredMove) {
+        continue;
+      }
+      final originRect = layout.positionRects[event.originPositionPublicId];
+      final destinationRect =
+          layout.positionRects[event.destinationPositionPublicId];
+      final eventRect = layout.eventRects[event.publicId];
+      if (originRect == null || destinationRect == null || eventRect == null) {
+        continue;
+      }
+
+      final bounds = _boundsForPoints([
+        originRect.center,
+        eventRect.center,
+        destinationRect.center,
+      ]).inflate(36);
+      if (!_shouldPaintRect(bounds)) {
+        continue;
+      }
+
+      final path = Path()
+        ..moveTo(originRect.center.dx, originRect.center.dy)
+        ..quadraticBezierTo(
+          eventRect.center.dx,
+          eventRect.center.dy,
+          destinationRect.center.dx,
+          destinationRect.center.dy,
+        );
+      canvas.drawPath(path, paint);
+      canvas.drawCircle(
+        originRect.center,
+        3,
+        paint..style = PaintingStyle.fill,
+      );
+      paint.style = PaintingStyle.stroke;
+      canvas.drawCircle(
+        destinationRect.center,
+        3,
+        paint..style = PaintingStyle.fill,
+      );
+      paint.style = PaintingStyle.stroke;
+    }
+  }
+
+  void _paintBar(
+    Canvas canvas,
+    Rect rect, {
+    required Color color,
+    required String label,
+    required bool selected,
+    bool compact = false,
+  }) {
+    final radius = Radius.circular(compact ? 7 : 9);
+    final fill = Paint()
+      ..color = selected
+          ? color.withValues(alpha: 0.22)
+          : color.withValues(alpha: 0.14);
+    final border = Paint()
+      ..color = selected ? _inkColor : color.withValues(alpha: 0.72)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = selected ? 2.2 : 1.2;
+    final rrect = RRect.fromRectAndRadius(rect, radius);
+    canvas.drawRRect(rrect, fill);
+    canvas.drawRRect(rrect, border);
+    _paintText(
+      canvas,
+      label,
+      Offset(rect.left + 10, rect.top + (compact ? 5 : 7)),
+      maxWidth: max(12.0, rect.width - 18),
+      style: TextStyle(
+        color: _inkColor,
+        fontSize: compact ? 11 : 12,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+
+  bool _isSelected(_NetworkTimelineSelectionKind kind, String publicId) {
+    return selectedItem?.kind == kind && selectedItem?.publicId == publicId;
+  }
+
+  bool _shouldPaintRect(Rect rect) {
+    return rect.overlaps(visibleSceneRect);
+  }
+
+  @override
+  bool shouldRepaint(covariant _NetworkTimelineCanvasPainter oldDelegate) {
+    return oldDelegate.payload != payload ||
+        oldDelegate.layout != layout ||
+        oldDelegate.selectedItem?.signature != selectedItem?.signature ||
+        oldDelegate.visibleSceneRect != visibleSceneRect;
+  }
+}
+
+class _NetworkTimelineDetailPanel extends StatelessWidget {
+  const _NetworkTimelineDetailPanel({
+    required this.payload,
+    required this.selectedItem,
+    required this.onSelectItem,
+    required this.onClose,
+  });
+
+  final _NetworkTimelinePayload payload;
+  final _NetworkTimelineSelection? selectedItem;
+  final ValueChanged<_NetworkTimelineSelection> onSelectItem;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final selection = selectedItem;
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFCF7),
+        border: Border(left: BorderSide(color: _lineColor)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _timelineDetailTitle(selection, payload),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                IconButton(
+                  onPressed: onClose,
+                  tooltip: 'Fechar detalhes',
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (selection == null)
+              _NetworkTimelineSummaryDetails(
+                payload: payload,
+                onSelectItem: onSelectItem,
+              )
+            else
+              _NetworkTimelineSelectedDetails(
+                payload: payload,
+                selectedItem: selection,
+                onSelectItem: onSelectItem,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkTimelineSummaryDetails extends StatelessWidget {
+  const _NetworkTimelineSummaryDetails({
+    required this.payload,
+    required this.onSelectItem,
+  });
+
+  final _NetworkTimelinePayload payload;
+  final ValueChanged<_NetworkTimelineSelection> onSelectItem;
+
+  @override
+  Widget build(BuildContext context) {
+    final recentEvents = payload.events.reversed.take(5).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _RelationalMetricPill(
+              icon: Icons.description_outlined,
+              label: '${payload.contracts.length} contratos',
+            ),
+            _RelationalMetricPill(
+              icon: Icons.badge_outlined,
+              label: '${payload.collaborators.length} colaboradores',
+            ),
+            _RelationalMetricPill(
+              icon: Icons.event_note_outlined,
+              label: '${payload.events.length} eventos',
+            ),
+          ],
+        ),
+        if (payload.warnings.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Text('Warnings', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          for (final warning in payload.warnings.take(4))
+            _NetworkTimelineWarningTile(warning: warning),
+        ],
+        if (recentEvents.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Text(
+            'Eventos recentes',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          for (final event in recentEvents)
+            _NetworkTimelineEventTile(
+              event: event,
+              onTap: () => onSelectItem(
+                _NetworkTimelineSelection(
+                  kind: _NetworkTimelineSelectionKind.event,
+                  publicId: event.publicId,
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _NetworkTimelineSelectedDetails extends StatelessWidget {
+  const _NetworkTimelineSelectedDetails({
+    required this.payload,
+    required this.selectedItem,
+    required this.onSelectItem,
+  });
+
+  final _NetworkTimelinePayload payload;
+  final _NetworkTimelineSelection selectedItem;
+  final ValueChanged<_NetworkTimelineSelection> onSelectItem;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (selectedItem.kind) {
+      _NetworkTimelineSelectionKind.contract => _contractDetails(context),
+      _NetworkTimelineSelectionKind.position => _positionDetails(context),
+      _NetworkTimelineSelectionKind.collaborator => _collaboratorDetails(
+        context,
+      ),
+      _NetworkTimelineSelectionKind.event => _eventDetails(context),
+    };
+  }
+
+  Widget _contractDetails(BuildContext context) {
+    final contract = payload.contractByPublicId(selectedItem.publicId);
+    if (contract == null) {
+      return const _NetworkTimelineMissingSelection();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _NetworkTimelineStatusHeader(
+          icon: Icons.description_outlined,
+          title: contract.displayName,
+          status: contract.status,
+        ),
+        _NetworkTimelineField(
+          label: 'Prestadora',
+          value: contract.providerCompanyName,
+        ),
+        _NetworkTimelineField(
+          label: 'Cliente',
+          value: contract.clientCompanyName,
+        ),
+        _NetworkTimelineField(label: 'Inicio', value: contract.startsAt ?? '-'),
+        _NetworkTimelineField(label: 'Fim', value: contract.endsAt ?? 'Aberto'),
+        const SizedBox(height: 16),
+        Text('Postos', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        for (final position in contract.positions)
+          _NetworkTimelineLinkTile(
+            icon: Icons.work_outline_rounded,
+            title: position.displayName,
+            subtitle: position.status,
+            onTap: () => onSelectItem(
+              _NetworkTimelineSelection(
+                kind: _NetworkTimelineSelectionKind.position,
+                publicId: position.publicId,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _positionDetails(BuildContext context) {
+    final position = payload.positionByPublicId(selectedItem.publicId);
+    if (position == null) {
+      return const _NetworkTimelineMissingSelection();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _NetworkTimelineStatusHeader(
+          icon: Icons.work_outline_rounded,
+          title: position.displayName,
+          status: position.status,
+        ),
+        _NetworkTimelineField(label: 'Servico', value: position.serviceName),
+        _NetworkTimelineField(label: 'Local', value: position.location),
+        _NetworkTimelineField(label: 'Escala', value: position.schedule),
+        _NetworkTimelineField(label: 'Turno', value: position.shift),
+        _NetworkTimelineField(
+          label: 'Origem das datas',
+          value: position.dateSource,
+        ),
+        const SizedBox(height: 16),
+        Text('Alocacoes', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        for (final allocation in position.allocations)
+          _NetworkTimelineLinkTile(
+            icon: Icons.badge_outlined,
+            title: allocation.personName,
+            subtitle: '${allocation.status} | ${allocation.startsAt ?? '-'}',
+            onTap: () => onSelectItem(
+              _NetworkTimelineSelection(
+                kind: _NetworkTimelineSelectionKind.collaborator,
+                publicId: allocation.employmentLinkPublicId,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _collaboratorDetails(BuildContext context) {
+    final segment = _timelineSegmentByEmploymentLink(
+      payload,
+      selectedItem.publicId,
+    );
+    final collaborator = segment == null
+        ? null
+        : _timelineCollaboratorBySegment(payload, segment);
+    if (segment == null || collaborator == null) {
+      return const _NetworkTimelineMissingSelection();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _NetworkTimelineStatusHeader(
+          icon: Icons.badge_outlined,
+          title: collaborator.personName,
+          status: segment.status,
+        ),
+        _NetworkTimelineField(label: 'Inicio', value: segment.startsAt ?? '-'),
+        _NetworkTimelineField(label: 'Fim', value: segment.endsAt ?? 'Aberto'),
+        _NetworkTimelineField(
+          label: 'Contrato',
+          value: segment.contractPublicId,
+        ),
+        _NetworkTimelineField(label: 'Posto', value: segment.positionPublicId),
+        if (collaborator.events.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('Eventos', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          for (final event in collaborator.events)
+            _NetworkTimelineEventTile(
+              event: event,
+              onTap: () => onSelectItem(
+                _NetworkTimelineSelection(
+                  kind: _NetworkTimelineSelectionKind.event,
+                  publicId: event.publicId,
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _eventDetails(BuildContext context) {
+    final event = payload.eventByPublicId(selectedItem.publicId);
+    if (event == null) {
+      return const _NetworkTimelineMissingSelection();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _NetworkTimelineStatusHeader(
+          icon: _timelineEventIcon(event.eventType),
+          title: event.label,
+          status: event.eventType,
+        ),
+        _NetworkTimelineField(label: 'Data', value: event.occurredAt ?? '-'),
+        _NetworkTimelineField(label: 'Origem', value: event.source),
+        if (event.notes != null)
+          _NetworkTimelineField(label: 'Notas', value: event.notes!),
+        if (event.eventType == 'move' && !event.hasStructuredMove)
+          const _NetworkTimelineInlineWarning(
+            message:
+                'Movimento sem ids estruturados. O evento fica narrativo e nao gera conexao entre postos.',
+          ),
+        for (final entity in event.linkedEntities)
+          _NetworkTimelineField(
+            label: _titleCase(entity.entityType),
+            value: entity.labelSnapshot,
+          ),
+      ],
+    );
+  }
+}
+
+class _NetworkTimelineStatusHeader extends StatelessWidget {
+  const _NetworkTimelineStatusHeader({
+    required this.icon,
+    required this.title,
+    required this.status,
+  });
+
+  final IconData icon;
+  final String title;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _timelineStatusColor(status).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _timelineStatusColor(status).withValues(alpha: 0.24),
+            ),
+          ),
+          child: Icon(icon, color: _timelineStatusColor(status), size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title.isEmpty ? 'Sem titulo' : title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _titleCase(status),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: _mutedColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NetworkTimelineField extends StatelessWidget {
+  const _NetworkTimelineField({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value.trim().isEmpty ? '-' : value;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: _mutedColor,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            displayValue,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: _inkColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkTimelineLinkTile extends StatelessWidget {
+  const _NetworkTimelineLinkTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      minLeadingWidth: 26,
+      leading: Icon(icon, color: _slateColor),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+    );
+  }
+}
+
+class _NetworkTimelineEventTile extends StatelessWidget {
+  const _NetworkTimelineEventTile({required this.event, required this.onTap});
+
+  final _NetworkTimelineEvent event;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _NetworkTimelineLinkTile(
+      icon: _timelineEventIcon(event.eventType),
+      title: event.label.isEmpty ? event.eventType : event.label,
+      subtitle: event.occurredAt ?? event.source,
+      onTap: onTap,
+    );
+  }
+}
+
+class _NetworkTimelineWarningTile extends StatelessWidget {
+  const _NetworkTimelineWarningTile({required this.warning});
+
+  final _NetworkTimelineWarning warning;
+
+  @override
+  Widget build(BuildContext context) {
+    return _NetworkTimelineInlineWarning(message: warning.message);
+  }
+}
+
+class _NetworkTimelineInlineWarning extends StatelessWidget {
+  const _NetworkTimelineInlineWarning({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _amberColor.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _amberColor.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: _amberColor, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _inkColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkTimelineMissingSelection extends StatelessWidget {
+  const _NetworkTimelineMissingSelection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'O item selecionado nao existe mais no recorte atual.',
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: _mutedColor),
+    );
+  }
+}
+
+class _NetworkCurrentSnapshotSection extends StatelessWidget {
+  const _NetworkCurrentSnapshotSection({
+    required this.runtimeData,
+    required this.onRetry,
+  });
+
+  final _NetworkTimelineRuntimeData runtimeData;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!runtimeData.isLoading &&
+        !runtimeData.isLive &&
+        runtimeData.errorMessage != null) {
+      return _NetworkTimelineStateNotice(
+        icon: Icons.cloud_off_outlined,
+        title: 'Estado atual indisponivel',
+        message: runtimeData.errorMessage!,
+        actionLabel: 'Tentar novamente',
+        onAction: onRetry,
+      );
+    }
+
+    final snapshot = runtimeData.payload.currentSnapshot;
+    if (!runtimeData.isLoading && snapshot.contracts.isEmpty) {
+      return const _NetworkTimelineStateNotice(
+        icon: Icons.account_tree_outlined,
+        title: 'Sem estado atual',
+        message:
+            'O payload da timeline nao retornou contratos ativos para a data de referencia.',
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(28, 18, 28, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _RelationalMetricPill(
+                icon: Icons.description_outlined,
+                label: '${snapshot.contractsCount} contratos ativos',
+              ),
+              _RelationalMetricPill(
+                icon: Icons.work_outline_rounded,
+                label: '${snapshot.positionsCount} postos ativos',
+              ),
+              _RelationalMetricPill(
+                icon: Icons.badge_outlined,
+                label: '${snapshot.collaboratorsCount} colaboradores ativos',
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          for (final contract in snapshot.contracts)
+            _NetworkCurrentContractBlock(
+              snapshot: snapshot,
+              contract: contract,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkCurrentContractBlock extends StatelessWidget {
+  const _NetworkCurrentContractBlock({
+    required this.snapshot,
+    required this.contract,
+  });
+
+  final _NetworkTimelineCurrentSnapshot snapshot;
+  final _NetworkTimelineSnapshotContract contract;
+
+  @override
+  Widget build(BuildContext context) {
+    final positions = snapshot.positionsForContract(contract.publicId);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.description_outlined,
+                color: _timelineStatusColor(contract.status),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  contract.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              _Tag(
+                label: _titleCase(contract.status),
+                color: _timelineStatusColor(contract.status),
+                background: _timelineStatusColor(
+                  contract.status,
+                ).withValues(alpha: 0.10),
+                icon: Icons.circle,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _RelationalMetricPill(
+                icon: Icons.work_outline_rounded,
+                label: '${contract.activePositions} postos',
+              ),
+              _RelationalMetricPill(
+                icon: Icons.badge_outlined,
+                label: '${contract.activeCollaborators} colaboradores',
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          for (final position in positions)
+            _NetworkCurrentPositionRow(snapshot: snapshot, position: position),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkCurrentPositionRow extends StatelessWidget {
+  const _NetworkCurrentPositionRow({
+    required this.snapshot,
+    required this.position,
+  });
+
+  final _NetworkTimelineCurrentSnapshot snapshot;
+  final _NetworkTimelineSnapshotPosition position;
+
+  @override
+  Widget build(BuildContext context) {
+    final collaborators = snapshot.collaboratorsForPosition(position.publicId);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: _lineColor)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.work_outline_rounded, color: _slateColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  position.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Text(
+                '${position.activeCollaborators}',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: _mutedColor,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          if (collaborators.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final collaborator in collaborators)
+                  _Tag(
+                    label: collaborator.personName,
+                    color: _deepTealColor,
+                    background: _deepTealColor.withValues(alpha: 0.08),
+                    icon: Icons.badge_outlined,
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -2089,6 +3765,7 @@ class _NetworkHistoryEntry {
     required this.attentionOnly,
     required this.clusterEmployees,
     required this.drillDownNodeId,
+    required this.workspaceMode,
     required this.hiddenLanes,
     required this.activeOnlyLanes,
   });
@@ -2114,6 +3791,7 @@ class _NetworkHistoryEntry {
     required bool attentionOnly,
     required bool clusterEmployees,
     required String? drillDownNodeId,
+    required _NetworkWorkspaceMode workspaceMode,
     required Set<_NetworkGraphLane> hiddenLanes,
     required Set<_NetworkGraphLane> activeOnlyLanes,
   }) {
@@ -2138,6 +3816,7 @@ class _NetworkHistoryEntry {
       attentionOnly: attentionOnly,
       clusterEmployees: clusterEmployees,
       drillDownNodeId: drillDownNodeId,
+      workspaceMode: workspaceMode,
       hiddenLanes: {...hiddenLanes},
       activeOnlyLanes: {...activeOnlyLanes},
     );
@@ -2163,6 +3842,7 @@ class _NetworkHistoryEntry {
   final bool attentionOnly;
   final bool clusterEmployees;
   final String? drillDownNodeId;
+  final _NetworkWorkspaceMode workspaceMode;
   final Set<_NetworkGraphLane> hiddenLanes;
   final Set<_NetworkGraphLane> activeOnlyLanes;
 
@@ -2188,6 +3868,7 @@ class _NetworkHistoryEntry {
     attentionOnly,
     clusterEmployees,
     drillDownNodeId,
+    workspaceMode.name,
     _sortedSignature(hiddenLanes.map((lane) => lane.name).toSet()),
     _sortedSignature(activeOnlyLanes.map((lane) => lane.name).toSet()),
   ].join('|');
@@ -7710,6 +9391,229 @@ String _detailTitleFor(_NetworkGraphNode node) {
     _NetworkGraphLane.position => 'Detalhes da posicao',
     _NetworkGraphLane.employee => 'Detalhes do colaborador',
   };
+}
+
+Rect _visibleTimelineSceneRect(
+  Matrix4 matrix,
+  Size viewportSize,
+  Size sceneSize,
+) {
+  try {
+    final inverse = Matrix4.inverted(matrix);
+    final topLeft = MatrixUtils.transformPoint(inverse, Offset.zero);
+    final bottomRight = MatrixUtils.transformPoint(
+      inverse,
+      Offset(viewportSize.width, viewportSize.height),
+    );
+    final sceneBounds = Offset.zero & sceneSize;
+    return Rect.fromPoints(
+      topLeft,
+      bottomRight,
+    ).inflate(120).intersect(sceneBounds);
+  } catch (_) {
+    return Offset.zero & sceneSize;
+  }
+}
+
+Rect _boundsForPoints(List<Offset> points) {
+  if (points.isEmpty) {
+    return Rect.zero;
+  }
+  var left = points.first.dx;
+  var right = points.first.dx;
+  var top = points.first.dy;
+  var bottom = points.first.dy;
+  for (final point in points.skip(1)) {
+    left = min(left, point.dx);
+    right = max(right, point.dx);
+    top = min(top, point.dy);
+    bottom = max(bottom, point.dy);
+  }
+  return Rect.fromLTRB(left, top, right, bottom);
+}
+
+int _monthSpan(DateTime start, DateTime end) {
+  return ((end.year - start.year) * 12) + end.month - start.month + 1;
+}
+
+double _xForDate(
+  DateTime date, {
+  required DateTime periodStart,
+  required DateTime periodEnd,
+  required double leftRailWidth,
+  required double axisWidth,
+}) {
+  final totalDays = max(1, periodEnd.difference(periodStart).inDays);
+  final clamped = date.isBefore(periodStart)
+      ? periodStart
+      : date.isAfter(periodEnd)
+      ? periodEnd
+      : date;
+  final dayOffset = clamped.difference(periodStart).inDays;
+  return leftRailWidth + (dayOffset / totalDays) * axisWidth;
+}
+
+List<_NetworkTimelineMonthTick> _timelineMonthTicks(
+  DateTime start,
+  DateTime end, {
+  required double leftRailWidth,
+  required double axisWidth,
+}) {
+  final first = DateTime(start.year, start.month);
+  final ticks = <_NetworkTimelineMonthTick>[];
+  var cursor = first;
+  while (!cursor.isAfter(end)) {
+    ticks.add(
+      _NetworkTimelineMonthTick(
+        date: cursor,
+        x: _xForDate(
+          cursor,
+          periodStart: start,
+          periodEnd: end,
+          leftRailWidth: leftRailWidth,
+          axisWidth: axisWidth,
+        ),
+      ),
+    );
+    cursor = _addMonths(cursor, 1);
+  }
+  return ticks;
+}
+
+String _timelineMonthLabel(DateTime date, {required bool showYear}) {
+  final month = switch (date.month) {
+    1 => 'Jan',
+    2 => 'Fev',
+    3 => 'Mar',
+    4 => 'Abr',
+    5 => 'Mai',
+    6 => 'Jun',
+    7 => 'Jul',
+    8 => 'Ago',
+    9 => 'Set',
+    10 => 'Out',
+    11 => 'Nov',
+    _ => 'Dez',
+  };
+  return showYear ? '$month ${date.year}' : month;
+}
+
+void _paintText(
+  Canvas canvas,
+  String text,
+  Offset offset, {
+  required double maxWidth,
+  required TextStyle style,
+}) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    maxLines: 1,
+    ellipsis: '...',
+    textDirection: TextDirection.ltr,
+    textScaler: TextScaler.noScaling,
+  )..layout(maxWidth: max(1, maxWidth));
+  painter.paint(canvas, offset);
+}
+
+void _paintIcon(Canvas canvas, IconData icon, Offset offset, Color color) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: String.fromCharCode(icon.codePoint),
+      style: TextStyle(
+        fontFamily: icon.fontFamily,
+        package: icon.fontPackage,
+        color: color,
+        fontSize: 16,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+    textScaler: TextScaler.noScaling,
+  )..layout();
+  painter.paint(canvas, offset);
+}
+
+Color _timelineStatusColor(String status) {
+  return switch (_normalizeNetworkText(status)) {
+    'active' || 'ativo' => _tealColor,
+    'expired' || 'historical' || 'inactive' || 'encerrado' => _amberColor,
+    'dismissed' || 'suspended' || 'blocked' => _roseColor,
+    _ => _slateColor,
+  };
+}
+
+Color _timelineEventColor(String eventType) {
+  return switch (eventType) {
+    'admission' => _tealColor,
+    'move' => _amberColor,
+    'dismissal' => _roseColor,
+    'calendar_entry' => _slateColor,
+    'timeline_record' => _deepTealColor,
+    _ => _slateColor,
+  };
+}
+
+String _timelineDetailTitle(
+  _NetworkTimelineSelection? selection,
+  _NetworkTimelinePayload payload,
+) {
+  if (selection == null) {
+    return 'Detalhes da timeline';
+  }
+
+  return switch (selection.kind) {
+    _NetworkTimelineSelectionKind.contract =>
+      payload.contractByPublicId(selection.publicId)?.displayName ?? 'Contrato',
+    _NetworkTimelineSelectionKind.position =>
+      payload.positionByPublicId(selection.publicId)?.displayName ?? 'Posto',
+    _NetworkTimelineSelectionKind.collaborator =>
+      _timelineCollaboratorByEmploymentLink(
+            payload,
+            selection.publicId,
+          )?.personName ??
+          'Colaborador',
+    _NetworkTimelineSelectionKind.event =>
+      payload.eventByPublicId(selection.publicId)?.label ?? 'Evento',
+  };
+}
+
+_NetworkTimelineSegment? _timelineSegmentByEmploymentLink(
+  _NetworkTimelinePayload payload,
+  String employmentLinkPublicId,
+) {
+  for (final collaborator in payload.collaborators) {
+    for (final segment in collaborator.segments) {
+      if (segment.employmentLinkPublicId == employmentLinkPublicId) {
+        return segment;
+      }
+    }
+  }
+  return null;
+}
+
+_NetworkTimelineCollaborator? _timelineCollaboratorBySegment(
+  _NetworkTimelinePayload payload,
+  _NetworkTimelineSegment segment,
+) {
+  for (final collaborator in payload.collaborators) {
+    if (collaborator.segments.contains(segment)) {
+      return collaborator;
+    }
+  }
+  return null;
+}
+
+_NetworkTimelineCollaborator? _timelineCollaboratorByEmploymentLink(
+  _NetworkTimelinePayload payload,
+  String employmentLinkPublicId,
+) {
+  final segment = _timelineSegmentByEmploymentLink(
+    payload,
+    employmentLinkPublicId,
+  );
+  if (segment == null) {
+    return null;
+  }
+  return _timelineCollaboratorBySegment(payload, segment);
 }
 
 String _initialsFor(String name) {
