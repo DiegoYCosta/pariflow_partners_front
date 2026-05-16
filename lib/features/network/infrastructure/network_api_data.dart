@@ -53,6 +53,42 @@ class _NetworkApiRepository {
 
     return _NetworkGraphPayload.fromMap(data);
   }
+
+  Future<_NetworkTimelinePayload> loadTimeline({
+    required String periodPreset,
+    required Iterable<String> rootCompanyPublicIds,
+    required Iterable<String> clientCompanyPublicIds,
+    required Iterable<String> contractStatuses,
+    required Iterable<String> employeeStatuses,
+    required bool includeHistorical,
+    required String search,
+    required String focusCompanyPublicId,
+    required String focusCompanyType,
+  }) async {
+    await _apiClient.ensureDevelopmentSession();
+    final data = await _apiClient.getMap(
+      'network/timeline',
+      query: {
+        'periodPreset': periodPreset,
+        'rootCompanyPublicIds': _networkQueryList(rootCompanyPublicIds),
+        'clientCompanyPublicIds': _networkQueryList(clientCompanyPublicIds),
+        'contractStatuses': _networkQueryList(contractStatuses),
+        'employeeStatuses': _networkQueryList(employeeStatuses),
+        'includeHistorical': '$includeHistorical',
+        'includeMoves': 'true',
+        'includeOperationalEvents': 'true',
+        'search': search.trim().isEmpty ? null : search.trim(),
+        'focusCompanyPublicId': focusCompanyPublicId.trim().isEmpty
+            ? null
+            : focusCompanyPublicId,
+        'focusCompanyType': focusCompanyType.trim().isEmpty
+            ? null
+            : focusCompanyType,
+      },
+    );
+
+    return _NetworkTimelinePayload.fromMap(data);
+  }
 }
 
 class _NetworkRuntimeData {
@@ -124,6 +160,65 @@ class _NetworkRuntimeData {
   }
 }
 
+class _NetworkTimelineRuntimeData {
+  const _NetworkTimelineRuntimeData({
+    required this.payload,
+    required this.sourceLabel,
+    required this.isLive,
+    required this.isLoading,
+    this.errorMessage,
+  });
+
+  factory _NetworkTimelineRuntimeData.initial() {
+    return const _NetworkTimelineRuntimeData(
+      payload: _emptyNetworkTimelinePayload,
+      sourceLabel: 'aguardando timeline',
+      isLive: false,
+      isLoading: false,
+    );
+  }
+
+  factory _NetworkTimelineRuntimeData.live(_NetworkTimelinePayload payload) {
+    return _NetworkTimelineRuntimeData(
+      payload: payload,
+      sourceLabel: 'API real | /network/timeline',
+      isLive: true,
+      isLoading: false,
+    );
+  }
+
+  factory _NetworkTimelineRuntimeData.unavailable({required String message}) {
+    return _NetworkTimelineRuntimeData(
+      payload: _emptyNetworkTimelinePayload,
+      sourceLabel: 'timeline indisponivel',
+      isLive: false,
+      isLoading: false,
+      errorMessage: message,
+    );
+  }
+
+  final _NetworkTimelinePayload payload;
+  final String sourceLabel;
+  final bool isLive;
+  final bool isLoading;
+  final String? errorMessage;
+
+  _NetworkTimelineRuntimeData copyWith({
+    _NetworkTimelinePayload? payload,
+    bool? isLoading,
+    String? errorMessage,
+  }) {
+    final loading = isLoading ?? this.isLoading;
+    return _NetworkTimelineRuntimeData(
+      payload: payload ?? this.payload,
+      sourceLabel: loading ? 'sincronizando timeline' : sourceLabel,
+      isLive: isLive,
+      isLoading: loading,
+      errorMessage: loading ? null : errorMessage ?? this.errorMessage,
+    );
+  }
+}
+
 String? _networkQueryList(Iterable<String> values) {
   final normalized = values
       .map((value) => value.trim())
@@ -139,6 +234,13 @@ String _networkRuntimeErrorMessage(Object error) {
     return 'API indisponivel para Network (${error.code}). Nenhum dado mock foi carregado.';
   }
   return 'Nao foi possivel sincronizar Network com a API. Nenhum dado mock foi carregado.';
+}
+
+String _networkTimelineRuntimeErrorMessage(Object error) {
+  if (error is ApiException) {
+    return 'Timeline indisponivel (${error.code}). O grafo atual foi preservado.';
+  }
+  return 'Nao foi possivel sincronizar a timeline. O grafo atual foi preservado.';
 }
 
 const _emptyNetworkGraphPayload = _NetworkGraphPayload(
@@ -180,5 +282,20 @@ const _emptyNetworkGraphPayload = _NetworkGraphPayload(
     ],
   ),
   focus: _NetworkGraphFocus(),
+  meta: _NetworkGraphMeta(traceId: ''),
+);
+
+const _emptyNetworkTimelinePayload = _NetworkTimelinePayload(
+  period: _NetworkGraphPeriod(preset: '1y', from: '', to: ''),
+  focus: _NetworkTimelineFocus(),
+  contractsCount: 0,
+  collaboratorsCount: 0,
+  events: [],
+  currentSnapshot: _NetworkTimelineCurrentSnapshot(
+    contractsCount: 0,
+    positionsCount: 0,
+    collaboratorsCount: 0,
+  ),
+  warnings: [],
   meta: _NetworkGraphMeta(traceId: ''),
 );

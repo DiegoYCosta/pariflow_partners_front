@@ -24,6 +24,7 @@ part '../core/widgets/entity_visual_identity.dart';
 part '../shared/models/attachment_record.dart';
 part '../shared/models/entity_crud_snapshots.dart';
 part '../shared/models/network_graph_payload.dart';
+part '../shared/models/network_timeline_payload.dart';
 part '../shared/models/sensitive_note_tag.dart';
 part '../shared/models/viewer_access.dart';
 part '../core/widgets/master_detail_workspace.dart';

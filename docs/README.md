@@ -13,10 +13,12 @@ importa na realidade atual do produto.
 3. [Guia operacional, seguranca e deploy](guia-operacional-ambientes-e-funcoes.md)
 4. [Consolidacao arquitetural do front](front-architecture-consolidation.md)
 5. [Calendario, Timeline e relatorios](calendario-compartilhado-e-relatorios.md)
-6. [Contrato relacional de Network](relational-graph-contract.md)
-7. [Design system CRM](new-ui-design-system.md)
-8. [Sistema visual de cores e formas](sistema-visual-de-cores-e-formas.md)
-9. [Icones e moldes](icones-moldes.md)
+6. [Workspaces operacionais](operational-entity-workspaces.md)
+7. [Contrato relacional de Network](relational-graph-contract.md)
+8. [Network Timeline Implementation Plan](network-timeline-implementation-plan.md)
+9. [Design system CRM](new-ui-design-system.md)
+10. [Sistema visual de cores e formas](sistema-visual-de-cores-e-formas.md)
+11. [Icones e moldes](icones-moldes.md)
 
 ## Fontes de verdade
 
@@ -49,6 +51,6 @@ importa na realidade atual do produto.
 3. UX final de refresh/logout.
 4. Storage privado, step-up e download rastreavel.
 5. Persistencia backend de identidade visual.
-6. Preview de audiencia, ciencia e filtros salvos no calendario.
+6. Preview de audiencia e ciencia no calendario.
 7. Exportacao/auditoria final de relatorios.
 8. Validacao responsiva com dados reais.

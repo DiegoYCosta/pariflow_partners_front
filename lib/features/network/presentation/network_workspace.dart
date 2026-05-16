@@ -146,6 +146,8 @@ class _RelationalNetworkWorkspaceBodyState
   late final TextEditingController _searchController;
   final TransformationController _canvasController = TransformationController();
   _NetworkRuntimeData _runtimeData = _NetworkRuntimeData.initial();
+  _NetworkTimelineRuntimeData _timelineRuntimeData =
+      _NetworkTimelineRuntimeData.initial();
   late String _periodPreset;
   late Set<String> _selectedRootIds;
   late Set<String> _selectedClientIds;
@@ -237,6 +239,7 @@ class _RelationalNetworkWorkspaceBodyState
   Future<void> _loadNetworkGraph({bool resetFilters = false}) async {
     setState(() {
       _runtimeData = _runtimeData.copyWith(isLoading: true);
+      _timelineRuntimeData = _timelineRuntimeData.copyWith(isLoading: true);
     });
 
     try {
@@ -256,6 +259,28 @@ class _RelationalNetworkWorkspaceBodyState
         return;
       }
 
+      late final _NetworkTimelineRuntimeData nextTimelineRuntimeData;
+      try {
+        final timelinePayload = await _repository.loadTimeline(
+          periodPreset: _periodPreset,
+          rootCompanyPublicIds: _selectedRootIds,
+          clientCompanyPublicIds: _selectedClientIds,
+          contractStatuses: _contractStatuses,
+          employeeStatuses: _employeeStatuses,
+          includeHistorical: _includeHistorical,
+          search: _remoteNetworkSearchText(_searchController.text),
+          focusCompanyPublicId: _timelineFocusCompanyPublicId(payload),
+          focusCompanyType: _timelineFocusCompanyType(payload),
+        );
+        nextTimelineRuntimeData = _NetworkTimelineRuntimeData.live(
+          timelinePayload,
+        );
+      } catch (timelineError) {
+        nextTimelineRuntimeData = _NetworkTimelineRuntimeData.unavailable(
+          message: _networkTimelineRuntimeErrorMessage(timelineError),
+        );
+      }
+
       final nextRuntimeData = payload.nodes.isEmpty
           ? _NetworkRuntimeData.empty(
               message:
@@ -265,6 +290,7 @@ class _RelationalNetworkWorkspaceBodyState
 
       setState(() {
         _runtimeData = nextRuntimeData;
+        _timelineRuntimeData = nextTimelineRuntimeData;
         if (resetFilters) {
           _searchController.text = payload.filters.search;
           _applyPayloadDefaults(payload);
@@ -280,6 +306,9 @@ class _RelationalNetworkWorkspaceBodyState
         _runtimeData = _NetworkRuntimeData.unavailable(
           message: _networkRuntimeErrorMessage(error),
         );
+        _timelineRuntimeData = _NetworkTimelineRuntimeData.unavailable(
+          message: _networkTimelineRuntimeErrorMessage(error),
+        );
         if (resetFilters) {
           _searchController.text = _payload.filters.search;
           _applyPayloadDefaults(_payload);
@@ -287,6 +316,30 @@ class _RelationalNetworkWorkspaceBodyState
       });
       _pushHistoryState();
     }
+  }
+
+  String _timelineFocusCompanyPublicId(_NetworkGraphPayload payload) {
+    final selectedNode = payload.nodeByPublicId(widget.selectedNodeId);
+
+    if (selectedNode == null) {
+      return '';
+    }
+
+    return switch (selectedNode.lane) {
+      _NetworkGraphLane.rootCompany => selectedNode.publicId,
+      _NetworkGraphLane.clientCompany => selectedNode.publicId,
+      _ => '',
+    };
+  }
+
+  String _timelineFocusCompanyType(_NetworkGraphPayload payload) {
+    final selectedNode = payload.nodeByPublicId(widget.selectedNodeId);
+
+    return switch (selectedNode?.lane) {
+      _NetworkGraphLane.rootCompany => 'provider_company',
+      _NetworkGraphLane.clientCompany => 'client_company',
+      _ => '',
+    };
   }
 
   void _applyPayloadDefaults(_NetworkGraphPayload payload) {
@@ -877,6 +930,15 @@ class _RelationalNetworkWorkspaceBodyState
                       onRetry: () => _loadNetworkGraph(resetFilters: true),
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 14, 28, 0),
+                  child: _NetworkTimelineOverview(
+                    payload: _timelineRuntimeData.payload,
+                    sourceLabel: _timelineRuntimeData.sourceLabel,
+                    isLoading: _timelineRuntimeData.isLoading,
+                    errorMessage: _timelineRuntimeData.errorMessage,
+                  ),
+                ),
                 Expanded(
                   child: wide
                       ? Row(
@@ -1431,6 +1493,242 @@ class _RelationalNetworkWorkspaceBodyState
             .length >=
         8;
   }
+}
+
+class _NetworkTimelineOverview extends StatelessWidget {
+  const _NetworkTimelineOverview({
+    required this.payload,
+    required this.sourceLabel,
+    required this.isLoading,
+    required this.errorMessage,
+  });
+
+  final _NetworkTimelinePayload payload;
+  final String sourceLabel;
+  final bool isLoading;
+  final String? errorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final recentEvents = payload.events.reversed.take(4).toList();
+    final focusLabel = payload.focus.displayName;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFCFA),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _lineColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 900;
+            final header = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.timeline_outlined,
+                      color: _deepTealColor,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        focusLabel == null
+                            ? 'Linha do tempo relacional'
+                            : 'Linha do tempo: $focusLabel',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: _inkColor,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                    ),
+                    if (isLoading)
+                      const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _RelationalMetricPill(
+                      icon: Icons.event_note_outlined,
+                      label: '${payload.events.length} eventos',
+                    ),
+                    _RelationalMetricPill(
+                      icon: Icons.description_outlined,
+                      label:
+                          '${payload.currentSnapshot.contractsCount} contratos ativos',
+                    ),
+                    _RelationalMetricPill(
+                      icon: Icons.work_outline_rounded,
+                      label:
+                          '${payload.currentSnapshot.positionsCount} postos ativos',
+                    ),
+                    _RelationalMetricPill(
+                      icon: Icons.badge_outlined,
+                      label:
+                          '${payload.currentSnapshot.collaboratorsCount} colaboradores ativos',
+                    ),
+                    if (payload.warnings.isNotEmpty)
+                      _RelationalMetricPill(
+                        icon: Icons.warning_amber_rounded,
+                        label: '${payload.warnings.length} alertas',
+                      ),
+                  ],
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    errorMessage!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _roseColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '$sourceLabel | ${payload.period.from} a ${payload.period.to}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _mutedColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            );
+            final events = recentEvents.isEmpty
+                ? Text(
+                    'Sem eventos no recorte atual.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _mutedColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (final event in recentEvents)
+                        _NetworkTimelineEventRow(event: event),
+                    ],
+                  );
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [header, const SizedBox(height: 14), events],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 420, child: header),
+                const SizedBox(width: 18),
+                Expanded(child: events),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkTimelineEventRow extends StatelessWidget {
+  const _NetworkTimelineEventRow({required this.event});
+
+  final _NetworkTimelineEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondary = event.linkedEntities.isEmpty
+        ? event.source
+        : event.linkedEntities.first.labelSnapshot;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _tealColor.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _tealColor.withValues(alpha: 0.20)),
+            ),
+            child: Icon(
+              _timelineEventIcon(event.eventType),
+              color: _deepTealColor,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inkColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  secondary,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _mutedColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            event.occurredAt ?? '',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: _slateColor,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _timelineEventIcon(String eventType) {
+  return switch (eventType) {
+    'admission' => Icons.login_rounded,
+    'move' => Icons.swap_horiz_rounded,
+    'dismissal' => Icons.logout_rounded,
+    'calendar_entry' => Icons.event_available_outlined,
+    'timeline_record' => Icons.edit_note_outlined,
+    _ => Icons.timeline_outlined,
+  };
 }
 
 class _NetworkRuntimeNotice extends StatelessWidget {
