@@ -1,6 +1,6 @@
 ﻿# Documentacao do Front
 
-Data de referencia: `2026-05-14`.
+Data de referencia: `2026-07-09`.
 
 Esta pasta consolida a documentacao viva do front Flutter. Ela reduz duplicacao
 entre documentos externos e o repositorio, mantendo um indice direto para o que
@@ -39,7 +39,7 @@ importa na realidade atual do produto.
 | Focus Board | persistente, acoplavel/desacoplavel, alimentada pela API |
 | Timeline | calendario operacional com agenda, dias nao uteis e registros |
 | Relatorios | central integrada a `POST /api/v1/relatorios/executar` |
-| Network | grafo real via `GET /api/v1/network/graph` |
+| Network | grafo relacional via `GET /api/v1/network/graph`; Timeline e Atual via `GET /api/v1/network/timeline` |
 | Auth | Firebase real em host publico; `dev-token` so local |
 | Perfil | `GET/PATCH /auth/me`, preferencias, calendario e onboarding interno |
 | Mocks | fora do runtime real e do bundle publicado |
