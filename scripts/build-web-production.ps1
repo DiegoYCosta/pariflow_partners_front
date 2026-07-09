@@ -1,5 +1,5 @@
 param(
-  [string]$ApiBaseUrl = "https://pariflowpartners.com.br/api/v1",
+  [string]$ApiBaseUrl = "http://pariflowpartners.com.br/api/v1",
   [string]$EnvFile = ".env.front.preview"
 )
 

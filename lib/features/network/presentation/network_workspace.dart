@@ -1739,7 +1739,7 @@ class _NetworkModeSwitcher extends StatelessWidget {
   }
 }
 
-class _NetworkTimelineCanvasSection extends StatelessWidget {
+class _NetworkTimelineCanvasSection extends StatefulWidget {
   const _NetworkTimelineCanvasSection({
     required this.payload,
     required this.runtimeData,
@@ -1763,24 +1763,56 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
+  State<_NetworkTimelineCanvasSection> createState() =>
+      _NetworkTimelineCanvasSectionState();
+}
+
+class _NetworkTimelineCanvasSectionState
+    extends State<_NetworkTimelineCanvasSection> {
+  _NetworkTimelinePayload? _cachedLayoutPayload;
+  double? _cachedLayoutViewportWidth;
+  _NetworkTimelineCanvasLayout? _cachedLayout;
+
+  _NetworkTimelineCanvasLayout _layoutFor(
+    _NetworkTimelinePayload payload,
+    double viewportWidth,
+  ) {
+    final cachedLayout = _cachedLayout;
+    if (cachedLayout != null &&
+        identical(_cachedLayoutPayload, payload) &&
+        _cachedLayoutViewportWidth == viewportWidth) {
+      return cachedLayout;
+    }
+
+    final layout = _NetworkTimelineCanvasLayout.compute(
+      payload: payload,
+      viewportWidth: viewportWidth,
+    );
+    _cachedLayoutPayload = payload;
+    _cachedLayoutViewportWidth = viewportWidth;
+    _cachedLayout = layout;
+    return layout;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!runtimeData.isLoading &&
-        !runtimeData.isLive &&
-        runtimeData.errorMessage != null) {
+    if (!widget.runtimeData.isLoading &&
+        !widget.runtimeData.isLive &&
+        widget.runtimeData.errorMessage != null) {
       return _NetworkTimelineStateNotice(
         icon: Icons.cloud_off_outlined,
         title: 'Timeline indisponivel',
-        message: runtimeData.errorMessage!,
+        message: widget.runtimeData.errorMessage!,
         actionLabel: 'Tentar novamente',
-        onAction: onRetry,
+        onAction: widget.onRetry,
       );
     }
 
     final hasTimelineData =
-        payload.contracts.isNotEmpty ||
-        payload.collaborators.isNotEmpty ||
-        payload.events.isNotEmpty;
-    if (!runtimeData.isLoading && !hasTimelineData) {
+        widget.payload.contracts.isNotEmpty ||
+        widget.payload.collaborators.isNotEmpty ||
+        widget.payload.events.isNotEmpty;
+    if (!widget.runtimeData.isLoading && !hasTimelineData) {
       return const _NetworkTimelineStateNotice(
         icon: Icons.timeline_outlined,
         title: 'Sem dados de timeline',
@@ -1795,14 +1827,11 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
             ? max(560.0, constraints.maxHeight)
             : 640.0;
         final viewportSize = Size(max(1, constraints.maxWidth), viewportHeight);
-        onViewportChanged(viewportSize);
+        widget.onViewportChanged(viewportSize);
 
-        final layout = _NetworkTimelineCanvasLayout.compute(
-          payload: payload,
-          viewportWidth: viewportSize.width,
-        );
+        final layout = _layoutFor(widget.payload, viewportSize.width);
         final visibleSceneRect = _visibleTimelineSceneRect(
-          controller.value,
+          widget.controller.value,
           viewportSize,
           Size(layout.sceneWidth, layout.sceneHeight),
         );
@@ -1817,7 +1846,7 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
                     child: InteractiveViewer(
-                      transformationController: controller,
+                      transformationController: widget.controller,
                       constrained: false,
                       boundaryMargin: const EdgeInsets.all(620),
                       minScale:
@@ -1829,20 +1858,22 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
                       panEnabled: true,
                       scaleEnabled: true,
                       clipBehavior: Clip.none,
-                      onInteractionUpdate: (_) => onInteractionUpdate(),
-                      onInteractionEnd: (_) => onInteractionEnd(),
+                      onInteractionUpdate: (_) => widget.onInteractionUpdate(),
+                      onInteractionEnd: (_) => widget.onInteractionEnd(),
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTapUp: (details) {
-                          onSelectItem(layout.hitTest(details.localPosition));
+                          widget.onSelectItem(
+                            layout.hitTest(details.localPosition),
+                          );
                         },
                         child: RepaintBoundary(
                           child: CustomPaint(
                             size: Size(layout.sceneWidth, layout.sceneHeight),
                             painter: _NetworkTimelineCanvasPainter(
-                              payload: payload,
+                              payload: widget.payload,
                               layout: layout,
-                              selectedItem: selectedItem,
+                              selectedItem: widget.selectedItem,
                               visibleSceneRect: visibleSceneRect,
                             ),
                           ),
@@ -1860,16 +1891,16 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
                     onBackTap: () {},
                     onForwardTap: () {},
                     onCenterTap: () {
-                      controller.value = Matrix4.identity();
-                      onInteractionEnd();
+                      widget.controller.value = Matrix4.identity();
+                      widget.onInteractionEnd();
                     },
                     onResetTap: () {
-                      controller.value = Matrix4.identity();
-                      onInteractionEnd();
+                      widget.controller.value = Matrix4.identity();
+                      widget.onInteractionEnd();
                     },
                   ),
                 ),
-                if (runtimeData.isLoading)
+                if (widget.runtimeData.isLoading)
                   const Positioned(
                     right: 24,
                     top: 20,
@@ -9572,6 +9603,106 @@ Rect _boundsForPoints(List<Offset> points) {
     right = max(right, point.dx);
     top = min(top, point.dy);
     bottom = max(bottom, point.dy);
+  }
+  return Rect.fromLTRB(left, top, right, bottom);
+}
+
+@visibleForTesting
+Map<String, Object?> debugNetworkTimelineCullingSummary(
+  Map<String, dynamic> map, {
+  double viewportWidth = 1366,
+  double visibleLeft = 0,
+  double visibleTop = 0,
+  double visibleWidth = 1366,
+  double visibleHeight = 900,
+}) {
+  final payload = _NetworkTimelinePayload.fromMap(map);
+  final layout = _NetworkTimelineCanvasLayout.compute(
+    payload: payload,
+    viewportWidth: viewportWidth,
+  );
+  final visibleSceneRect = _clampedTimelineRect(
+    Rect.fromLTWH(visibleLeft, visibleTop, visibleWidth, visibleHeight),
+    Size(layout.sceneWidth, layout.sceneHeight),
+  );
+
+  final totalPositions = payload.contracts.fold<int>(
+    0,
+    (total, contract) => total + contract.positions.length,
+  );
+  final totalAllocations = payload.contracts.fold<int>(
+    0,
+    (total, contract) =>
+        total +
+        contract.positions.fold<int>(
+          0,
+          (positionTotal, position) =>
+              positionTotal + position.allocations.length,
+        ),
+  );
+  final totalStructuredMoves = payload.events.where((event) {
+    return event.eventType == 'move' && event.hasStructuredMove;
+  }).length;
+
+  bool isVisible(Rect rect) => rect.overlaps(visibleSceneRect);
+
+  var visibleStructuredMoves = 0;
+  for (final event in payload.events) {
+    if (event.eventType != 'move' || !event.hasStructuredMove) {
+      continue;
+    }
+    final originRect = layout.positionRects[event.originPositionPublicId];
+    final destinationRect =
+        layout.positionRects[event.destinationPositionPublicId];
+    final eventRect = layout.eventRects[event.publicId];
+    if (originRect == null || destinationRect == null || eventRect == null) {
+      continue;
+    }
+    final bounds = _boundsForPoints([
+      originRect.center,
+      eventRect.center,
+      destinationRect.center,
+    ]).inflate(36);
+    if (isVisible(bounds)) {
+      visibleStructuredMoves++;
+    }
+  }
+
+  return {
+    'sceneWidth': layout.sceneWidth,
+    'sceneHeight': layout.sceneHeight,
+    'totalContracts': payload.contracts.length,
+    'totalPositions': totalPositions,
+    'totalAllocations': totalAllocations,
+    'totalEvents': payload.events.length,
+    'totalStructuredMoves': totalStructuredMoves,
+    'visibleContracts': layout.contractRects.values.where(isVisible).length,
+    'visiblePositions': layout.positionRects.values.where(isVisible).length,
+    'visibleAllocations': layout.allocationRects.values.where(isVisible).length,
+    'visibleEvents': layout.eventRects.values
+        .where((rect) => isVisible(rect.inflate(18)))
+        .length,
+    'visibleStructuredMoves': visibleStructuredMoves,
+    'visibleRowLabels': layout.rowLabels.where((row) {
+      return row.top >= visibleSceneRect.top - 48 &&
+          row.top <= visibleSceneRect.bottom + 48;
+    }).length,
+    'visibleMonthTicks': layout.monthTicks.where((tick) {
+      return tick.x >= visibleSceneRect.left - 80 &&
+          tick.x <= visibleSceneRect.right + 80;
+    }).length,
+  };
+}
+
+Rect _clampedTimelineRect(Rect rect, Size sceneSize) {
+  final scene = Offset.zero & sceneSize;
+  final left = rect.left.clamp(scene.left, scene.right).toDouble();
+  final top = rect.top.clamp(scene.top, scene.bottom).toDouble();
+  final right = rect.right.clamp(scene.left, scene.right).toDouble();
+  final bottom = rect.bottom.clamp(scene.top, scene.bottom).toDouble();
+
+  if (right <= left || bottom <= top) {
+    return Rect.fromLTWH(left, top, 0, 0);
   }
   return Rect.fromLTRB(left, top, right, bottom);
 }

@@ -356,6 +356,18 @@ Painel lateral:
 - Rodar analyze/test/build web.
 - Smoke manual do grafo relacional atual.
 
+Status em `2026-07-09`:
+
+- culling por viewport existe no painter para ticks, labels, barras, eventos e
+  conexoes estruturadas;
+- teste automatizado `network_timeline_payload_test.dart` valida layout e
+  culling com 120 contratos, 500 postos, 3000 alocacoes e movimentos
+  estruturados;
+- smoke externo sem token valida que `/network/graph` e `/network/timeline`
+  continuam publicados e protegidos;
+- ainda falta smoke autenticado visual com dados reais e medicao manual de
+  fluidez em navegador.
+
 ## Testes obrigatorios
 
 Flutter:

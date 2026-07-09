@@ -63,6 +63,10 @@ Front local contra AWS por proxy:
 .\scripts\run-web-online.ps1
 ```
 
+Use esse caminho para teste local contra a API online. Servir `build\web`
+direto em `127.0.0.1` pode bater em CORS/cookie; o proxy local preserva o
+comportamento esperado de autenticacao.
+
 Build web release:
 
 ```powershell

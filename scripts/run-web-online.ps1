@@ -1,7 +1,7 @@
 param(
   [string]$WebPort = "8082",
   [string]$ProxyPort = "3002",
-  [string]$ProxyTarget = "https://pariflowpartners.com.br",
+  [string]$ProxyTarget = "http://pariflowpartners.com.br",
   [string]$EnvFile = ".env.front.preview",
   [switch]$UseDevToken
 )
@@ -67,6 +67,15 @@ if (-not $proxyCheck) {
   $env:PARIFLOW_PROXY_HOST = '127.0.0.1'
   $proxyArgs = @('.\scripts\dev-api-proxy.cjs')
   Start-Process -FilePath 'node.exe' -ArgumentList $proxyArgs -WorkingDirectory (Get-Location) -WindowStyle Hidden -RedirectStandardOutput $proxyOut -RedirectStandardError $proxyErr
+} else {
+  try {
+    $proxyStatus = Invoke-RestMethod -Uri "http://127.0.0.1:$ProxyPort/__pariflow_dev_proxy" -TimeoutSec 3
+    if ($proxyStatus.target -ne $ProxyTarget) {
+      throw "Proxy atual aponta para $($proxyStatus.target), mas este comando pediu $ProxyTarget."
+    }
+  } catch {
+    throw "A porta $ProxyPort ja esta em uso por outro processo ou por um proxy antigo. Encerre esse processo ou informe outra porta com -ProxyPort."
+  }
 }
 
 for ($i = 0; $i -lt 30; $i++) {

@@ -68,6 +68,10 @@ mas os documentos operacionais tambem estao em `PariFlow Partners - Front/docs`.
 .\scripts\run-web-online.ps1
 ```
 
+Esse e o caminho recomendado para testar localmente contra a API online: o
+proxy local evita CORS direto entre `127.0.0.1` e o dominio publico e mantem o
+refresh por cookie HttpOnly no fluxo suportado pelo navegador.
+
 - Para build web de producao:
 
 ```powershell
