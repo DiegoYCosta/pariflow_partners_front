@@ -56,11 +56,14 @@ class _NetworkApiRepository {
 
   Future<_NetworkTimelinePayload> loadTimeline({
     required String periodPreset,
+    required DateTimeRange? customPeriod,
     required Iterable<String> rootCompanyPublicIds,
     required Iterable<String> clientCompanyPublicIds,
     required Iterable<String> contractStatuses,
     required Iterable<String> employeeStatuses,
     required bool includeHistorical,
+    required bool includeMoves,
+    required bool includeOperationalEvents,
     required String search,
     required String focusCompanyPublicId,
     required String focusCompanyType,
@@ -70,13 +73,15 @@ class _NetworkApiRepository {
       'network/timeline',
       query: {
         'periodPreset': periodPreset,
+        'from': _formatNetworkDateInput(customPeriod?.start),
+        'to': _formatNetworkDateInput(customPeriod?.end),
         'rootCompanyPublicIds': _networkQueryList(rootCompanyPublicIds),
         'clientCompanyPublicIds': _networkQueryList(clientCompanyPublicIds),
         'contractStatuses': _networkQueryList(contractStatuses),
         'employeeStatuses': _networkQueryList(employeeStatuses),
         'includeHistorical': '$includeHistorical',
-        'includeMoves': 'true',
-        'includeOperationalEvents': 'true',
+        'includeMoves': '$includeMoves',
+        'includeOperationalEvents': '$includeOperationalEvents',
         'search': search.trim().isEmpty ? null : search.trim(),
         'focusCompanyPublicId': focusCompanyPublicId.trim().isEmpty
             ? null

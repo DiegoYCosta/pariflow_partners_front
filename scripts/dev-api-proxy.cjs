@@ -1,11 +1,17 @@
 const http = require('http');
 const https = require('https');
 
-const target = process.env.PARIFLOW_PROXY_TARGET || 'https://pariflowpartners.com.br';
+const target = process.env.PARIFLOW_PROXY_TARGET || 'http://pariflowpartners.com.br';
 const port = Number(process.env.PARIFLOW_PROXY_PORT || 3002);
 const host = process.env.PARIFLOW_PROXY_HOST || '127.0.0.1';
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/__pariflow_dev_proxy') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ target, port, host }));
+    return;
+  }
+
   const origin = req.headers.origin || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin, Access-Control-Request-Headers');

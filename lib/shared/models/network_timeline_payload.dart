@@ -627,3 +627,47 @@ int _networkTimelineInt(Map<String, dynamic> map, String key) {
   }
   return int.tryParse('${value ?? ''}') ?? 0;
 }
+
+@visibleForTesting
+Map<String, Object?> debugNetworkTimelinePayloadSummary(
+  Map<String, dynamic> map,
+) {
+  final payload = _NetworkTimelinePayload.fromMap(map);
+  final positionsCount = payload.contracts.fold<int>(
+    0,
+    (total, contract) => total + contract.positions.length,
+  );
+  final allocationsCount = payload.contracts.fold<int>(
+    0,
+    (total, contract) =>
+        total +
+        contract.positions.fold<int>(
+          0,
+          (positionTotal, position) =>
+              positionTotal + position.allocations.length,
+        ),
+  );
+  final moveEvent = payload.events.where((event) => event.eventType == 'move');
+
+  return {
+    'periodPreset': payload.period.preset,
+    'periodFrom': payload.period.from,
+    'periodTo': payload.period.to,
+    'contractsCount': payload.contractsCount,
+    'positionsCount': positionsCount,
+    'allocationsCount': allocationsCount,
+    'collaboratorsCount': payload.collaboratorsCount,
+    'eventsCount': payload.events.length,
+    'snapshotContractsCount': payload.currentSnapshot.contractsCount,
+    'snapshotPositionsCount': payload.currentSnapshot.positionsCount,
+    'snapshotCollaboratorsCount': payload.currentSnapshot.collaboratorsCount,
+    'warningsCount': payload.warnings.length,
+    'firstWarningCode': payload.warnings.isEmpty
+        ? null
+        : payload.warnings.first.code,
+    'firstMoveHasStructuredLink': moveEvent.isEmpty
+        ? null
+        : moveEvent.first.hasStructuredMove,
+    'metaTraceId': payload.meta.traceId,
+  };
+}

@@ -1,6 +1,6 @@
 param(
   [string]$DeviceId,
-  [string]$ApiBaseUrl = "https://pariflowpartners.com.br/api/v1"
+  [string]$ApiBaseUrl = "http://pariflowpartners.com.br/api/v1"
 )
 
 $ErrorActionPreference = "Stop"

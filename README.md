@@ -2,7 +2,7 @@
 
 Frontend Flutter do PariFlow Partners com alvo Web, Android e iOS.
 
-Data de referencia: `2026-05-14`.
+Data de referencia: `2026-07-09`.
 
 ## Estado atual
 
@@ -28,7 +28,7 @@ backend. Dados mock/sample nao entram no runtime real nem no bundle publicado.
 | Focus Board | hub persistente acoplado/desacoplado com dados da API |
 | Timeline | calendario mensal operacional com timeline, agenda e dias nao uteis |
 | Reports | catalogo e execucao real via `POST /api/v1/relatorios/executar` |
-| Network | grafo real via `GET /api/v1/network/graph` |
+| Network | grafo relacional via `GET /api/v1/network/graph` e modos Timeline/Atual via `GET /api/v1/network/timeline` |
 | Perfil/configuracoes | `GET/PATCH /auth/me`, calendario, contatos e onboarding interno |
 | Identidade visual | marcadores, badges, chips, picker e cache local por `shared_preferences` |
 
@@ -40,6 +40,7 @@ backend. Dados mock/sample nao entram no runtime real nem no bundle publicado.
 - [Consolidacao arquitetural do front](docs/front-architecture-consolidation.md)
 - [Calendario, Timeline e relatorios](docs/calendario-compartilhado-e-relatorios.md)
 - [Contrato relacional de Network](docs/relational-graph-contract.md)
+- [Network Timeline Implementation Plan](docs/network-timeline-implementation-plan.md)
 - [Design system CRM](docs/new-ui-design-system.md)
 - [Sistema visual de cores e formas](docs/sistema-visual-de-cores-e-formas.md)
 - [Icones e moldes](docs/icones-moldes.md)
@@ -66,6 +67,10 @@ mas os documentos operacionais tambem estao em `PariFlow Partners - Front/docs`.
 ```powershell
 .\scripts\run-web-online.ps1
 ```
+
+Esse e o caminho recomendado para testar localmente contra a API online: o
+proxy local evita CORS direto entre `127.0.0.1` e o dominio publico e mantem o
+refresh por cookie HttpOnly no fluxo suportado pelo navegador.
 
 - Para build web de producao:
 

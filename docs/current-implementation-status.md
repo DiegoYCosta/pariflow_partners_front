@@ -1,6 +1,6 @@
 ﻿# Estado Atual e Proximos Passos
 
-Data de referencia: `2026-05-14`.
+Data de referencia: `2026-07-09`.
 
 O projeto ja tem front e backend integrados nos modulos operacionais centrais.
 A fase atual nao e criar shell, CRUD basico, People, Network ou agenda. A fase
@@ -20,7 +20,7 @@ acabamento operacional.
 | Focus Board | hub persistente, desacoplavel, agenda e anexos auditaveis | responsividade mobile/tablet |
 | Timeline | calendario mensal com timeline, agenda, dias nao uteis e filtros salvos | UX de audiencia |
 | Relatorios | catalogo e execucao real de templates suportados | exportacao/auditoria final |
-| Network | consome `GET /network/graph` | performance, ACL fina e acabamento visual |
+| Network | consome `GET /network/graph` e `GET /network/timeline` com modos Relacional, Timeline e Atual | performance, ACL fina, validacao visual e volume real |
 | Auth | Firebase Web, refresh/logout no cliente, onboarding publico e seletor multiempresa | usuarios reais e smoke online |
 | Identidade visual | gerador, componentes, picker e cache local | persistencia backend |
 
@@ -36,7 +36,7 @@ acabamento operacional.
 | Timeline | CRUD de registros com vinculos e filtros salvos | relatorios derivados |
 | Agenda | compromissos, lembretes, `NOTICE`, dias nao uteis e aplicabilidade | preview de audiencia e ciencia |
 | Relatorios | templates suportados, metadata e CSV | modelos persistidos, exportacao final e jobs |
-| Network | grafo relacional ativo | volume, paginacao e ACL fina |
+| Network | grafo relacional e read model de timeline ativos | volume, paginacao e ACL fina |
 | AWS | homologacao por IP com Apache/PM2/MySQL | dominio, HTTPS e backups |
 
 ## O que saiu do backlog

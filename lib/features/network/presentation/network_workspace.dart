@@ -196,6 +196,9 @@ class _RelationalNetworkWorkspaceBodyState
   late Set<String> _selectedPositions;
   late bool _includeHistorical;
   late bool _includeIndirect;
+  bool _includeTimelineMoves = true;
+  bool _includeTimelineOperationalEvents = true;
+  DateTimeRange? _timelineDateRange;
   _NetworkTenurePreset? _selectedTenurePreset;
   RangeValues? _customTenureYears;
   _NetworkHireDateRange? _hireDateRange;
@@ -268,6 +271,7 @@ class _RelationalNetworkWorkspaceBodyState
   void _setPeriodPreset(String preset) {
     setState(() {
       _periodPreset = preset;
+      _timelineDateRange = null;
       if (preset == '6m') {
         _includeHistorical = false;
       } else if (preset == '1y') {
@@ -304,11 +308,14 @@ class _RelationalNetworkWorkspaceBodyState
       try {
         final timelinePayload = await _repository.loadTimeline(
           periodPreset: _periodPreset,
+          customPeriod: _timelineDateRange,
           rootCompanyPublicIds: _selectedRootIds,
           clientCompanyPublicIds: _selectedClientIds,
           contractStatuses: _contractStatuses,
           employeeStatuses: _employeeStatuses,
           includeHistorical: _includeHistorical,
+          includeMoves: _includeTimelineMoves,
+          includeOperationalEvents: _includeTimelineOperationalEvents,
           search: _remoteNetworkSearchText(_searchController.text),
           focusCompanyPublicId: _timelineFocusCompanyPublicId(payload),
           focusCompanyType: _timelineFocusCompanyType(payload),
@@ -393,6 +400,9 @@ class _RelationalNetworkWorkspaceBodyState
     _selectedPositions = {};
     _includeHistorical = payload.filters.applied.includeHistorical;
     _includeIndirect = payload.filters.applied.includeIndirect;
+    _includeTimelineMoves = true;
+    _includeTimelineOperationalEvents = true;
+    _timelineDateRange = null;
     _selectedTenurePreset = null;
     _customTenureYears = null;
     _hireDateRange = null;
@@ -560,6 +570,39 @@ class _RelationalNetworkWorkspaceBodyState
     _pushHistoryState();
   }
 
+  void _applyTimelineDateRange(DateTimeRange? range) {
+    setState(() {
+      _timelineDateRange = range;
+      _timelineSelection = null;
+    });
+    _pushHistoryState();
+  }
+
+  Future<void> _openTimelineDateRangePicker() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initialRange =
+        _timelineDateRange ??
+        DateTimeRange(start: _addMonths(today, -12), end: today);
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(1970),
+      lastDate: DateTime(today.year + 5, 12, 31),
+      initialDateRange: initialRange,
+      helpText: 'Intervalo da timeline',
+      saveText: 'Aplicar',
+    );
+
+    if (range != null) {
+      _applyTimelineDateRange(
+        DateTimeRange(
+          start: DateTime(range.start.year, range.start.month, range.start.day),
+          end: DateTime(range.end.year, range.end.month, range.end.day),
+        ),
+      );
+    }
+  }
+
   void _applyReportPreset(_NetworkReportPreset? preset) {
     setState(() {
       _reportPreset = preset;
@@ -587,6 +630,9 @@ class _RelationalNetworkWorkspaceBodyState
       _selectedTenurePreset = null;
       _customTenureYears = null;
       _hireDateRange = null;
+      _timelineDateRange = null;
+      _includeTimelineMoves = true;
+      _includeTimelineOperationalEvents = true;
       _reportPreset = null;
       _attentionOnly = false;
       _drillDownNodeId = null;
@@ -623,6 +669,9 @@ class _RelationalNetworkWorkspaceBodyState
       selectedPositions: _selectedPositions,
       includeHistorical: _includeHistorical,
       includeIndirect: _includeIndirect,
+      includeTimelineMoves: _includeTimelineMoves,
+      includeTimelineOperationalEvents: _includeTimelineOperationalEvents,
+      timelineDateRange: _timelineDateRange,
       selectedTenurePreset: _selectedTenurePreset,
       customTenureYears: _customTenureYears,
       hireDateRange: _hireDateRange,
@@ -677,6 +726,10 @@ class _RelationalNetworkWorkspaceBodyState
       _selectedPositions = {...entry.selectedPositions};
       _includeHistorical = entry.includeHistorical;
       _includeIndirect = entry.includeIndirect;
+      _includeTimelineMoves = entry.includeTimelineMoves;
+      _includeTimelineOperationalEvents =
+          entry.includeTimelineOperationalEvents;
+      _timelineDateRange = entry.timelineDateRange;
       _selectedTenurePreset = entry.selectedTenurePreset;
       _customTenureYears = entry.customTenureYears;
       _hireDateRange = entry.hireDateRange;
@@ -983,6 +1036,10 @@ class _RelationalNetworkWorkspaceBodyState
                       employeeStatuses: _employeeStatuses,
                       includeHistorical: _includeHistorical,
                       includeIndirect: _includeIndirect,
+                      includeTimelineMoves: _includeTimelineMoves,
+                      includeTimelineOperationalEvents:
+                          _includeTimelineOperationalEvents,
+                      timelineDateRange: _timelineDateRange,
                       onToggleRoot: (publicId) {
                         setState(() {
                           _toggleInSet(_selectedRootIds, publicId);
@@ -1019,6 +1076,22 @@ class _RelationalNetworkWorkspaceBodyState
                         });
                         _pushHistoryState();
                       },
+                      onToggleTimelineMoves: (value) {
+                        setState(() {
+                          _includeTimelineMoves = value;
+                          _timelineSelection = null;
+                        });
+                        _pushHistoryState();
+                      },
+                      onToggleTimelineOperationalEvents: (value) {
+                        setState(() {
+                          _includeTimelineOperationalEvents = value;
+                          _timelineSelection = null;
+                        });
+                        _pushHistoryState();
+                      },
+                      onPickTimelineRange: _openTimelineDateRangePicker,
+                      onClearTimelineRange: () => _applyTimelineDateRange(null),
                       onRestore: _restoreFilters,
                     ),
                   ),
@@ -1666,7 +1739,7 @@ class _NetworkModeSwitcher extends StatelessWidget {
   }
 }
 
-class _NetworkTimelineCanvasSection extends StatelessWidget {
+class _NetworkTimelineCanvasSection extends StatefulWidget {
   const _NetworkTimelineCanvasSection({
     required this.payload,
     required this.runtimeData,
@@ -1690,24 +1763,56 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
+  State<_NetworkTimelineCanvasSection> createState() =>
+      _NetworkTimelineCanvasSectionState();
+}
+
+class _NetworkTimelineCanvasSectionState
+    extends State<_NetworkTimelineCanvasSection> {
+  _NetworkTimelinePayload? _cachedLayoutPayload;
+  double? _cachedLayoutViewportWidth;
+  _NetworkTimelineCanvasLayout? _cachedLayout;
+
+  _NetworkTimelineCanvasLayout _layoutFor(
+    _NetworkTimelinePayload payload,
+    double viewportWidth,
+  ) {
+    final cachedLayout = _cachedLayout;
+    if (cachedLayout != null &&
+        identical(_cachedLayoutPayload, payload) &&
+        _cachedLayoutViewportWidth == viewportWidth) {
+      return cachedLayout;
+    }
+
+    final layout = _NetworkTimelineCanvasLayout.compute(
+      payload: payload,
+      viewportWidth: viewportWidth,
+    );
+    _cachedLayoutPayload = payload;
+    _cachedLayoutViewportWidth = viewportWidth;
+    _cachedLayout = layout;
+    return layout;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!runtimeData.isLoading &&
-        !runtimeData.isLive &&
-        runtimeData.errorMessage != null) {
+    if (!widget.runtimeData.isLoading &&
+        !widget.runtimeData.isLive &&
+        widget.runtimeData.errorMessage != null) {
       return _NetworkTimelineStateNotice(
         icon: Icons.cloud_off_outlined,
         title: 'Timeline indisponivel',
-        message: runtimeData.errorMessage!,
+        message: widget.runtimeData.errorMessage!,
         actionLabel: 'Tentar novamente',
-        onAction: onRetry,
+        onAction: widget.onRetry,
       );
     }
 
     final hasTimelineData =
-        payload.contracts.isNotEmpty ||
-        payload.collaborators.isNotEmpty ||
-        payload.events.isNotEmpty;
-    if (!runtimeData.isLoading && !hasTimelineData) {
+        widget.payload.contracts.isNotEmpty ||
+        widget.payload.collaborators.isNotEmpty ||
+        widget.payload.events.isNotEmpty;
+    if (!widget.runtimeData.isLoading && !hasTimelineData) {
       return const _NetworkTimelineStateNotice(
         icon: Icons.timeline_outlined,
         title: 'Sem dados de timeline',
@@ -1722,14 +1827,11 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
             ? max(560.0, constraints.maxHeight)
             : 640.0;
         final viewportSize = Size(max(1, constraints.maxWidth), viewportHeight);
-        onViewportChanged(viewportSize);
+        widget.onViewportChanged(viewportSize);
 
-        final layout = _NetworkTimelineCanvasLayout.compute(
-          payload: payload,
-          viewportWidth: viewportSize.width,
-        );
+        final layout = _layoutFor(widget.payload, viewportSize.width);
         final visibleSceneRect = _visibleTimelineSceneRect(
-          controller.value,
+          widget.controller.value,
           viewportSize,
           Size(layout.sceneWidth, layout.sceneHeight),
         );
@@ -1744,7 +1846,7 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
                     child: InteractiveViewer(
-                      transformationController: controller,
+                      transformationController: widget.controller,
                       constrained: false,
                       boundaryMargin: const EdgeInsets.all(620),
                       minScale:
@@ -1756,20 +1858,22 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
                       panEnabled: true,
                       scaleEnabled: true,
                       clipBehavior: Clip.none,
-                      onInteractionUpdate: (_) => onInteractionUpdate(),
-                      onInteractionEnd: (_) => onInteractionEnd(),
+                      onInteractionUpdate: (_) => widget.onInteractionUpdate(),
+                      onInteractionEnd: (_) => widget.onInteractionEnd(),
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTapUp: (details) {
-                          onSelectItem(layout.hitTest(details.localPosition));
+                          widget.onSelectItem(
+                            layout.hitTest(details.localPosition),
+                          );
                         },
                         child: RepaintBoundary(
                           child: CustomPaint(
                             size: Size(layout.sceneWidth, layout.sceneHeight),
                             painter: _NetworkTimelineCanvasPainter(
-                              payload: payload,
+                              payload: widget.payload,
                               layout: layout,
-                              selectedItem: selectedItem,
+                              selectedItem: widget.selectedItem,
                               visibleSceneRect: visibleSceneRect,
                             ),
                           ),
@@ -1787,16 +1891,16 @@ class _NetworkTimelineCanvasSection extends StatelessWidget {
                     onBackTap: () {},
                     onForwardTap: () {},
                     onCenterTap: () {
-                      controller.value = Matrix4.identity();
-                      onInteractionEnd();
+                      widget.controller.value = Matrix4.identity();
+                      widget.onInteractionEnd();
                     },
                     onResetTap: () {
-                      controller.value = Matrix4.identity();
-                      onInteractionEnd();
+                      widget.controller.value = Matrix4.identity();
+                      widget.onInteractionEnd();
                     },
                   ),
                 ),
-                if (runtimeData.isLoading)
+                if (widget.runtimeData.isLoading)
                   const Positioned(
                     right: 24,
                     top: 20,
@@ -3758,6 +3862,9 @@ class _NetworkHistoryEntry {
     required this.selectedPositions,
     required this.includeHistorical,
     required this.includeIndirect,
+    required this.includeTimelineMoves,
+    required this.includeTimelineOperationalEvents,
+    required this.timelineDateRange,
     required this.selectedTenurePreset,
     required this.customTenureYears,
     required this.hireDateRange,
@@ -3784,6 +3891,9 @@ class _NetworkHistoryEntry {
     required Set<String> selectedPositions,
     required bool includeHistorical,
     required bool includeIndirect,
+    required bool includeTimelineMoves,
+    required bool includeTimelineOperationalEvents,
+    required DateTimeRange? timelineDateRange,
     required _NetworkTenurePreset? selectedTenurePreset,
     required RangeValues? customTenureYears,
     required _NetworkHireDateRange? hireDateRange,
@@ -3809,6 +3919,14 @@ class _NetworkHistoryEntry {
       selectedPositions: {...selectedPositions},
       includeHistorical: includeHistorical,
       includeIndirect: includeIndirect,
+      includeTimelineMoves: includeTimelineMoves,
+      includeTimelineOperationalEvents: includeTimelineOperationalEvents,
+      timelineDateRange: timelineDateRange == null
+          ? null
+          : DateTimeRange(
+              start: timelineDateRange.start,
+              end: timelineDateRange.end,
+            ),
       selectedTenurePreset: selectedTenurePreset,
       customTenureYears: customTenureYears,
       hireDateRange: hireDateRange,
@@ -3835,6 +3953,9 @@ class _NetworkHistoryEntry {
   final Set<String> selectedPositions;
   final bool includeHistorical;
   final bool includeIndirect;
+  final bool includeTimelineMoves;
+  final bool includeTimelineOperationalEvents;
+  final DateTimeRange? timelineDateRange;
   final _NetworkTenurePreset? selectedTenurePreset;
   final RangeValues? customTenureYears;
   final _NetworkHireDateRange? hireDateRange;
@@ -3859,6 +3980,11 @@ class _NetworkHistoryEntry {
     _sortedSignature(selectedPositions),
     includeHistorical,
     includeIndirect,
+    includeTimelineMoves,
+    includeTimelineOperationalEvents,
+    timelineDateRange == null
+        ? ''
+        : '${_formatNetworkDateInput(timelineDateRange!.start)}-${_formatNetworkDateInput(timelineDateRange!.end)}',
     selectedTenurePreset?.name,
     customTenureYears == null
         ? ''
@@ -4208,6 +4334,13 @@ String _formatNetworkDateInput(DateTime? date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '${date.year}-$month-$day';
+}
+
+String _timelineRangeFilterLabel(DateTimeRange? range) {
+  if (range == null) {
+    return 'Intervalo customizado';
+  }
+  return '${_formatNetworkDateInput(range.start)} a ${_formatNetworkDateInput(range.end)}';
 }
 
 bool _allStatusesSelected(List<String> available, Set<String> selected) {
@@ -7818,12 +7951,19 @@ class _RelationalFilterPanel extends StatelessWidget {
     required this.employeeStatuses,
     required this.includeHistorical,
     required this.includeIndirect,
+    required this.includeTimelineMoves,
+    required this.includeTimelineOperationalEvents,
+    required this.timelineDateRange,
     required this.onToggleRoot,
     required this.onToggleClient,
     required this.onToggleContractStatus,
     required this.onToggleEmployeeStatus,
     required this.onToggleHistorical,
     required this.onToggleIndirect,
+    required this.onToggleTimelineMoves,
+    required this.onToggleTimelineOperationalEvents,
+    required this.onPickTimelineRange,
+    required this.onClearTimelineRange,
     required this.onRestore,
   });
 
@@ -7834,12 +7974,19 @@ class _RelationalFilterPanel extends StatelessWidget {
   final Set<String> employeeStatuses;
   final bool includeHistorical;
   final bool includeIndirect;
+  final bool includeTimelineMoves;
+  final bool includeTimelineOperationalEvents;
+  final DateTimeRange? timelineDateRange;
   final ValueChanged<String> onToggleRoot;
   final ValueChanged<String> onToggleClient;
   final ValueChanged<String> onToggleContractStatus;
   final ValueChanged<String> onToggleEmployeeStatus;
   final ValueChanged<bool> onToggleHistorical;
   final ValueChanged<bool> onToggleIndirect;
+  final ValueChanged<bool> onToggleTimelineMoves;
+  final ValueChanged<bool> onToggleTimelineOperationalEvents;
+  final VoidCallback onPickTimelineRange;
+  final VoidCallback onClearTimelineRange;
   final VoidCallback onRestore;
 
   @override
@@ -7933,6 +8080,34 @@ class _RelationalFilterPanel extends StatelessWidget {
                 label: const Text('Mostrar relacoes indiretas'),
                 selected: includeIndirect,
                 onSelected: onToggleIndirect,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _RelationalFilterGroup(
+            title: 'Timeline',
+            children: [
+              FilterChip(
+                label: Text(_timelineRangeFilterLabel(timelineDateRange)),
+                selected: timelineDateRange != null,
+                avatar: const Icon(Icons.date_range_outlined, size: 18),
+                onSelected: (_) => onPickTimelineRange(),
+              ),
+              if (timelineDateRange != null)
+                ActionChip(
+                  avatar: const Icon(Icons.close_rounded, size: 18),
+                  label: const Text('Limpar intervalo'),
+                  onPressed: onClearTimelineRange,
+                ),
+              FilterChip(
+                label: const Text('Movimentacoes'),
+                selected: includeTimelineMoves,
+                onSelected: onToggleTimelineMoves,
+              ),
+              FilterChip(
+                label: const Text('Eventos operacionais'),
+                selected: includeTimelineOperationalEvents,
+                onSelected: onToggleTimelineOperationalEvents,
               ),
             ],
           ),
@@ -9428,6 +9603,106 @@ Rect _boundsForPoints(List<Offset> points) {
     right = max(right, point.dx);
     top = min(top, point.dy);
     bottom = max(bottom, point.dy);
+  }
+  return Rect.fromLTRB(left, top, right, bottom);
+}
+
+@visibleForTesting
+Map<String, Object?> debugNetworkTimelineCullingSummary(
+  Map<String, dynamic> map, {
+  double viewportWidth = 1366,
+  double visibleLeft = 0,
+  double visibleTop = 0,
+  double visibleWidth = 1366,
+  double visibleHeight = 900,
+}) {
+  final payload = _NetworkTimelinePayload.fromMap(map);
+  final layout = _NetworkTimelineCanvasLayout.compute(
+    payload: payload,
+    viewportWidth: viewportWidth,
+  );
+  final visibleSceneRect = _clampedTimelineRect(
+    Rect.fromLTWH(visibleLeft, visibleTop, visibleWidth, visibleHeight),
+    Size(layout.sceneWidth, layout.sceneHeight),
+  );
+
+  final totalPositions = payload.contracts.fold<int>(
+    0,
+    (total, contract) => total + contract.positions.length,
+  );
+  final totalAllocations = payload.contracts.fold<int>(
+    0,
+    (total, contract) =>
+        total +
+        contract.positions.fold<int>(
+          0,
+          (positionTotal, position) =>
+              positionTotal + position.allocations.length,
+        ),
+  );
+  final totalStructuredMoves = payload.events.where((event) {
+    return event.eventType == 'move' && event.hasStructuredMove;
+  }).length;
+
+  bool isVisible(Rect rect) => rect.overlaps(visibleSceneRect);
+
+  var visibleStructuredMoves = 0;
+  for (final event in payload.events) {
+    if (event.eventType != 'move' || !event.hasStructuredMove) {
+      continue;
+    }
+    final originRect = layout.positionRects[event.originPositionPublicId];
+    final destinationRect =
+        layout.positionRects[event.destinationPositionPublicId];
+    final eventRect = layout.eventRects[event.publicId];
+    if (originRect == null || destinationRect == null || eventRect == null) {
+      continue;
+    }
+    final bounds = _boundsForPoints([
+      originRect.center,
+      eventRect.center,
+      destinationRect.center,
+    ]).inflate(36);
+    if (isVisible(bounds)) {
+      visibleStructuredMoves++;
+    }
+  }
+
+  return {
+    'sceneWidth': layout.sceneWidth,
+    'sceneHeight': layout.sceneHeight,
+    'totalContracts': payload.contracts.length,
+    'totalPositions': totalPositions,
+    'totalAllocations': totalAllocations,
+    'totalEvents': payload.events.length,
+    'totalStructuredMoves': totalStructuredMoves,
+    'visibleContracts': layout.contractRects.values.where(isVisible).length,
+    'visiblePositions': layout.positionRects.values.where(isVisible).length,
+    'visibleAllocations': layout.allocationRects.values.where(isVisible).length,
+    'visibleEvents': layout.eventRects.values
+        .where((rect) => isVisible(rect.inflate(18)))
+        .length,
+    'visibleStructuredMoves': visibleStructuredMoves,
+    'visibleRowLabels': layout.rowLabels.where((row) {
+      return row.top >= visibleSceneRect.top - 48 &&
+          row.top <= visibleSceneRect.bottom + 48;
+    }).length,
+    'visibleMonthTicks': layout.monthTicks.where((tick) {
+      return tick.x >= visibleSceneRect.left - 80 &&
+          tick.x <= visibleSceneRect.right + 80;
+    }).length,
+  };
+}
+
+Rect _clampedTimelineRect(Rect rect, Size sceneSize) {
+  final scene = Offset.zero & sceneSize;
+  final left = rect.left.clamp(scene.left, scene.right).toDouble();
+  final top = rect.top.clamp(scene.top, scene.bottom).toDouble();
+  final right = rect.right.clamp(scene.left, scene.right).toDouble();
+  final bottom = rect.bottom.clamp(scene.top, scene.bottom).toDouble();
+
+  if (right <= left || bottom <= top) {
+    return Rect.fromLTWH(left, top, 0, 0);
   }
   return Rect.fromLTRB(left, top, right, bottom);
 }
