@@ -471,6 +471,8 @@ class _FocusBoardNote {
     this.archivedAt,
     this.restoredFromAutoTrash = false,
     this.isDraft = false,
+    this.remoteVersion = 0,
+    this.remotePermissions,
     this.audit = const [],
   });
 
@@ -502,6 +504,8 @@ class _FocusBoardNote {
   final DateTime? archivedAt;
   final bool restoredFromAutoTrash;
   final bool isDraft;
+  final int remoteVersion;
+  final _FocusBoardRemotePermissions? remotePermissions;
   final List<_FocusBoardAuditEntry> audit;
 
   bool isCreator(_ViewerAccessProfile viewerProfile) {
@@ -616,6 +620,9 @@ class _FocusBoardNote {
     bool clearArchivedAt = false,
     bool? restoredFromAutoTrash,
     bool? isDraft,
+    int? remoteVersion,
+    _FocusBoardRemotePermissions? remotePermissions,
+    bool clearRemotePermissions = false,
     List<_FocusBoardAuditEntry>? audit,
   }) {
     return _FocusBoardNote(
@@ -650,6 +657,10 @@ class _FocusBoardNote {
       restoredFromAutoTrash:
           restoredFromAutoTrash ?? this.restoredFromAutoTrash,
       isDraft: isDraft ?? this.isDraft,
+      remoteVersion: remoteVersion ?? this.remoteVersion,
+      remotePermissions: clearRemotePermissions
+          ? null
+          : remotePermissions ?? this.remotePermissions,
       audit: audit ?? this.audit,
     );
   }
@@ -686,6 +697,7 @@ class _FocusBoardNote {
       'archivedAt': archivedAt?.toIso8601String(),
       'restoredFromAutoTrash': restoredFromAutoTrash,
       'isDraft': isDraft,
+      'remoteVersion': remoteVersion,
       'audit': audit.map((entry) => entry.toJson()).toList(),
     };
   }
@@ -752,6 +764,8 @@ class _FocusBoardNote {
       archivedAt: _focusBoardDateFromJson(json['archivedAt']),
       restoredFromAutoTrash: json['restoredFromAutoTrash'] == true,
       isDraft: json['isDraft'] == true,
+      remoteVersion:
+          int.tryParse('${json['remoteVersion'] ?? json['version'] ?? 0}') ?? 0,
       audit: auditEntries,
     );
   }
@@ -874,21 +888,34 @@ List<String> _focusBoardStringList(Object? value) {
 }
 
 class _FocusBoardNotesController extends ChangeNotifier {
+  _FocusBoardNotesController({ApiClient? apiClient, bool? useBackendNotes})
+    : _apiRepository = _FocusBoardApiRepository(apiClient: apiClient),
+      _useBackendNotes =
+          useBackendNotes ??
+          const bool.fromEnvironment('PARIFLOW_FOCUS_BOARD_NOTES_API');
+
   static const _notesStorageKey = 'pariflow.focus_board.notes.v1';
   static const _profilesStorageKey = 'pariflow.focus_board.filters.v1';
   static const _activeProfileStorageKey =
       'pariflow.focus_board.active_filter.v1';
 
+  final _FocusBoardApiRepository _apiRepository;
+  final bool _useBackendNotes;
   final List<_FocusBoardNote> _notes = [];
   final List<_FocusBoardFilterProfile> _filterProfiles = [];
   bool _loaded = false;
   bool _loading = false;
+  String? _errorMessage;
+  bool _localMigrationPending = false;
   _FocusBoardNoteStatusFilter _statusFilter = _FocusBoardNoteStatusFilter.all;
   _FocusBoardNoteSort _sort = _FocusBoardNoteSort.editedOrCreatedAt;
   _FocusBoardFilterProfile _activeFilter = _FocusBoardFilterProfile.generic;
 
+  bool get usesBackendNotes => _useBackendNotes;
   bool get loaded => _loaded;
   bool get loading => _loading;
+  String? get errorMessage => _errorMessage;
+  bool get localMigrationPending => _localMigrationPending;
   _FocusBoardNoteStatusFilter get statusFilter => _statusFilter;
   _FocusBoardNoteSort get sort => _sort;
   _FocusBoardFilterProfile get activeFilter => _activeFilter;
@@ -901,11 +928,13 @@ class _FocusBoardNotesController extends ChangeNotifier {
       return;
     }
     _loading = true;
+    _errorMessage = null;
     notifyListeners();
     final preferences = await SharedPreferences.getInstance();
-    _notes
-      ..clear()
-      ..addAll(_readNotes(preferences.getString(_notesStorageKey)));
+    final localRaw = preferences.getString(_notesStorageKey);
+    final localNotes = _readNotes(localRaw);
+    _localMigrationPending =
+        _useBackendNotes && _hasPendingLocalNotes(localRaw);
     _filterProfiles
       ..clear()
       ..addAll(_readProfiles(preferences.getString(_profilesStorageKey)));
@@ -919,11 +948,59 @@ class _FocusBoardNotesController extends ChangeNotifier {
         _activeFilter = active;
       }
     }
+    if (_useBackendNotes) {
+      try {
+        final remoteNotes = await _apiRepository.listAllNotes();
+        _notes
+          ..clear()
+          ..addAll(remoteNotes.map((payload) => payload.note));
+      } catch (error) {
+        _notes.clear();
+        _errorMessage = _focusBoardApiErrorMessage(error);
+      }
+      _loaded = true;
+      _loading = false;
+      notifyListeners();
+      return;
+    }
+    _notes
+      ..clear()
+      ..addAll(localNotes);
     _applyAutomaticTrash();
     _loaded = true;
     _loading = false;
     notifyListeners();
     await _persistNotes();
+  }
+
+  Future<void> reload() async {
+    if (_loading) {
+      return;
+    }
+    _loaded = false;
+    await ensureLoaded();
+  }
+
+  void _replaceRemoteNote(_FocusBoardNote note) {
+    final index = _notes.indexWhere((entry) => entry.id == note.id);
+    if (index >= 0) {
+      _notes[index] = note;
+    } else {
+      _notes.insert(0, note);
+    }
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  void _removeRemoteNote(String id) {
+    _notes.removeWhere((entry) => entry.id == id);
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  void _setRemoteError(Object error) {
+    _errorMessage = _focusBoardApiErrorMessage(error);
+    notifyListeners();
   }
 
   List<_FocusBoardNote> visibleNotes(_ViewerAccessProfile viewerProfile) {
@@ -1042,6 +1119,18 @@ class _FocusBoardNotesController extends ChangeNotifier {
     required _ViewerAccessProfile viewerProfile,
   }) async {
     await ensureLoaded();
+    if (_useBackendNotes) {
+      try {
+        final payload = await _apiRepository.createNote(
+          draft,
+          viewerProfile: viewerProfile,
+        );
+        _replaceRemoteNote(payload.note);
+      } catch (error) {
+        _setRemoteError(error);
+      }
+      return;
+    }
     final now = DateTime.now();
     final actorId = _focusBoardActorId(viewerProfile);
     final note = _FocusBoardNote(
@@ -1080,6 +1169,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
     await ensureLoaded();
     final now = DateTime.now();
     final actorId = _focusBoardActorId(viewerProfile);
+    final draft = _FocusBoardNoteDraft(
+      title: 'Nova nota',
+      description: '',
+      priority: _FocusBoardNotePriority.normal,
+      dueAt: now.add(const Duration(days: 7)),
+      companyLabel: '',
+      assignments: const [],
+      visibility: _FocusBoardNoteVisibility.private,
+      replicasEnabled: true,
+      replicaMode: _FocusBoardReplicaMode.ownerOnly,
+    );
     final note = _FocusBoardNote(
       id: 'fbn-${now.microsecondsSinceEpoch}',
       title: 'Nova nota',
@@ -1104,6 +1204,19 @@ class _FocusBoardNotesController extends ChangeNotifier {
         ),
       ],
     );
+    if (_useBackendNotes) {
+      try {
+        final payload = await _apiRepository.createNote(
+          draft,
+          viewerProfile: viewerProfile,
+        );
+        _replaceRemoteNote(payload.note);
+        return payload.note;
+      } catch (error) {
+        _setRemoteError(error);
+        return note;
+      }
+    }
     _notes.insert(0, note);
     notifyListeners();
     await _persistNotes();
@@ -1121,6 +1234,18 @@ class _FocusBoardNotesController extends ChangeNotifier {
       return;
     }
     final current = _notes[index];
+    if (_useBackendNotes) {
+      try {
+        final payload = await _apiRepository.updateNote(
+          current,
+          _focusBoardUpdateBodyFromDraft(draft),
+        );
+        _replaceRemoteNote(payload.note);
+      } catch (error) {
+        _setRemoteError(error);
+      }
+      return;
+    }
     if (!current.isCreator(viewerProfile)) {
       return;
     }
@@ -1256,6 +1381,20 @@ class _FocusBoardNotesController extends ChangeNotifier {
       await _persistNotes();
       return _FocusBoardTextCommitResult.draftSaved;
     }
+    if (_useBackendNotes) {
+      try {
+        final payload = await _apiRepository.updateNote(current, {
+          'title': nextTitle,
+          'body': nextDescription,
+          'editJustification': 'Texto atualizado pela interface Focus Board.',
+        });
+        _replaceRemoteNote(payload.note);
+        return _FocusBoardTextCommitResult.textUpdated;
+      } catch (error) {
+        _setRemoteError(error);
+        return _FocusBoardTextCommitResult.none;
+      }
+    }
     final now = DateTime.now();
     final changes = <String>[];
     if (current.title != nextTitle) {
@@ -1358,6 +1497,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
       return;
     }
     final current = _notes[index];
+    if (_useBackendNotes) {
+      try {
+        final payload = current.completedByOwner
+            ? await _apiRepository.reopenNote(current)
+            : await _apiRepository.completeNote(current);
+        _replaceRemoteNote(payload.note);
+      } catch (error) {
+        _setRemoteError(error);
+      }
+      return;
+    }
     if (current.isClosed) {
       return;
     }
@@ -1416,6 +1566,23 @@ class _FocusBoardNotesController extends ChangeNotifier {
       return;
     }
     final current = _notes[index];
+    if (_useBackendNotes) {
+      final assignment = current.assignments
+          .where((entry) => entry.id == assignmentId)
+          .firstOrNull;
+      if (assignment == null) {
+        return;
+      }
+      try {
+        final payload = assignment.completed
+            ? await _apiRepository.reopenNote(current)
+            : await _apiRepository.completeNote(current);
+        _replaceRemoteNote(payload.note);
+      } catch (error) {
+        _setRemoteError(error);
+      }
+      return;
+    }
     if (current.isClosed || !current.replicasEnabled) {
       return;
     }
@@ -1486,6 +1653,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
     if (linked.isEmpty) {
       return;
     }
+    if (_useBackendNotes) {
+      try {
+        for (final current in linked) {
+          final payload = await _apiRepository.trashNote(current);
+          _replaceRemoteNote(payload.note);
+        }
+      } catch (error) {
+        _setRemoteError(error);
+      }
+      return;
+    }
     final now = DateTime.now();
     final actorId = _focusBoardActorId(viewerProfile);
     for (final current in linked) {
@@ -1524,6 +1702,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
     await ensureLoaded();
     final linked = fullThreadNotes(id);
     if (linked.isEmpty) {
+      return;
+    }
+    if (_useBackendNotes) {
+      try {
+        for (final current in linked) {
+          final payload = await _apiRepository.archiveNote(current);
+          _replaceRemoteNote(payload.note);
+        }
+      } catch (error) {
+        _setRemoteError(error);
+      }
       return;
     }
     final now = DateTime.now();
@@ -1566,6 +1755,12 @@ class _FocusBoardNotesController extends ChangeNotifier {
     }
     final root = linked.first;
     if (!root.isCreator(viewerProfile) || root.isClosed) {
+      return;
+    }
+    if (_useBackendNotes) {
+      _errorMessage =
+          'Encerramento de thread ainda nao possui contrato backend dedicado.';
+      notifyListeners();
       return;
     }
     final now = DateTime.now();
@@ -1619,6 +1814,30 @@ class _FocusBoardNotesController extends ChangeNotifier {
         : source.parentNoteId;
     final childDescription = sourceDepth >= 1 ? '' : source.description;
     final childTitle = sourceDepth >= 1 ? 'Resposta curta' : source.title;
+    if (_useBackendNotes) {
+      final draft = _FocusBoardNoteDraft(
+        title: childTitle,
+        description: childDescription,
+        priority: source.priority,
+        dueAt: source.dueAt,
+        companyLabel: source.companyLabel,
+        assignments: const [],
+        visibility: _FocusBoardNoteVisibility.private,
+        replicasEnabled: sourceDepth == 0,
+        replicaMode: _FocusBoardReplicaMode.ownerOnly,
+      );
+      try {
+        final payload = await _apiRepository.createNote(
+          draft,
+          viewerProfile: viewerProfile,
+          parentNotePublicId: source.id,
+        );
+        _replaceRemoteNote(payload.note);
+      } catch (error) {
+        _setRemoteError(error);
+      }
+      return;
+    }
     final replica = _FocusBoardNote(
       id: 'fbn-${now.microsecondsSinceEpoch}',
       title: childTitle,
@@ -1721,6 +1940,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
     if (linked.isEmpty) {
       return;
     }
+    if (_useBackendNotes) {
+      try {
+        for (final current in linked) {
+          final payload = await _apiRepository.restoreNote(current);
+          _replaceRemoteNote(payload.note);
+        }
+      } catch (error) {
+        _setRemoteError(error);
+      }
+      return;
+    }
     final now = DateTime.now();
     final actorId = _focusBoardActorId(viewerProfile);
     for (final current in linked) {
@@ -1756,6 +1986,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
     await ensureLoaded();
     final linked = fullThreadNotes(id);
     if (linked.isEmpty) {
+      return;
+    }
+    if (_useBackendNotes) {
+      try {
+        for (final current in linked) {
+          final payload = await _apiRepository.restoreNote(current);
+          _replaceRemoteNote(payload.note);
+        }
+      } catch (error) {
+        _setRemoteError(error);
+      }
       return;
     }
     final now = DateTime.now();
@@ -1798,6 +2039,17 @@ class _FocusBoardNotesController extends ChangeNotifier {
     }
     final linked = threadNotes(id);
     if (linked.isEmpty) {
+      return;
+    }
+    if (_useBackendNotes) {
+      try {
+        for (final current in linked) {
+          await _apiRepository.deleteNote(current);
+          _removeRemoteNote(current.id);
+        }
+      } catch (error) {
+        _setRemoteError(error);
+      }
       return;
     }
     final linkedIds = linked.map((note) => note.id).toSet();
@@ -1899,6 +2151,44 @@ class _FocusBoardNotesController extends ChangeNotifier {
     notifyListeners();
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_activeProfileStorageKey, _activeFilter.id);
+  }
+
+  Future<List<_FocusBoardAuditEntry>> auditEntriesFor(
+    _FocusBoardNote note,
+  ) async {
+    await ensureLoaded();
+    if (!_useBackendNotes) {
+      return note.audit;
+    }
+    final events = await _apiRepository.listEvents(note.id);
+    return events.map((event) => event.toAuditEntry()).toList(growable: false);
+  }
+
+  bool _hasPendingLocalNotes(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return false;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return false;
+      }
+      return decoded.any((item) {
+        if (item is! Map) {
+          return false;
+        }
+        final map = Map<String, dynamic>.from(item);
+        final id = _focusBoardText(map['id']);
+        if (id.isEmpty) {
+          return false;
+        }
+        return _focusBoardText(map['remotePublicId']).isEmpty &&
+            _focusBoardText(map['migratedAt']).isEmpty &&
+            _focusBoardText(map['migrationIgnoredAt']).isEmpty;
+      });
+    } catch (_) {
+      return false;
+    }
   }
 
   List<_FocusBoardNote> _readNotes(String? raw) {
@@ -2075,6 +2365,9 @@ class _FocusBoardNotesController extends ChangeNotifier {
   }
 
   Future<void> _persistNotes() async {
+    if (_useBackendNotes) {
+      return;
+    }
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(
       _notesStorageKey,
@@ -2096,7 +2389,7 @@ class _FocusBoardPersistentController extends ChangeNotifier {
     ApiClient? apiClient,
     this.fastInitialLoad = false,
   }) : _repository = _PeopleApiRepository(apiClient: apiClient),
-       notesController = _FocusBoardNotesController();
+       notesController = _FocusBoardNotesController(apiClient: apiClient);
 
   final _PeopleApiRepository _repository;
   final bool fastInitialLoad;
@@ -2139,6 +2432,7 @@ class _FocusBoardPersistentController extends ChangeNotifier {
       return _activeLoad!;
     }
 
+    unawaited(notesController.reload());
     _runtimeData = _runtimeData.copyWith(isLoading: true);
     notifyListeners();
 
