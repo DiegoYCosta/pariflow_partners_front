@@ -1717,6 +1717,8 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     return _FocusBoardNotesStage(
       notes: boardNotes,
       loading: widget.notesController.loading,
+      errorMessage: widget.notesController.errorMessage,
+      localMigrationPending: widget.notesController.localMigrationPending,
       selectedNoteIds: _selectedNoteIds,
       viewerProfile: widget.viewerProfile,
       cardsHidden: _cardsHidden,
@@ -1724,6 +1726,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       attentionNoteId: _attentionNoteId,
       attentionPulse: _attentionPulse,
       onAddNote: _createSimpleNote,
+      onRetry: () => unawaited(widget.notesController.reload()),
       onTapNote: _handleNoteTap,
       onLongPressNote: _handleNoteLongPress,
       onToggleOwner: _toggleOwnerCompletion,
@@ -2590,9 +2593,27 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   }
 
   Future<void> _showAudit(_FocusBoardNote note) async {
+    late final List<_FocusBoardAuditEntry> entries;
+    try {
+      entries = await widget.notesController.auditEntriesFor(note);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_focusBoardApiErrorMessage(error)),
+          backgroundColor: _roseColor,
+        ),
+      );
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
     await showDialog<void>(
       context: context,
-      builder: (context) => _FocusBoardAuditDialog(note: note),
+      builder: (context) => _FocusBoardAuditDialog(entries: entries),
     );
   }
 
@@ -2891,6 +2912,8 @@ class _FocusBoardNotesStage extends StatelessWidget {
   const _FocusBoardNotesStage({
     required this.notes,
     required this.loading,
+    this.errorMessage,
+    this.localMigrationPending = false,
     required this.selectedNoteIds,
     required this.viewerProfile,
     required this.cardsHidden,
@@ -2898,6 +2921,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.attentionNoteId,
     required this.attentionPulse,
     required this.onAddNote,
+    required this.onRetry,
     required this.onTapNote,
     required this.onLongPressNote,
     required this.onToggleOwner,
@@ -2917,6 +2941,8 @@ class _FocusBoardNotesStage extends StatelessWidget {
 
   final List<_FocusBoardNote> notes;
   final bool loading;
+  final String? errorMessage;
+  final bool localMigrationPending;
   final Set<String> selectedNoteIds;
   final _ViewerAccessProfile viewerProfile;
   final bool cardsHidden;
@@ -2924,6 +2950,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
   final String? attentionNoteId;
   final int attentionPulse;
   final VoidCallback onAddNote;
+  final VoidCallback onRetry;
   final ValueChanged<_FocusBoardNote> onTapNote;
   final ValueChanged<_FocusBoardNote> onLongPressNote;
   final ValueChanged<_FocusBoardNote> onToggleOwner;
@@ -2964,37 +2991,73 @@ class _FocusBoardNotesStage extends StatelessWidget {
       return const _FocusBoardCardsHiddenState();
     }
 
+    final notices = <Widget>[
+      if (errorMessage != null && errorMessage!.trim().isNotEmpty)
+        _FocusBoardStageNotice(
+          icon: Icons.cloud_off_outlined,
+          message: errorMessage!,
+          color: _roseColor,
+          actionLabel: 'Tentar novamente',
+          onAction: onRetry,
+        ),
+      if (localMigrationPending)
+        const _FocusBoardStageNotice(
+          icon: Icons.sync_problem_outlined,
+          message:
+              'Existem notas locais aguardando migracao para a API do Focus Board.',
+          color: _amberColor,
+        ),
+    ];
+
     if (notes.isEmpty) {
       return _FocusBoardPaperCanvas(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.sticky_note_2_outlined,
-                  color: _mutedColor,
-                  size: 30,
+        child: Column(
+          children: [
+            if (notices.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                child: Column(
+                  children: [
+                    for (final notice in notices) ...[
+                      notice,
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Nenhuma nota neste filtro.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: _inkColor,
-                    fontWeight: FontWeight.w800,
+              ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.sticky_note_2_outlined,
+                        color: _mutedColor,
+                        size: 30,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Nenhuma nota neste filtro.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: _inkColor,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: onAddNote,
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Criar nota'),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: onAddNote,
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Criar nota'),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       );
     }
@@ -3031,10 +3094,14 @@ class _FocusBoardNotesStage extends StatelessWidget {
     return _FocusBoardPaperCanvas(
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(14, 18, 14, 22),
-        itemCount: notes.length,
+        itemCount: notes.length + notices.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
-          final note = notes[index];
+          if (index < notices.length) {
+            return notices[index];
+          }
+          final noteIndex = index - notices.length;
+          final note = notes[noteIndex];
           final threadDepth = depthFor(note);
           final rootNote = rootFor(note);
           final tile = _FocusBoardNoteTile(
@@ -3126,6 +3193,56 @@ class _FocusBoardNotesStage extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _FocusBoardStageNotice extends StatelessWidget {
+  const _FocusBoardStageNotice({
+    required this.icon,
+    required this.message,
+    required this.color,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String message;
+  final Color color;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: _inkColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(width: 8),
+              TextButton(onPressed: onAction, child: Text(actionLabel!)),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -5292,26 +5409,26 @@ class _FocusBoardFilterDialogState extends State<_FocusBoardFilterDialog> {
 }
 
 class _FocusBoardAuditDialog extends StatelessWidget {
-  const _FocusBoardAuditDialog({required this.note});
+  const _FocusBoardAuditDialog({required this.entries});
 
-  final _FocusBoardNote note;
+  final List<_FocusBoardAuditEntry> entries;
 
   @override
   Widget build(BuildContext context) {
-    final entries = [...note.audit]
+    final sortedEntries = [...entries]
       ..sort((left, right) => right.at.compareTo(left.at));
     return AlertDialog(
       title: const Text('Auditoria da nota'),
       content: SizedBox(
         width: 620,
-        child: entries.isEmpty
+        child: sortedEntries.isEmpty
             ? const Text('Sem registros de auditoria.')
             : ListView.separated(
                 shrinkWrap: true,
-                itemCount: entries.length,
+                itemCount: sortedEntries.length,
                 separatorBuilder: (_, _) => const Divider(color: _lineColor),
                 itemBuilder: (context, index) {
-                  final entry = entries[index];
+                  final entry = sortedEntries[index];
                   return ListTile(
                     leading: const Icon(Icons.history_rounded),
                     title: Text('${entry.action} por ${entry.actorName}'),

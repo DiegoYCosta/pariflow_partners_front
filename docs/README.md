@@ -16,9 +16,12 @@ importa na realidade atual do produto.
 6. [Workspaces operacionais](operational-entity-workspaces.md)
 7. [Contrato relacional de Network](relational-graph-contract.md)
 8. [Network Timeline Implementation Plan](network-timeline-implementation-plan.md)
-9. [Design system CRM](new-ui-design-system.md)
-10. [Sistema visual de cores e formas](sistema-visual-de-cores-e-formas.md)
-11. [Icones e moldes](icones-moldes.md)
+9. [Focus Board - Plano de integracao backend](focus-board-backend-integration-plan.md)
+10. [Focus Board - Especificacao Front Fase 1](focus-board-phase-1-frontend-spec.md)
+11. [Focus Board - Plano Front de Migracao Local](focus-board-local-migration-plan.md)
+12. [Design system CRM](new-ui-design-system.md)
+13. [Sistema visual de cores e formas](sistema-visual-de-cores-e-formas.md)
+14. [Icones e moldes](icones-moldes.md)
 
 ## Fontes de verdade
 
@@ -36,7 +39,7 @@ importa na realidade atual do produto.
 | Home | dashboard real, sem mock silencioso |
 | Companies/Clients/Contracts | CRUDs reais conectados a API |
 | People | CRUD de pessoa, vinculos, ocorrencias, anexos, agenda e Focus Board |
-| Focus Board | persistente, acoplavel/desacoplavel, alimentada pela API |
+| Focus Board | persistente, acoplavel/desacoplavel, com notas locais legadas e API por feature flag |
 | Timeline | calendario operacional com agenda, dias nao uteis e registros |
 | Relatorios | central integrada a `POST /api/v1/relatorios/executar` |
 | Network | grafo relacional via `GET /api/v1/network/graph`; Timeline e Atual via `GET /api/v1/network/timeline` |

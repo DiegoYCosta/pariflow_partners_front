@@ -25,7 +25,7 @@ backend. Dados mock/sample nao entram no runtime real nem no bundle publicado.
 | Clients | lista, detalhe e CRUD via `clientes` |
 | Contracts | contratos, tipos, modelos, servicos, postos e documentos |
 | People | pessoa, vinculos, ocorrencias, anexos, agenda e Focus Board |
-| Focus Board | hub persistente acoplado/desacoplado com dados da API |
+| Focus Board | hub persistente acoplado/desacoplado; notas locais legadas e API por feature flag |
 | Timeline | calendario mensal operacional com timeline, agenda e dias nao uteis |
 | Reports | catalogo e execucao real via `POST /api/v1/relatorios/executar` |
 | Network | grafo relacional via `GET /api/v1/network/graph` e modos Timeline/Atual via `GET /api/v1/network/timeline` |
@@ -41,6 +41,9 @@ backend. Dados mock/sample nao entram no runtime real nem no bundle publicado.
 - [Calendario, Timeline e relatorios](docs/calendario-compartilhado-e-relatorios.md)
 - [Contrato relacional de Network](docs/relational-graph-contract.md)
 - [Network Timeline Implementation Plan](docs/network-timeline-implementation-plan.md)
+- [Focus Board - Plano de integracao backend](docs/focus-board-backend-integration-plan.md)
+- [Focus Board - Especificacao Front Fase 1](docs/focus-board-phase-1-frontend-spec.md)
+- [Focus Board - Plano Front de Migracao Local](docs/focus-board-local-migration-plan.md)
 - [Design system CRM](docs/new-ui-design-system.md)
 - [Sistema visual de cores e formas](docs/sistema-visual-de-cores-e-formas.md)
 - [Icones e moldes](docs/icones-moldes.md)
