@@ -4,9 +4,9 @@ Data de referencia: `2026-07-12`.
 
 Status: implementacao parcial em `2026-07-12`.
 
-O adapter API, modelos internos e controlador com feature flag foram
-implementados. A migracao manual de notas locais e a validacao smoke com dois
-usuarios/tenants permanecem pendentes antes de ativar em producao sem ressalvas.
+O adapter API, modelos internos, controlador com feature flag e migracao manual
+de notas locais foram implementados. A validacao smoke com dois usuarios/tenants
+permanece pendente antes de ativar em producao sem ressalvas.
 
 ## Objetivo
 
@@ -80,4 +80,6 @@ Se backend estiver ativo e falhar:
   fallback silencioso para notas locais se a API falhar.
 - Operacoes ligadas ao backend: listar, criar, editar, texto inline, concluir,
   reabrir, arquivar, mover para lixeira, restaurar, delete logico e eventos.
-- Pendencia: UI de migracao manual das notas locais.
+- Migracao manual das notas locais: aviso com quantidade, confirmacao sem
+  expor conteudo, envio individual com `clientMigrationId`, preservacao em erro
+  parcial e opcao local "Agora nao".

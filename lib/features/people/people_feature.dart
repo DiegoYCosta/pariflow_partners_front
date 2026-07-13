@@ -4,12 +4,14 @@ class _PeopleWorkspace extends StatefulWidget {
   const _PeopleWorkspace({
     required this.viewerProfile,
     required this.selectedIndex,
+    required this.preferredPublicId,
     required this.onSelectItem,
     this.onFocusPersonChanged,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final int selectedIndex;
+  final String preferredPublicId;
   final ValueChanged<int> onSelectItem;
   final ValueChanged<String>? onFocusPersonChanged;
 
@@ -34,6 +36,16 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PeopleWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.preferredPublicId != widget.preferredPublicId &&
+        widget.preferredPublicId.trim().isNotEmpty) {
+      _searchController.clear();
+      setState(() {});
+    }
   }
 
   Future<void> _loadPeopleData() async {
@@ -469,7 +481,20 @@ class _PeopleWorkspaceState extends State<_PeopleWorkspace> {
     final visibleItems = _filterPeopleItems(data.items);
     final fallbackIndex = data.items.isEmpty
         ? -1
-        : min(max(widget.selectedIndex, 0), data.items.length - 1);
+        : _entityIndexForPreferredPublicId(
+            items: data.items,
+            preferredPublicId: widget.preferredPublicId,
+            fallbackIndex: widget.selectedIndex,
+          );
+    if (fallbackIndex >= 0 &&
+        fallbackIndex != widget.selectedIndex &&
+        data.items.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onSelectItem(fallbackIndex);
+        }
+      });
+    }
     final preferredItem = fallbackIndex < 0 ? null : data.items[fallbackIndex];
     final selectedItem = visibleItems.isEmpty
         ? null
@@ -1522,6 +1547,8 @@ class _FocusBoardHubPanel extends StatefulWidget {
   State<_FocusBoardHubPanel> createState() => _FocusBoardHubPanelState();
 }
 
+enum _FocusBoardMigrationDecision { cancel, ignore, migrate }
+
 class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
   final Set<String> _selectedNoteIds = <String>{};
   bool _creatingQuickNote = false;
@@ -1719,6 +1746,8 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       loading: widget.notesController.loading,
       errorMessage: widget.notesController.errorMessage,
       localMigrationPending: widget.notesController.localMigrationPending,
+      localMigrationPendingCount:
+          widget.notesController.localMigrationPendingCount,
       selectedNoteIds: _selectedNoteIds,
       viewerProfile: widget.viewerProfile,
       cardsHidden: _cardsHidden,
@@ -1727,6 +1756,7 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
       attentionPulse: _attentionPulse,
       onAddNote: _createSimpleNote,
       onRetry: () => unawaited(widget.notesController.reload()),
+      onMigrateLocalNotes: _openLocalMigrationDialog,
       onTapNote: _handleNoteTap,
       onLongPressNote: _handleNoteLongPress,
       onToggleOwner: _toggleOwnerCompletion,
@@ -2266,6 +2296,69 @@ class _FocusBoardHubPanelState extends State<_FocusBoardHubPanel> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
+  }
+
+  Future<void> _openLocalMigrationDialog() async {
+    final pendingCount = widget.notesController.localMigrationPendingCount;
+    if (pendingCount <= 0) {
+      _showFocusBoardSnack('Nao ha notas locais pendentes de migracao.');
+      return;
+    }
+    final decision = await showDialog<_FocusBoardMigrationDecision>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Migrar notas locais?'),
+        content: Text(
+          '$pendingCount nota(s) deste dispositivo podem ser enviadas para a API do Focus Board. '
+          'A migracao e manual, usa notas privadas por padrao e preserva o registro local em caso de falha.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_FocusBoardMigrationDecision.cancel),
+            child: const Text('Voltar'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_FocusBoardMigrationDecision.ignore),
+            child: const Text('Agora nao'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_FocusBoardMigrationDecision.migrate),
+            child: const Text('Migrar'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted ||
+        decision == null ||
+        decision == _FocusBoardMigrationDecision.cancel) {
+      return;
+    }
+    if (decision == _FocusBoardMigrationDecision.ignore) {
+      final result = await widget.notesController.ignoreLocalMigration();
+      if (mounted) {
+        _showFocusBoardSnack(
+          '${result.ignored} nota(s) local(is) mantidas neste dispositivo.',
+        );
+      }
+      return;
+    }
+
+    final result = await widget.notesController.migrateLocalNotes(
+      viewerProfile: widget.viewerProfile,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (result.hasFailures) {
+      _showFocusBoardSnack(
+        '${result.migrated}/${result.total} nota(s) migradas; ${result.failed} falharam.',
+      );
+      return;
+    }
+    _showFocusBoardSnack('${result.migrated} nota(s) migradas.');
   }
 
   Future<void> _confirmMoveToTrash(_FocusBoardNote note) async {
@@ -2914,6 +3007,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.loading,
     this.errorMessage,
     this.localMigrationPending = false,
+    this.localMigrationPendingCount = 0,
     required this.selectedNoteIds,
     required this.viewerProfile,
     required this.cardsHidden,
@@ -2922,6 +3016,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
     required this.attentionPulse,
     required this.onAddNote,
     required this.onRetry,
+    required this.onMigrateLocalNotes,
     required this.onTapNote,
     required this.onLongPressNote,
     required this.onToggleOwner,
@@ -2943,6 +3038,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
   final bool loading;
   final String? errorMessage;
   final bool localMigrationPending;
+  final int localMigrationPendingCount;
   final Set<String> selectedNoteIds;
   final _ViewerAccessProfile viewerProfile;
   final bool cardsHidden;
@@ -2951,6 +3047,7 @@ class _FocusBoardNotesStage extends StatelessWidget {
   final int attentionPulse;
   final VoidCallback onAddNote;
   final VoidCallback onRetry;
+  final VoidCallback onMigrateLocalNotes;
   final ValueChanged<_FocusBoardNote> onTapNote;
   final ValueChanged<_FocusBoardNote> onLongPressNote;
   final ValueChanged<_FocusBoardNote> onToggleOwner;
@@ -3001,11 +3098,14 @@ class _FocusBoardNotesStage extends StatelessWidget {
           onAction: onRetry,
         ),
       if (localMigrationPending)
-        const _FocusBoardStageNotice(
+        _FocusBoardStageNotice(
           icon: Icons.sync_problem_outlined,
-          message:
-              'Existem notas locais aguardando migracao para a API do Focus Board.',
+          message: localMigrationPendingCount > 0
+              ? '$localMigrationPendingCount nota(s) local(is) aguardam migracao manual para a API do Focus Board.'
+              : 'Existem notas locais aguardando migracao para a API do Focus Board.',
           color: _amberColor,
+          actionLabel: 'Migrar',
+          onAction: onMigrateLocalNotes,
         ),
     ];
 

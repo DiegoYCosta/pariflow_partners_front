@@ -473,6 +473,11 @@ class _FocusBoardNote {
     this.isDraft = false,
     this.remoteVersion = 0,
     this.remotePermissions,
+    this.clientMigrationId = '',
+    this.remotePublicId = '',
+    this.migratedAt,
+    this.migrationIgnoredAt,
+    this.migrationError = '',
     this.audit = const [],
   });
 
@@ -506,7 +511,18 @@ class _FocusBoardNote {
   final bool isDraft;
   final int remoteVersion;
   final _FocusBoardRemotePermissions? remotePermissions;
+  final String clientMigrationId;
+  final String remotePublicId;
+  final DateTime? migratedAt;
+  final DateTime? migrationIgnoredAt;
+  final String migrationError;
   final List<_FocusBoardAuditEntry> audit;
+
+  bool get isLocalMigrationPending {
+    return remotePublicId.isEmpty &&
+        migratedAt == null &&
+        migrationIgnoredAt == null;
+  }
 
   bool isCreator(_ViewerAccessProfile viewerProfile) {
     return createdById == _focusBoardActorId(viewerProfile);
@@ -623,6 +639,13 @@ class _FocusBoardNote {
     int? remoteVersion,
     _FocusBoardRemotePermissions? remotePermissions,
     bool clearRemotePermissions = false,
+    String? clientMigrationId,
+    String? remotePublicId,
+    DateTime? migratedAt,
+    bool clearMigratedAt = false,
+    DateTime? migrationIgnoredAt,
+    bool clearMigrationIgnoredAt = false,
+    String? migrationError,
     List<_FocusBoardAuditEntry>? audit,
   }) {
     return _FocusBoardNote(
@@ -661,6 +684,13 @@ class _FocusBoardNote {
       remotePermissions: clearRemotePermissions
           ? null
           : remotePermissions ?? this.remotePermissions,
+      clientMigrationId: clientMigrationId ?? this.clientMigrationId,
+      remotePublicId: remotePublicId ?? this.remotePublicId,
+      migratedAt: clearMigratedAt ? null : migratedAt ?? this.migratedAt,
+      migrationIgnoredAt: clearMigrationIgnoredAt
+          ? null
+          : migrationIgnoredAt ?? this.migrationIgnoredAt,
+      migrationError: migrationError ?? this.migrationError,
       audit: audit ?? this.audit,
     );
   }
@@ -698,6 +728,11 @@ class _FocusBoardNote {
       'restoredFromAutoTrash': restoredFromAutoTrash,
       'isDraft': isDraft,
       'remoteVersion': remoteVersion,
+      'clientMigrationId': clientMigrationId,
+      'remotePublicId': remotePublicId,
+      'migratedAt': migratedAt?.toIso8601String(),
+      'migrationIgnoredAt': migrationIgnoredAt?.toIso8601String(),
+      'migrationError': migrationError,
       'audit': audit.map((entry) => entry.toJson()).toList(),
     };
   }
@@ -766,6 +801,11 @@ class _FocusBoardNote {
       isDraft: json['isDraft'] == true,
       remoteVersion:
           int.tryParse('${json['remoteVersion'] ?? json['version'] ?? 0}') ?? 0,
+      clientMigrationId: _focusBoardText(json['clientMigrationId']),
+      remotePublicId: _focusBoardText(json['remotePublicId']),
+      migratedAt: _focusBoardDateFromJson(json['migratedAt']),
+      migrationIgnoredAt: _focusBoardDateFromJson(json['migrationIgnoredAt']),
+      migrationError: _focusBoardText(json['migrationError']),
       audit: auditEntries,
     );
   }
@@ -877,6 +917,22 @@ class _FocusBoardFilterProfile {
   }
 }
 
+class _FocusBoardLocalMigrationSummary {
+  const _FocusBoardLocalMigrationSummary({
+    required this.total,
+    required this.migrated,
+    required this.failed,
+    required this.ignored,
+  });
+
+  final int total;
+  final int migrated;
+  final int failed;
+  final int ignored;
+
+  bool get hasFailures => failed > 0;
+}
+
 List<String> _focusBoardStringList(Object? value) {
   if (value is! List) {
     return const [];
@@ -907,6 +963,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
   bool _loading = false;
   String? _errorMessage;
   bool _localMigrationPending = false;
+  int _localMigrationPendingCount = 0;
   _FocusBoardNoteStatusFilter _statusFilter = _FocusBoardNoteStatusFilter.all;
   _FocusBoardNoteSort _sort = _FocusBoardNoteSort.editedOrCreatedAt;
   _FocusBoardFilterProfile _activeFilter = _FocusBoardFilterProfile.generic;
@@ -916,6 +973,7 @@ class _FocusBoardNotesController extends ChangeNotifier {
   bool get loading => _loading;
   String? get errorMessage => _errorMessage;
   bool get localMigrationPending => _localMigrationPending;
+  int get localMigrationPendingCount => _localMigrationPendingCount;
   _FocusBoardNoteStatusFilter get statusFilter => _statusFilter;
   _FocusBoardNoteSort get sort => _sort;
   _FocusBoardFilterProfile get activeFilter => _activeFilter;
@@ -933,8 +991,9 @@ class _FocusBoardNotesController extends ChangeNotifier {
     final preferences = await SharedPreferences.getInstance();
     final localRaw = preferences.getString(_notesStorageKey);
     final localNotes = _readNotes(localRaw);
+    _localMigrationPendingCount = _pendingLocalNotes(localRaw).length;
     _localMigrationPending =
-        _useBackendNotes && _hasPendingLocalNotes(localRaw);
+        _useBackendNotes && _localMigrationPendingCount > 0;
     _filterProfiles
       ..clear()
       ..addAll(_readProfiles(preferences.getString(_profilesStorageKey)));
@@ -1001,6 +1060,112 @@ class _FocusBoardNotesController extends ChangeNotifier {
   void _setRemoteError(Object error) {
     _errorMessage = _focusBoardApiErrorMessage(error);
     notifyListeners();
+  }
+
+  Future<_FocusBoardLocalMigrationSummary> migrateLocalNotes({
+    required _ViewerAccessProfile viewerProfile,
+  }) async {
+    await ensureLoaded();
+    if (!_useBackendNotes) {
+      return const _FocusBoardLocalMigrationSummary(
+        total: 0,
+        migrated: 0,
+        failed: 0,
+        ignored: 0,
+      );
+    }
+
+    final preferences = await SharedPreferences.getInstance();
+    final localNotes = _readNotes(preferences.getString(_notesStorageKey));
+    final nextNotes = <_FocusBoardNote>[];
+    final remoteByLocalId = <String, String>{
+      for (final note in localNotes)
+        if (note.remotePublicId.isNotEmpty) note.id: note.remotePublicId,
+    };
+    final pending = [
+      for (final note in localNotes)
+        if (note.isLocalMigrationPending) note,
+    ];
+    var migrated = 0;
+    var failed = 0;
+
+    for (final note in localNotes) {
+      if (!note.isLocalMigrationPending) {
+        nextNotes.add(note);
+        continue;
+      }
+      final migrationId = _migrationIdFor(note);
+      try {
+        final parentRemotePublicId = note.parentNoteId.isEmpty
+            ? null
+            : remoteByLocalId[note.parentNoteId];
+        final payload = await _apiRepository.createNote(
+          _migrationDraftFor(note),
+          viewerProfile: viewerProfile,
+          parentNotePublicId: parentRemotePublicId,
+          clientMigrationId: migrationId,
+        );
+        remoteByLocalId[note.id] = payload.note.id;
+        nextNotes.add(
+          note.copyWith(
+            clientMigrationId: migrationId,
+            remotePublicId: payload.note.id,
+            migratedAt: DateTime.now(),
+            clearMigrationIgnoredAt: true,
+            migrationError: '',
+          ),
+        );
+        _replaceRemoteNote(payload.note);
+        migrated += 1;
+      } catch (error) {
+        nextNotes.add(
+          note.copyWith(
+            clientMigrationId: migrationId,
+            migrationError: _focusBoardApiErrorMessage(error),
+          ),
+        );
+        failed += 1;
+      }
+    }
+
+    await _persistLocalNotesForMigration(nextNotes);
+    _localMigrationPendingCount = nextNotes
+        .where((note) => note.isLocalMigrationPending)
+        .length;
+    _localMigrationPending =
+        _useBackendNotes && _localMigrationPendingCount > 0;
+    notifyListeners();
+    return _FocusBoardLocalMigrationSummary(
+      total: pending.length,
+      migrated: migrated,
+      failed: failed,
+      ignored: 0,
+    );
+  }
+
+  Future<_FocusBoardLocalMigrationSummary> ignoreLocalMigration() async {
+    final preferences = await SharedPreferences.getInstance();
+    final localNotes = _readNotes(preferences.getString(_notesStorageKey));
+    final now = DateTime.now();
+    var ignored = 0;
+    final nextNotes = [
+      for (final note in localNotes)
+        if (note.isLocalMigrationPending)
+          note.copyWith(migrationIgnoredAt: now, migrationError: '')
+        else
+          note,
+    ];
+    ignored = localNotes.where((note) => note.isLocalMigrationPending).length;
+    await _persistLocalNotesForMigration(nextNotes);
+    _localMigrationPendingCount = 0;
+    _localMigrationPending = false;
+    notifyListeners();
+    return _FocusBoardLocalMigrationSummary(
+      total: ignored,
+      migrated: 0,
+      failed: 0,
+      ignored: ignored,
+    );
   }
 
   List<_FocusBoardNote> visibleNotes(_ViewerAccessProfile viewerProfile) {
@@ -2164,31 +2329,58 @@ class _FocusBoardNotesController extends ChangeNotifier {
     return events.map((event) => event.toAuditEntry()).toList(growable: false);
   }
 
-  bool _hasPendingLocalNotes(String? raw) {
+  List<_FocusBoardNote> _pendingLocalNotes(String? raw) {
     if (raw == null || raw.trim().isEmpty) {
-      return false;
+      return const [];
     }
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) {
-        return false;
+        return const [];
       }
-      return decoded.any((item) {
-        if (item is! Map) {
-          return false;
-        }
-        final map = Map<String, dynamic>.from(item);
-        final id = _focusBoardText(map['id']);
-        if (id.isEmpty) {
-          return false;
-        }
-        return _focusBoardText(map['remotePublicId']).isEmpty &&
-            _focusBoardText(map['migratedAt']).isEmpty &&
-            _focusBoardText(map['migrationIgnoredAt']).isEmpty;
-      });
+      return [
+        for (final item in decoded)
+          if (item is Map)
+            _FocusBoardNote.fromJson(Map<String, dynamic>.from(item)),
+      ].where((note) => note.isLocalMigrationPending).toList(growable: false);
     } catch (_) {
-      return false;
+      return const [];
     }
+  }
+
+  String _migrationIdFor(_FocusBoardNote note) {
+    if (note.clientMigrationId.trim().isNotEmpty) {
+      return note.clientMigrationId.trim();
+    }
+    final raw = 'local-${note.id}'.replaceAll(RegExp(r'[^A-Za-z0-9_.:-]'), '-');
+    if (raw.length <= 80) {
+      return raw;
+    }
+    return raw.substring(0, 80);
+  }
+
+  _FocusBoardNoteDraft _migrationDraftFor(_FocusBoardNote note) {
+    return _FocusBoardNoteDraft(
+      title: note.title.trim().isEmpty ? 'Nota migrada' : note.title.trim(),
+      description: note.description,
+      priority: note.priority,
+      dueAt: note.dueAt,
+      companyLabel: note.companyLabel,
+      assignments: const [],
+      visibility: _FocusBoardNoteVisibility.private,
+      replicasEnabled: false,
+      replicaMode: _FocusBoardReplicaMode.ownerOnly,
+    );
+  }
+
+  Future<void> _persistLocalNotesForMigration(
+    List<_FocusBoardNote> notes,
+  ) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      _notesStorageKey,
+      jsonEncode(notes.map((note) => note.toJson()).toList()),
+    );
   }
 
   List<_FocusBoardNote> _readNotes(String? raw) {

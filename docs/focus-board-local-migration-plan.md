@@ -2,7 +2,7 @@
 
 Data de referencia: `2026-07-12`.
 
-Status: planejamento. Complementa o plano backend de migracao.
+Status: implementado em `2026-07-13`. Complementa o plano backend de migracao.
 
 ## Deteccao
 
@@ -44,6 +44,17 @@ Manter lista local com status:
 - pendente.
 
 Usuario pode tentar novamente apenas falhas.
+
+## Estado implementado
+
+- O hub mostra a quantidade de notas locais pendentes quando a API do Focus
+  Board esta ativa.
+- A migracao e manual, com confirmacao antes de enviar.
+- O dialogo nao lista titulo ou conteudo das notas.
+- Cada nota recebe `clientMigrationId` estavel, e sucesso grava
+  `remotePublicId`/`migratedAt` no armazenamento local.
+- Falha parcial preserva a nota local como pendente para nova tentativa.
+- "Agora nao" marca as notas como ignoradas localmente sem excluir dados.
 
 ## Remocao futura do local
 

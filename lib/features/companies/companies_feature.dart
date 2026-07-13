@@ -4,11 +4,13 @@ class _CompaniesWorkspace extends StatefulWidget {
   const _CompaniesWorkspace({
     required this.viewerProfile,
     required this.selectedIndex,
+    required this.preferredPublicId,
     required this.onSelectItem,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final int selectedIndex;
+  final String preferredPublicId;
   final ValueChanged<int> onSelectItem;
 
   @override
@@ -32,6 +34,16 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompaniesWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.preferredPublicId != widget.preferredPublicId &&
+        widget.preferredPublicId.trim().isNotEmpty) {
+      _searchController.clear();
+      unawaited(_loadCompanies());
+    }
   }
 
   Future<void> _loadCompanies() async {
@@ -169,10 +181,22 @@ class _CompaniesWorkspaceState extends State<_CompaniesWorkspace> {
   @override
   Widget build(BuildContext context) {
     final data = _runtimeData.data;
+    final selectedIndex = _entityIndexForPreferredPublicId(
+      items: data.items,
+      preferredPublicId: widget.preferredPublicId,
+      fallbackIndex: widget.selectedIndex,
+    );
+    if (selectedIndex != widget.selectedIndex && data.items.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onSelectItem(selectedIndex);
+        }
+      });
+    }
     return _CompaniesRedesignedWorkspace(
       data: data,
       viewerProfile: widget.viewerProfile,
-      selectedIndex: widget.selectedIndex,
+      selectedIndex: selectedIndex,
       onSelectItem: widget.onSelectItem,
       sourceLabel: _runtimeData.sourceLabel,
       isLive: _runtimeData.isLive,

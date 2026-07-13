@@ -2,7 +2,7 @@
 
 Data de referencia: `2026-07-12`.
 
-Status: planejamento. Depende de `GET /api/v1/search`.
+Status: implementado em `2026-07-13`. Depende de `GET /api/v1/search`.
 
 ## Objetivo
 
@@ -41,3 +41,12 @@ resultado, ACL e navegacao direta.
 - resultado abre workspace correto;
 - teclado funciona sem mouse;
 - falha de API mostra erro sem mock.
+
+## Estado implementado
+
+- Header CRM consulta `/api/v1/search` apos 2 caracteres com debounce.
+- Resultados aparecem em popover agrupado por tipo.
+- Setas, Enter e Esc controlam a lista sem mouse.
+- Resultado abre o workspace canonico e seleciona o `publicId` retornado pela
+  API quando a tela carrega seus dados.
+- Falha de API mostra erro e acao de tentar novamente, sem fallback local/mock.

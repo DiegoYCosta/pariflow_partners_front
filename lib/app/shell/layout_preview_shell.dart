@@ -58,6 +58,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     _Destination.contracts: 0,
     _Destination.people: 0,
   };
+  final Map<_Destination, String> _preferredItemPublicId = {};
 
   @override
   void initState() {
@@ -266,6 +267,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
                         _CrmTopBar(
                           viewerProfile: _viewerProfile,
                           showMenuButton: !showSidebar,
+                          onOpenSearchResult: _handleGlobalSearchTarget,
                           onViewerChanged: (value) {
                             setState(() {
                               _viewerProfile = value;
@@ -775,9 +777,11 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         return _CompaniesWorkspace(
           viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          preferredPublicId: _preferredItemPublicId[_destination] ?? '',
           onSelectItem: (index) {
             setState(() {
               _selectedItemIndex[_destination] = index;
+              _preferredItemPublicId.remove(_destination);
             });
           },
         );
@@ -785,9 +789,11 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         return _ClientCompaniesWorkspace(
           viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          preferredPublicId: _preferredItemPublicId[_destination] ?? '',
           onSelectItem: (index) {
             setState(() {
               _selectedItemIndex[_destination] = index;
+              _preferredItemPublicId.remove(_destination);
             });
           },
         );
@@ -795,9 +801,11 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         return _ContractsWorkspace(
           viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          preferredPublicId: _preferredItemPublicId[_destination] ?? '',
           onSelectItem: (index) {
             setState(() {
               _selectedItemIndex[_destination] = index;
+              _preferredItemPublicId.remove(_destination);
             });
           },
         );
@@ -805,10 +813,12 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
         return _PeopleWorkspace(
           viewerProfile: _viewerProfile,
           selectedIndex: _selectedItemIndex[_destination] ?? 0,
+          preferredPublicId: _preferredItemPublicId[_destination] ?? '',
           onFocusPersonChanged: _focusBoardController.selectPerson,
           onSelectItem: (index) {
             setState(() {
               _selectedItemIndex[_destination] = index;
+              _preferredItemPublicId.remove(_destination);
             });
           },
         );
@@ -821,6 +831,7 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     final keepFocusBoardDetached = isFocusBoardStandaloneWindowOpen();
     setState(() {
       _destination = destination;
+      _preferredItemPublicId.remove(destination);
       _focusBoardDetached = keepFocusBoardDetached;
       _focusBoardSlotVisible = !keepFocusBoardDetached;
       if (!keepFocusBoardDetached) {
@@ -831,6 +842,51 @@ class _ShellPreviewPageState extends State<_ShellPreviewPage> {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
+  }
+
+  void _handleGlobalSearchTarget(_GlobalSearchRouteTarget target) {
+    final destination = _destinationForGlobalSearchWorkspace(target.workspace);
+    final publicId = target.publicId.trim();
+    if (destination == null || publicId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Resultado sem destino operacional suportado.'),
+        ),
+      );
+      return;
+    }
+
+    final keepFocusBoardDetached = isFocusBoardStandaloneWindowOpen();
+    setState(() {
+      _destination = destination;
+      _preferredItemPublicId[destination] = publicId;
+      _focusBoardDetached = keepFocusBoardDetached;
+      _focusBoardSlotVisible = !keepFocusBoardDetached;
+      if (!keepFocusBoardDetached) {
+        _focusBoardFloatingWindowVisible = false;
+        _focusBoardWindowMonitor?.cancel();
+      }
+    });
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Abrindo ${_pageInfo[destination]!.shortLabel} - $publicId.',
+          ),
+        ),
+      );
+  }
+
+  _Destination? _destinationForGlobalSearchWorkspace(String workspace) {
+    return switch (workspace) {
+      'people' => _Destination.people,
+      'provider_companies' => _Destination.companies,
+      'client_companies' => _Destination.clientCompanies,
+      'contracts' || 'positions' => _Destination.contracts,
+      _ => null,
+    };
   }
 
   void _handleChoice(_ChoiceTarget target) {

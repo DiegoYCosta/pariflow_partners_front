@@ -14,11 +14,13 @@ class _CrmTopBar extends StatelessWidget {
     required this.viewerProfile,
     required this.showMenuButton,
     required this.onViewerChanged,
+    required this.onOpenSearchResult,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final bool showMenuButton;
   final ValueChanged<_ViewerAccessProfile> onViewerChanged;
+  final ValueChanged<_GlobalSearchRouteTarget> onOpenSearchResult;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +64,8 @@ class _CrmTopBar extends StatelessWidget {
                 _CrmHeaderIconButton(
                   icon: Icons.search_rounded,
                   tooltip: 'Buscar',
+                  onPressed: () =>
+                      _openGlobalSearchDialog(context, onOpenSearchResult),
                 ),
                 const SizedBox(width: 4),
                 _CrmHeaderIconButton(
@@ -77,7 +81,7 @@ class _CrmTopBar extends StatelessWidget {
               ] else ...[
                 SizedBox(
                   width: searchWidth,
-                  child: const _CrmHeaderSearchBox(),
+                  child: _CrmHeaderSearchBox(onOpenResult: onOpenSearchResult),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -109,35 +113,641 @@ class _CrmTopBar extends StatelessWidget {
   }
 }
 
-class _CrmHeaderSearchBox extends StatelessWidget {
-  const _CrmHeaderSearchBox();
+Future<void> _openGlobalSearchDialog(
+  BuildContext context,
+  ValueChanged<_GlobalSearchRouteTarget> onOpenResult,
+) {
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => Dialog(
+      insetPadding: const EdgeInsets.all(18),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: _CrmHeaderSearchBox(
+            autofocus: true,
+            onOpenResult: (target) {
+              Navigator.of(dialogContext).pop();
+              onOpenResult(target);
+            },
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _CrmHeaderSearchBox extends StatefulWidget {
+  const _CrmHeaderSearchBox({
+    required this.onOpenResult,
+    this.autofocus = false,
+  });
+
+  final ValueChanged<_GlobalSearchRouteTarget> onOpenResult;
+  final bool autofocus;
+
+  @override
+  State<_CrmHeaderSearchBox> createState() => _CrmHeaderSearchBoxState();
+}
+
+class _CrmHeaderSearchBoxState extends State<_CrmHeaderSearchBox> {
+  final _repository = _GlobalSearchApiRepository();
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode(debugLabel: 'global-search');
+  final _layerLink = LayerLink();
+  Timer? _debounce;
+  OverlayEntry? _overlayEntry;
+  _GlobalSearchResponse? _response;
+  String _submittedQuery = '';
+  String? _errorMessage;
+  bool _loading = false;
+  int _activeIndex = -1;
+  int _requestSerial = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_handleTextChanged);
+    _focusNode.addListener(_handleFocusChanged);
+    if (widget.autofocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _focusNode.requestFocus();
+          _ensureOverlay();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _removeOverlay();
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChanged() {
+    if (_focusNode.hasFocus) {
+      _ensureOverlay();
+      return;
+    }
+    _removeOverlay();
+  }
+
+  void _handleTextChanged() {
+    final query = _controller.text.trim();
+    _ensureOverlay();
+    _debounce?.cancel();
+    if (query.length < 2) {
+      setState(() {
+        _loading = false;
+        _response = null;
+        _errorMessage = null;
+        _activeIndex = -1;
+      });
+      _overlayEntry?.markNeedsBuild();
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 280), () {
+      unawaited(_search(query));
+    });
+  }
+
+  Future<void> _search(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
+      return;
+    }
+
+    final serial = ++_requestSerial;
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+      _submittedQuery = trimmed;
+    });
+    _overlayEntry?.markNeedsBuild();
+
+    try {
+      final response = await _repository.search(trimmed);
+      if (!mounted || serial != _requestSerial) {
+        return;
+      }
+      final flatItems = response.flatItems;
+      setState(() {
+        _response = response;
+        _loading = false;
+        _activeIndex = flatItems.isEmpty ? -1 : 0;
+      });
+      _overlayEntry?.markNeedsBuild();
+    } catch (error) {
+      if (!mounted || serial != _requestSerial) {
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _response = null;
+        _activeIndex = -1;
+        _errorMessage = error is ApiException
+            ? 'Busca indisponivel (${error.code}).'
+            : 'Nao foi possivel concluir a busca.';
+      });
+      _overlayEntry?.markNeedsBuild();
+    }
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _focusNode.unfocus();
+      _removeOverlay();
+      return KeyEventResult.handled;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _moveActiveResult(1);
+      return KeyEventResult.handled;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _moveActiveResult(-1);
+      return KeyEventResult.handled;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.enter) {
+      _openActiveResult();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  void _moveActiveResult(int delta) {
+    final flatItems = _response?.flatItems ?? const <_GlobalSearchFlatItem>[];
+    if (flatItems.isEmpty) {
+      return;
+    }
+    setState(() {
+      _activeIndex = (_activeIndex + delta).clamp(0, flatItems.length - 1);
+    });
+    _overlayEntry?.markNeedsBuild();
+  }
+
+  void _openActiveResult() {
+    final flatItems = _response?.flatItems ?? const <_GlobalSearchFlatItem>[];
+    if (_activeIndex < 0 || _activeIndex >= flatItems.length) {
+      final query = _controller.text.trim();
+      if (query.length >= 2) {
+        unawaited(_search(query));
+      }
+      return;
+    }
+    _openResult(flatItems[_activeIndex].item);
+  }
+
+  void _openResult(_GlobalSearchItem item) {
+    _controller.text = item.title;
+    _controller.selection = TextSelection.collapsed(
+      offset: _controller.text.length,
+    );
+    _focusNode.unfocus();
+    _removeOverlay();
+    widget.onOpenResult(item.routeTarget);
+  }
+
+  void _ensureOverlay() {
+    if (_overlayEntry != null || !mounted) {
+      return;
+    }
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        final renderBox = this.context.findRenderObject() as RenderBox?;
+        final width = renderBox?.size.width ?? 320.0;
+        return CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          offset: const Offset(0, 40),
+          child: Material(
+            color: Colors.transparent,
+            child: SizedBox(width: max(width, 320.0), child: _buildPopover()),
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 34,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(3),
-        border: Border.all(color: const Color(0xFFE5EAE8)),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.search_rounded, color: Color(0xFF98A39E), size: 15),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Search people, companies...',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Color(0xFF98A39E), fontSize: 11),
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: Focus(
+        onKeyEvent: _handleKeyEvent,
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(
+              color: _focusNode.hasFocus ? _tealColor : const Color(0xFFE5EAE8),
             ),
           ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.search_rounded,
+                color: Color(0xFF64736D),
+                size: 15,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  autofocus: widget.autofocus,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _openActiveResult(),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: 'Buscar pessoas, empresas...',
+                    hintStyle: TextStyle(
+                      color: Color(0xFF98A39E),
+                      fontSize: 11,
+                    ),
+                  ),
+                  style: const TextStyle(color: _inkColor, fontSize: 12),
+                ),
+              ),
+              if (_controller.text.isNotEmpty)
+                InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () {
+                    _controller.clear();
+                    _focusNode.requestFocus();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: _mutedColor,
+                      size: 15,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPopover() {
+    final query = _controller.text.trim();
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 420),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8E5)),
+          boxShadow: [
+            BoxShadow(
+              color: _inkColor.withValues(alpha: 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: _buildPopoverBody(query),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPopoverBody(String query) {
+    if (query.length < 2) {
+      return const _GlobalSearchStateNotice(
+        icon: Icons.manage_search_outlined,
+        title: 'Busca global',
+        message: 'Digite ao menos 2 caracteres.',
+      );
+    }
+
+    if (_errorMessage != null) {
+      return _GlobalSearchStateNotice(
+        icon: Icons.cloud_off_outlined,
+        title: 'Busca indisponivel',
+        message: _errorMessage!,
+        actionLabel: 'Tentar novamente',
+        onAction: () => unawaited(_search(query)),
+      );
+    }
+
+    final response = _response;
+    if (_loading && response == null) {
+      return const _GlobalSearchStateNotice(
+        icon: Icons.search_rounded,
+        title: 'Buscando',
+        message: 'Consultando entidades autorizadas.',
+        loading: true,
+      );
+    }
+
+    if (response == null || response.flatItems.isEmpty) {
+      return _GlobalSearchStateNotice(
+        icon: Icons.search_off_rounded,
+        title: 'Nenhum resultado',
+        message: 'Nao ha entidades autorizadas para "$query".',
+      );
+    }
+
+    var flatIndex = 0;
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        if (_loading) const LinearProgressIndicator(minHeight: 2),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+          child: Text(
+            '${response.authorizedTotal} resultado(s) autorizado(s) para "${response.query.isEmpty ? _submittedQuery : response.query}"',
+            style: const TextStyle(color: _mutedColor, fontSize: 11),
+          ),
+        ),
+        for (final group in response.groups)
+          if (group.items.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+              child: Text(
+                group.label,
+                style: const TextStyle(
+                  color: _deepTealColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            for (final item in group.items)
+              Builder(
+                builder: (context) {
+                  final itemIndex = flatIndex++;
+                  return _GlobalSearchResultTile(
+                    item: item,
+                    selected: itemIndex == _activeIndex,
+                    onHover: () {
+                      setState(() {
+                        _activeIndex = itemIndex;
+                      });
+                      _overlayEntry?.markNeedsBuild();
+                    },
+                    onTap: () => _openResult(item),
+                  );
+                },
+              ),
+          ],
+      ],
+    );
+  }
+}
+
+class _GlobalSearchStateNotice extends StatelessWidget {
+  const _GlobalSearchStateNotice({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.loading = false,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final bool loading;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: _tealColor, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: _inkColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(color: _mutedColor, fontSize: 12),
+          ),
+          if (loading) ...[
+            const SizedBox(height: 12),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(actionLabel!),
+            ),
+          ],
         ],
       ),
     );
   }
+}
+
+class _GlobalSearchResultTile extends StatelessWidget {
+  const _GlobalSearchResultTile({
+    required this.item,
+    required this.selected,
+    required this.onHover,
+    required this.onTap,
+  });
+
+  final _GlobalSearchItem item;
+  final bool selected;
+  final VoidCallback onHover;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = selected
+        ? _tealColor.withValues(alpha: 0.08)
+        : Colors.transparent;
+    return InkWell(
+      onTap: onTap,
+      onHover: (hovered) {
+        if (hovered) {
+          onHover();
+        }
+      },
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: background),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _globalSearchWorkspaceColor(
+                    item.routeTarget.workspace,
+                  ).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(
+                  _globalSearchWorkspaceIcon(item.routeTarget.workspace),
+                  color: _globalSearchWorkspaceColor(
+                    item.routeTarget.workspace,
+                  ),
+                  size: 17,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _inkColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (item.subtitle.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        item.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _mutedColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                    if (item.context.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        item.context,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _mutedColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                    if (item.badges.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: [
+                          for (final badge in item.badges.take(3))
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF2F6F4),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8E5),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  badge,
+                                  style: const TextStyle(
+                                    color: _mutedColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.north_east_rounded,
+                color: _mutedColor,
+                size: 15,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+IconData _globalSearchWorkspaceIcon(String workspace) {
+  return switch (workspace) {
+    'people' => Icons.badge_outlined,
+    'provider_companies' => Icons.business_center_outlined,
+    'client_companies' => Icons.apartment_outlined,
+    'contracts' => Icons.description_outlined,
+    _ => Icons.manage_search_outlined,
+  };
+}
+
+Color _globalSearchWorkspaceColor(String workspace) {
+  return switch (workspace) {
+    'people' => _roseColor,
+    'provider_companies' => _tealColor,
+    'client_companies' => _slateColor,
+    'contracts' => _amberColor,
+    _ => _mutedColor,
+  };
 }
 
 enum _CrmReportFamily {

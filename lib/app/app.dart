@@ -31,6 +31,7 @@ part '../core/widgets/master_detail_workspace.dart';
 part '../core/widgets/entity_crud_actions.dart';
 part '../shared/infrastructure/entity_workspace_runtime_metadata.dart';
 part '../shared/infrastructure/entity_workspace_api_data.dart';
+part '../shared/infrastructure/global_search_api_data.dart';
 part '../features/companies/companies_feature.dart';
 part '../features/client_companies/client_companies_feature.dart';
 part '../features/contracts/contracts_feature.dart';

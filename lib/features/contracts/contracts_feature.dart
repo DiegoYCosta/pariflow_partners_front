@@ -4,11 +4,13 @@ class _ContractsWorkspace extends StatefulWidget {
   const _ContractsWorkspace({
     required this.viewerProfile,
     required this.selectedIndex,
+    required this.preferredPublicId,
     required this.onSelectItem,
   });
 
   final _ViewerAccessProfile viewerProfile;
   final int selectedIndex;
+  final String preferredPublicId;
   final ValueChanged<int> onSelectItem;
 
   @override
@@ -38,6 +40,16 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ContractsWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.preferredPublicId != widget.preferredPublicId &&
+        widget.preferredPublicId.trim().isNotEmpty) {
+      _searchController.clear();
+      unawaited(_loadContracts());
+    }
   }
 
   Future<void> _loadContracts() async {
@@ -591,9 +603,18 @@ class _ContractsWorkspaceState extends State<_ContractsWorkspace> {
   @override
   Widget build(BuildContext context) {
     final data = _runtimeData.data;
-    final safeIndex = data.items.isEmpty
-        ? 0
-        : min(max(widget.selectedIndex, 0), data.items.length - 1);
+    final safeIndex = _entityIndexForPreferredPublicId(
+      items: data.items,
+      preferredPublicId: widget.preferredPublicId,
+      fallbackIndex: widget.selectedIndex,
+    );
+    if (safeIndex != widget.selectedIndex && data.items.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onSelectItem(safeIndex);
+        }
+      });
+    }
     final selectedItem = data.items.isEmpty ? null : data.items[safeIndex];
 
     return Column(
